@@ -1,0 +1,284 @@
+
+======================================================================
+CURRENT CARELOOP CODEBASE SUMMARY — 30 September 2026
+======================================================================
+This summary reflects the files inspected for this update and supersedes older architectural descriptions above. Code presence is distinguished from verified AWS deployment. This documentation update did not invoke AWS or rerun tests.
+
+1. What CareLoop currently implements
+CareLoop is a post-discharge companion prototype with document ingestion, structured recovery-state generation, S3 storage, DynamoDB persistence, and SQS notification handling. A Lambda worker implementation now connects those components. The codebase also contains manual diagnostic scripts, local unit tests, and older files that require migration.
+
+Core flow:
+PDF bytes -> pypdf embedded-text extraction ----+
+                                              |
+Image bytes -> Bedrock image transcription ----+-> numbered page text
+                                                  -> structured Bedrock extraction
+                                                  -> normalization
+                                                  -> validation
+                                                  -> RecoveryState
+
+Storage and queued-processing flow implemented in the worker:
+S3 upload -> S3 notification -> SQS -> Lambda handler
+  -> parse object key -> download document
+  -> choose PDF/image processing -> save RecoveryState in DynamoDB
+
+S3 notification rules, queue permissions, Lambda deployment, and the SQS event-source mapping must exist in AWS for the automated flow to run. Local source files and .env settings alone do not establish those AWS connections.
+
+2. Configuration: app/config.py
+Loads the repository .env without overriding existing shell environment variables.
+Exposes:
+- REGION from AWS_REGION.
+- DOCUMENT_BUCKET from CARELOOP_BUCKET.
+- DOCUMENT_QUEUE_URL from SQS_DOCUMENT_QUEUE_URL.
+- RECOVERY_STATE_TABLE and EVENT_HISTORY_TABLE with defaults matching the project tables.
+- IMAGE_MODEL_ID, EXTRACTION_MODEL_ID (from BEDROCK_EXTRACTION_MODEL_ID), AGENT_MODEL_ID.
+- EMBEDDING_MODEL_ID and EMBEDDING_DIMENSIONS.
+
+Current local bucket configuration:
+careloop-documents-992617582533-london
+
+The configured region has been eu-west-2. The old bucket was replaced in .env; upload/download/diagnostic code reads the configuration. This change did not migrate old objects or update remote IAM policies, S3 event notifications, or SQS queue policies.
+
+3. Document processors
+app/ingestion/pdf_processor.py:
+- Actual function name is extract_text(); callers may alias it as extract_pdf_text.
+- Accepts a local file path or PDF bytes, wrapping bytes in BytesIO.
+- Uses pypdf to return [{"page": 1, "text": "..."}, ...].
+- Extracts embedded text only; scanned/image-only PDFs are not automatically OCR-processed.
+
+app/ingestion/image_processor.py:
+- extract_text_from_image() accepts a file path or file_bytes plus filename.
+- Uses the filename extension for JPEG/PNG selection, case-insensitively; unknown extensions default to JPEG.
+- Sends bytes to the configured Bedrock image model for handwriting/visible-text transcription.
+- Requests [?...?] uncertainty markers and [unreadable] for illegible text.
+- Preserves all returned text blocks and markers in a one-page list.
+- Does not itself set an uncertain boolean.
+- A previous real-image run still read handwritten 111 as 171 without a marker; the prompt does not guarantee transcription accuracy.
+
+4. Structured extraction: app/ingestion/bedrock.py
+invoke_extraction_model() uses the configured Bedrock extraction model, a JSON tool schema, and forced tool output. It rejects blank text and raises if the response has no toolUse block. The current settings are maxTokens=1200 and temperature=0.
+
+EXTRACTION_SCHEMA has seven required top-level fields:
+- discharge_date.
+- medications: name, dose, frequency, duration, notes.
+- tasks: description, timing.
+- appointments: with, date, time, location, status, notes.
+- restrictions: strings.
+- monitoring: what, how_often, threshold.
+- warning_signs: strings.
+
+PROMPT_CONSTRAINT prohibits inventing missing information and requires physical places in appointment location. Schema descriptions encourage explicit timing, thresholds, appointment arrangement status, and contextual notes. Tool output is returned as a dictionary without an independent full schema/source validation pass.
+
+5. Shared pipeline: app/ingestion/pipeline.py
+- combine_pages(): joins text with [Page N] labels.
+- process_text(): Bedrock extraction -> normalization -> validation -> returns RecoveryState.
+- process_pdf(): accepts PDF bytes, extracts pages, and calls process_text().
+- process_image(): accepts image bytes/filename, transcribes pages, and calls process_text().
+- process_document(): compatibility wrapper accepting a PDF path.
+
+The shared pipeline does not automatically upload files, save state, or append events. Those are explicit caller/worker operations.
+
+6. Models and normalization
+models/recovery_model.py defines Source, Medication, Task, Appointment, Monitoring, and RecoveryState dataclasses.
+
+RecoveryState contains patient_id, document_id, discharge_date, the recovery lists, ingestion_status, pending_checkin, and last_updated. Items have IDs and needs_confirmation flags; medications/tasks also have pending status defaults. Appointments use with_ in Python and have date/time/location/status/notes. Source provenance fields exist but are not populated by the current normalizer.
+
+app/ingestion/normalizer.py:
+- Converts extraction dictionaries into dataclasses.
+- Trims strings and turns blank strings into None.
+- Generates deterministic item IDs from identifying text using a SHA-256 prefix.
+- Maps JSON with to Appointment.with_.
+- Defaults missing appointment status to unknown.
+- Sets ingestion_status="processing", pending_checkin=None, and a UTC last_updated timestamp.
+- Skips medications without names, tasks without descriptions, and monitoring entries without what.
+- Preserves timing as strings; it does not calculate scheduled occurrences.
+
+Known mismatch: the model annotates warning_signs as dictionaries, while the extraction schema emits strings and normalization passes them through unchanged. Deterministic IDs are not checked for collisions or duplicate items.
+
+7. Validation and uncertainty
+app/ingestion/validator.py:
+- contains_uncertainty() recognizes [? and case-insensitive [unreadable].
+- Missing medication name/dose/frequency triggers needs_confirmation.
+- Checks markers across medication text, task description/timing, appointment fields, and monitoring fields.
+- Normalizes invalid appointment status to unknown and flags it.
+- Preserves existing flags and text.
+- Sets ingestion_status="ready" after the checks and returns the state.
+
+Ready means the validation stage completed, not that every value is certain. Flagged items may remain in a ready state. The validator does not compare output to the source, verify clinical correctness, validate source provenance, or check markers in restrictions/warning_signs/discharge_date. Unmarked transcription mistakes can therefore pass.
+
+8. Recovery-state database: app/database/recovery_state.py
+- save_recovery_state(): serializes a dataclass via asdict and puts it into the configured table.
+- get_recovery_state(): reads by patient_id and returns a dictionary or None.
+- get_medications(): returns the current medications list or [].
+- get_today_tasks(): returns the current tasks list or [].
+- The optional date parameters on those readers do not filter by date; schedules are still text.
+
+Action functions are incomplete:
+- mark_medication_taken(): loads state, finds the medication, and raises for missing state/item. It currently stops there.
+- mark_task_completed(): loads state, finds the task, defaults occurrence_key to the local current date when absent, and builds an idempotency key. It stops there.
+- Neither action currently changes status, writes an event, saves an updated state, or returns its declared dictionary result; successful calls currently return None.
+
+State writes are unconditional. Because the recovery-state table has only patient_id as its key, saving another document for the same patient replaces the existing item rather than merging progress across documents.
+
+9. Event history and idempotency: app/database/event_history.py
+build_idempotency_key(patient_id, item_id, occurrence_key) returns:
+patient_id#item_id#occurrence_key
+
+The helper does not choose a date. Same inputs give the same key; callers can use a date or a more specific occurrence string.
+
+append_event():
+- Rejects blank idempotency keys.
+- Hashes the key into a deterministic event#... identifier stored in the existing timestamp sort-key field.
+- Stores the actual UTC event write time separately as recorded_at.
+- Uses a conditional put to avoid replacing an item with the same patient/key.
+- New write returns {"created": True, "duplicate": False, "event": item}.
+- Duplicate returns {"created": False, "duplicate": True, "event": None}.
+- Other AWS errors propagate.
+
+get_events(patient_id) queries the patient's partition and returns Items or []. It reads only one query page; pagination is not implemented. Hash-based timestamp keys do not sort events chronologically. Existing historical entries with actual timestamps are not migrated or retroactively deduplicated.
+
+10. DynamoDB tables
+Previously verified through actual DescribeTable calls in eu-west-2:
+- PostDischargeRecoveryState: patient_id String partition key; no sort key.
+- PostDischargeEventHistory: patient_id String partition key and timestamp String sort key.
+Both were ACTIVE at that check. This summary does not claim a new remote verification.
+
+mcp_server/services/dynamodb_service.py retains configured references to both tables alongside the newer app/database modules.
+
+11. S3 service: mcp_server/services/s3_service.py
+- upload_document(): uploads a PDF/JPG/JPEG/PNG with content type and AES256 server-side encryption.
+- Key format: patients/{patient_id}/documents/{document_id}{extension}.
+- Returns bucket, key, patient_id, document_id, and source_type based on the extension.
+- download_document(key): reads bytes from config.DOCUMENT_BUCKET.
+- build_document_key(): constructs a key with a normalized extension.
+- parse_document_key(): extracts patient_id, document_id, and extension from the expected four-part path.
+
+S3 stores the actual document. It does not perform model extraction. The current bucket is careloop-documents-992617582533-london.
+
+12. SQS service: app/aws/sqs_service.py
+SQS holds notifications referencing uploaded documents, not the document bytes.
+- receive_messages(): validates a requested count of 1–10 and long-polls the configured queue for up to 20 seconds.
+- parse_s3_events_from_message(): parses an SQS Body containing direct S3 Records, extracts event_name/bucket/key, and URL-decodes keys.
+- delete_message(): deletes a message using its receipt handle after successful processing.
+
+Reading a message does not permanently remove it; it is temporarily hidden according to the queue visibility timeout. The local parser expects the direct S3-event format, not an arbitrary SNS envelope. Queue URL configuration, IAM receive permission, and S3-to-SQS notification permissions are distinct requirements.
+
+13. Lambda worker: app/aws/document_worker.py
+A worker implementation now exists; earlier summaries saying it was only a future design are outdated.
+
+lambda_handler(event, context):
+- Iterates Lambda SQS records and parses each record's JSON body into S3 records.
+- URL-decodes each object key and extracts patient/document/extension information.
+- Downloads bytes, chooses process_pdf() or process_image(), and saves the resulting state.
+- Catches processing errors per SQS message and returns batchItemFailures with failed message IDs.
+- Its comments note that ReportBatchItemFailures must be enabled on the SQS event-source mapping for partial failure handling.
+
+Current limitations visible in this implementation:
+- The event bucket is logged, but download_document() always uses config.DOCUMENT_BUCKET; there is no explicit check that the event bucket matches it.
+- There is no document-ingestion deduplication or object-version handling.
+- A retry can repeat model calls and state writes; patient-action event idempotency is separate from ingestion.
+- If a message holds multiple S3 records and a later one fails, a retry can reprocess earlier records.
+- Unsupported extensions raise an error.
+- Source inspection does not establish that the Lambda has been deployed, permissioned, or connected to the queue.
+
+14. Diagnostic scripts
+scripts/check_s3_to_sqs.py:
+- Sets up the repository import path for direct execution.
+- Uploads test_data/doc_001.pdf with a fresh document ID.
+- Polls SQS and searches for the matching uploaded key.
+- Does not call Bedrock, save RecoveryState, or delete messages.
+- Polling has a nominal 30-second deadline, but an individual long poll can extend total duration.
+
+scripts/diagnose_s3_sqs.py:
+- Sets up repository imports.
+- Prints region/bucket/queue settings.
+- Reads bucket notification configuration and queue policy.
+- Sends a direct test SQS message and receives messages.
+- Receiving any message is not proof that the particular direct test message was received; the script prints received bodies for inspection.
+- Running this diagnostic has AWS side effects, including sending a queue message.
+
+15. Tests and runnable entry points
+Useful commands from the repository root with .venv active:
+
+SQS parser tests, excluding live integration:
+pytest tests/test_sqs.py -v -m "not integration"
+Previously verified result: 4 passed, 1 deselected.
+
+Phase 4 normalization/validation tests:
+pytest tests/test_phase4.py -v
+Four tests cover normalization, ready status, missing dose, and uncertainty markers. The root test_phase4.py script is a compatibility runner.
+
+Event tests:
+pytest tests/test_event_history.py -v
+Previously verified 13 cases cover conditional-write results, error handling, stable key format, and changes in patient/item/occurrence. AWS resources are mocked.
+
+Live S3/SQS diagnostics:
+python scripts/check_s3_to_sqs.py
+python scripts/diagnose_s3_sqs.py
+
+Other files:
+- test_phase3.py/test_phase3_image.py: structured extraction JSON demos.
+- test_phase4_real.py: PDF -> shared pipeline -> printed RecoveryState, without saving.
+- test_phase4_pdf.py: verbose PDF processing and explicit DynamoDB save.
+- test_phase5_read.py: reads/prints a stored recovery state.
+- test_phase5_event.py: writes a test event.
+- test_phase5_actions.py: selects saved medication/task IDs, calls the currently incomplete action functions, then prints state/events.
+- test_s3_to_pdf_processor.py: downloads an S3 PDF and prints extracted page text.
+- test_s3_to_recovery_state.py: downloads an S3 PDF, runs process_pdf(), and saves the state.
+- test_s3_to_image_processor.py: uploads/downloads test_image1.jpeg, calls process_image(), and checks ready status; does not save to DynamoDB.
+- test_s3_key_parser.py, test_s3_config.py, upload/download scripts: small storage diagnostics.
+- check_setup.py, list_models.py, verify_models.py, test_bedrock.py: AWS/model smoke checks.
+
+pytest.ini currently supplies pythonpath=. and registers the integration marker. Many root test scripts perform work at import time, and not all are marked integration. Avoid assuming a blanket pytest invocation is offline or that all old tests are compatible.
+
+16. Known fixture and legacy mismatches
+The sample PDF currently on disk is test_data/doc_001.pdf. Several older scripts still reference test_data/discharge.pdf, including test_extraction.py, test_phase3.py, test_phase4_real.py, test_phase4_pdf.py, run_ingestion.py, and some upload scripts. Those local paths need updating before those scripts can run against the current fixture. S3 object keys are independent of local filenames.
+
+app/ingestion/extractor.py and tests/test_validator.py still import the removed RecoveryPlan class. Older extraction/image pipeline scripts depend on that old model and older validator interfaces. They should not be treated as working alternatives to the current RecoveryState flow.
+
+app/ingestion/persistence.py retains an older save_recovery_plan() utility. app/ingestion/classifier.py remains a placeholder.
+
+17. MCP and broader product status
+mcp_server/server.py and mcp_server/tools/get_recovery_plan.py contain plain recovery-plan reader functions. They are not a complete registered MCP tool server in those files.
+alexa_test.py starts a FastMCP hello-tool demo over HTTP; it is not a complete Alexa integration.
+No full patient-facing UI, conversational check-in workflow, parsed medication occurrence scheduler, or implemented RAG/vector retrieval was found in this inventory. pending_checkin and agent/embedding configuration exist as foundations for later work.
+
+18. Dependencies and verification boundaries
+requirements.txt lists pypdf, python-dotenv, and fastmcp. boto3 and pytest are used/installed in the environment but are not explicitly listed in that file.
+Tests include real AWS scripts and mocked local tests; a successful structure check is not a factual-accuracy guarantee. Earlier source comparisons found supported PDF values but also inconsistent field placement. Earlier image testing exposed confident, unmarked digit mistakes.
+
+For the new London bucket, local configuration and mocked upload/download routing were verified. This is not confirmation that remote S3 notifications, SQS policies, IAM permissions, or Lambda triggers have been updated successfully.
+
+This summary was appended without changing application code or existing output.txt content.
+
+
+Bedrock access error when running test_phase3.py
+
+PDF extraction succeeded: 2 pages were extracted. The startxref warnings
+were not the cause of this failure.
+
+The configured extraction model is Claude Haiku 4.5:
+eu.anthropic.claude-haiku-4-5-20251001-v1:0
+Region: eu-west-2
+
+Bedrock returned AccessDeniedException because the current identity could
+not enable the model's AWS Marketplace subscription.
+
+Resolution:
+1. Sign in to AWS with an administrator or role permitted to enable model
+   subscriptions.
+2. Open Amazon Bedrock -> Model catalog -> Claude Haiku 4.5 in London.
+3. Open the playground and send a simple test message. Complete the
+   Anthropic use-case form if prompted.
+4. The identity enabling access needs Marketplace permissions, including
+   aws-marketplace:ViewSubscriptions and aws-marketplace:Subscribe.
+   An authorized administrator can enable the model once for the account.
+5. After access is enabled, wait five minutes and rerun from the project
+   root with the virtual environment active:
+
+   python test_phase3.py
+
+No Python code change is needed for this access error. Access has not yet
+been confirmed as fixed.
+
+AWS documentation:
+https://docs.aws.amazon.com/bedrock/latest/userguide/model-access.html
