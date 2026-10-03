@@ -1,5 +1,5 @@
 """
-Helpers for interacting with the CareLoop document-processing SQS queue.
+Helpers for interacting with the Afterward document-processing SQS queue.
 
 S3 sends an event to this queue whenever a new discharge document
 is uploaded.
@@ -26,7 +26,7 @@ from app import config
 
 # Create one reusable boto3 SQS client.
 #
-# It uses the same AWS region as the rest of CareLoop.
+# It uses the same AWS region as the rest of Afterward.
 sqs = boto3.client(
     "sqs",
     region_name=config.REGION,
@@ -41,7 +41,7 @@ def receive_messages(
     max_messages: int = 1,
 ) -> list[dict]:
     """
-    Read messages from the CareLoop document-processing queue.
+    Read messages from the Afterward document-processing queue.
 
     Parameters
     ----------

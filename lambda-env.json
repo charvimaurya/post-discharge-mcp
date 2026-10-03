@@ -1,9 +1,0 @@
-{
-  "Variables": {
-    "MODEL_MODE": "test",
-    "TEST_MODEL_ID": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
-    "DOCUMENT_BUCKET": "careloop-documents-992617582533-london",
-    "RECOVERY_STATE_TABLE": "PostDischargeRecoveryState",
-    "EVENT_HISTORY_TABLE": "PostDischargeEventHistory"
-  }
-}

@@ -1,5 +1,5 @@
 """
-AWS Lambda entry point for CareLoop document ingestion.
+AWS Lambda entry point for Afterward document ingestion.
 
 This handler intentionally contains very little business
 logic.

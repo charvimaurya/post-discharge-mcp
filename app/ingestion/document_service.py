@@ -1,5 +1,5 @@
 """
-CareLoop asynchronous document-processing service.
+Afterward asynchronous document-processing service.
 
 This module contains the reusable application logic used
 by the AWS Lambda worker.
@@ -14,9 +14,11 @@ parse object key
     ↓
 download file
     ↓
-process_document()
+process_document_with_pages()
     ↓
 save RecoveryState
+    ↓
+index original pages for RAG
 """
 
 import json
@@ -32,30 +34,16 @@ from app.database.recovery_state import (
 )
 
 from app.ingestion.pipeline import (
-    process_document,
+    process_document_with_pages,
+)
+from app.rag.service import (
+    index_document_pages,
 )
 
-from mcp_server.services.s3_service import (
+from app.aws.s3_service import (
     download_document,
     parse_document_key,
 )
-
-from urllib.parse import unquote_plus
-import json
-
-from app.ingestion.pipeline import (
-    process_document,
-)
-
-from app.database.recovery_state import (
-    save_recovery_state,
-)
-
-from mcp_server.services.s3_service import (
-    download_document,
-    parse_document_key,
-)
-
 
 def _extract_s3_records(
     sqs_record: dict,
@@ -94,6 +82,11 @@ def _extract_s3_records(
             "SQS body is not valid JSON"
         ) from exc
 
+
+    # AWS sends this when validating an S3 notification, not for an upload.
+    if body.get("Event") == "s3:TestEvent":
+        print("Ignoring S3 test event")
+        return []
 
     records = body.get(
         "Records",
@@ -166,10 +159,6 @@ def _process_s3_record(
             "extension"
         ]
     )
-
-    # TEMPORARY: used only to test SQS retry + DLQ behaviour.
-    if document_id == "force_failure":
-        raise RuntimeError("Intentional CareLoop DLQ test")
 
     filename = (
         f"{document_id}"
@@ -247,7 +236,7 @@ def _process_s3_record(
     # 5. PROCESS DOCUMENT
     # -----------------------------------------------------
 
-    # This is why you created process_document().
+    # Preserve the original pages for RAG alongside the structured state.
     #
     # Lambda does NOT need to know:
     #
@@ -255,8 +244,8 @@ def _process_s3_record(
     # JPG?
     # PNG?
     #
-    # process_document() decides.
-    state = process_document(
+    # process_document_with_pages() decides.
+    state, pages = process_document_with_pages(
         file_bytes=file_bytes,
 
         filename=filename,
@@ -268,11 +257,11 @@ def _process_s3_record(
 
 
     # -----------------------------------------------------
-    # 6. MARK PROCESSING SUCCESS
+    # 6. KEEP THE DOCUMENT RETRYABLE UNTIL RAG INDEXING SUCCEEDS
     # -----------------------------------------------------
 
     state.ingestion_status = (
-        "ready"
+        "indexing"
     )
 
 
@@ -284,9 +273,24 @@ def _process_s3_record(
         state
     )
 
+    # -----------------------------------------------------
+    # 8. INDEX ORIGINAL DOCUMENT FOR RAG
+    # -----------------------------------------------------
+
+    vector_count = index_document_pages(
+        patient_id=patient_id,
+        document_id=document_id,
+        pages=pages,
+    )
+    print(f"Indexed {vector_count} RAG chunks document={document_id}")
+
+    # Only skip future deliveries once both persistence and indexing succeeded.
+    # If indexing or this final save fails, SQS retries the full document flow.
+    state.ingestion_status = "ready"
+    save_recovery_state(state)
 
     # -----------------------------------------------------
-    # 8. LOG PROCESSING TIME
+    # 9. LOG PROCESSING TIME
     # -----------------------------------------------------
 
     duration_ms = (

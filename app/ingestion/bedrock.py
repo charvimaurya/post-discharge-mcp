@@ -112,8 +112,11 @@ def invoke_extraction_model(document_text: str) -> dict:
         ]}],
         toolConfig={"tools": [tool],
                     "toolChoice": {"tool": {"name": "record_recovery_extraction"}}},
-        inferenceConfig={"maxTokens": 1200, "temperature": 0},
+        inferenceConfig={"maxTokens": 3000, "temperature": 0},
     )
+    # Temporary diagnostics to investigate truncated model responses.
+    print("BEDROCK_STOP_REASON:", resp.get("stopReason"))
+    print("BEDROCK_USAGE:", resp.get("usage"))
     for block in resp["output"]["message"]["content"]:
         if "toolUse" in block:
             return block["toolUse"]["input"]

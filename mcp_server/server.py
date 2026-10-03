@@ -1,27 +1,5 @@
-from mcp_server.services.dynamodb_service import recovery_table
+"""Expose MCP tools while keeping their implementations in the tools package."""
 
+from mcp_server.tools.get_recovery_plan import get_recovery_plan
 
-def get_recovery_plan(patient_id: str) -> dict:
-    """
-    Get the patient's current post-discharge recovery plan.
-    """
-
-    response = recovery_table.get_item(
-        Key={
-            "patient_id": patient_id
-        }
-    )
-
-    item = response.get("Item")
-
-    if not item:
-        return {
-            "success": False,
-            "error": f"No recovery plan found for patient {patient_id}"
-        }
-
-    return {
-        "success": True,
-        "patient_id": patient_id,
-        "recovery_plan": item
-    }
+__all__ = ["get_recovery_plan"]
