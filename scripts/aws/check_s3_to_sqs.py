@@ -1,3 +1,5 @@
+"""Upload a fresh sample PDF and poll SQS for its matching S3 notification using live AWS."""
+
 import time
 import uuid
 import sys

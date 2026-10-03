@@ -1,3 +1,5 @@
+"""Split the local sample PDF into page-preserving text chunks and print previews without AWS calls."""
+
 from pathlib import Path
 import sys
 

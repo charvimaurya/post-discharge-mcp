@@ -1,3 +1,5 @@
+"""Download a fixed test-document key from S3 and print its byte count; the object must exist."""
+
 from pathlib import Path
 import sys
 

@@ -1,3 +1,5 @@
+"""Index a second patient fixture and check that patient-one search excludes that document using live AWS."""
+
 from pathlib import Path
 import sys
 

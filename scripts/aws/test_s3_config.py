@@ -1,3 +1,5 @@
+"""Print S3 configuration values to check which bucket and region the script will use."""
+
 from pathlib import Path
 import sys
 

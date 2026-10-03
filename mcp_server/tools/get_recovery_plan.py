@@ -1,3 +1,5 @@
+"""Return a patient recovery plan from DynamoDB or an explicit not-found result."""
+
 from mcp_server.services.dynamodb_service import recovery_table
 
 

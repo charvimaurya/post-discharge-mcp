@@ -1,3 +1,5 @@
+"""Embed and store two hardcoded synthetic pages in the live S3 vector index."""
+
 from pathlib import Path
 import sys
 

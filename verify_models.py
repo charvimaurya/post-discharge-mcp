@@ -1,3 +1,5 @@
+"""Invoke configured extraction, agent, and embedding models to check live Bedrock access."""
+
 import json, boto3
 from app import config
 

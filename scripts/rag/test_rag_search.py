@@ -1,3 +1,5 @@
+"""Search live patient-one document vectors for driving instructions and print supporting passages."""
+
 from pathlib import Path
 import sys
 

@@ -1,3 +1,5 @@
+"""Transcribe the sample image, print uncertainty information, and request structured extraction from Bedrock."""
+
 from pathlib import Path
 import sys
 

@@ -1,3 +1,5 @@
+"""Route PDFs and images through extraction, normalization, and validation without saving results."""
+
 from pathlib import Path
 
 from app.ingestion.bedrock import (

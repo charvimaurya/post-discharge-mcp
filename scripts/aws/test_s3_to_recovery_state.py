@@ -1,3 +1,5 @@
+"""Download an existing S3 PDF, process it with Bedrock, and save the recovery state to DynamoDB."""
+
 from pathlib import Path
 import sys
 

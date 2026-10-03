@@ -1,3 +1,5 @@
+"""Process the sample PDF with Bedrock while printing the returned patient ID and original page previews."""
+
 from pathlib import Path
 import sys
 

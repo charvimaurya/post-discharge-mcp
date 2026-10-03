@@ -1,3 +1,5 @@
+"""Send a short prompt to the hardcoded Nova model and print its live Bedrock response."""
+
 from pathlib import Path
 import sys
 

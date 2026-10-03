@@ -1,1 +1,1 @@
-"""Application configuration and shared components."""
+"""Application configuration, document processing, storage, and retrieval components."""

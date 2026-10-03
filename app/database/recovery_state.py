@@ -1,3 +1,5 @@
+"""Read and save recovery plans in DynamoDB and record medication or task completion."""
+
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone, date
 

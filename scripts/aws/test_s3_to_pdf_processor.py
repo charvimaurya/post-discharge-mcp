@@ -1,3 +1,5 @@
+"""Download an existing test PDF from S3 and print its extracted page text."""
+
 from pathlib import Path
 import sys
 

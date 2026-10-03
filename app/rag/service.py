@@ -1,5 +1,4 @@
-"""
-CareLoop RAG application service.
+"""Coordinate document indexing and patient-filtered retrieval of original discharge evidence.
 
 This module coordinates:
 - chunking

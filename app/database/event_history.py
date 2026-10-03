@@ -1,3 +1,5 @@
+"""Store patient action history in DynamoDB, reject duplicate event keys, and read saved events."""
+
 from datetime import datetime, timezone
 import hashlib
 

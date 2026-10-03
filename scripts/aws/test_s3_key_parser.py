@@ -1,3 +1,5 @@
+"""Print identifiers parsed from an example S3 document key."""
+
 from pathlib import Path
 import sys
 

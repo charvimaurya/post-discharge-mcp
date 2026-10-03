@@ -1,3 +1,5 @@
+"""Create a live Titan embedding and print its length and first five values."""
+
 from pathlib import Path
 import sys
 

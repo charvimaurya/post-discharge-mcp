@@ -1,5 +1,6 @@
 Project notes have moved to maintained documentation:
 
+- docs/REPOSITORY_GUIDE.md — complete setup, file map, workflows, and component testing order
 - docs/architecture.md — current codebase and processing flow
 - docs/testing.md — automated tests and manual test commands
 - docs/aws-setup.md — configuration and troubleshooting

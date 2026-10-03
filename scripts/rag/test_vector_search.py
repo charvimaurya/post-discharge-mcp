@@ -1,3 +1,5 @@
+"""Search the live vector index for driving evidence and print source details and distances."""
+
 from pathlib import Path
 import sys
 

@@ -1,1 +1,1 @@
-"""Services used by ingestion and the MCP server."""
+"""Storage references used by the MCP reader."""

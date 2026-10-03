@@ -1,3 +1,5 @@
+"""Inspect S3/SQS configuration and exercise live queue diagnostics to investigate notification delivery."""
+
 import json
 import sys
 from pathlib import Path

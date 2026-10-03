@@ -1,3 +1,5 @@
+"""Extract sample PDF text, request structured JSON from Bedrock, and check the top-level fields."""
+
 from pathlib import Path
 import sys
 

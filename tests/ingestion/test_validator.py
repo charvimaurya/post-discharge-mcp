@@ -1,3 +1,5 @@
+"""Test that validation preserves extracted content and flags uncertainty without inventing provenance."""
+
 import unittest
 from dataclasses import asdict
 

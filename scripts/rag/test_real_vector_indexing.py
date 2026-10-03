@@ -1,3 +1,5 @@
+"""Extract the sample PDF, create Bedrock embeddings, and write its chunks to the live vector index."""
+
 from pathlib import Path
 import sys
 

@@ -1,3 +1,5 @@
+"""Convert extracted dictionaries into recovery-plan dataclasses with IDs and source evidence."""
+
 import hashlib
 from dataclasses import asdict
 from datetime import datetime, timezone

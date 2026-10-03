@@ -1,3 +1,5 @@
+"""Test normalization, validation, generated IDs, and confirmation flags using synthetic extraction data."""
+
 from app.ingestion.normalizer import normalize_recovery_plan
 from app.ingestion.validator import validate_recovery_plan
 

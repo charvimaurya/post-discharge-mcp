@@ -1,3 +1,5 @@
+"""Upload the sample PDF to S3 with the fixed force_failure ID; current source no longer forces a failure."""
+
 from pathlib import Path
 import sys
 

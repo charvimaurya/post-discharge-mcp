@@ -1,3 +1,5 @@
+"""Transcribe the sample image through Bedrock and print the page output."""
+
 from pathlib import Path
 import sys
 

@@ -1,3 +1,5 @@
+"""Create shared DynamoDB table references for recovery-state and event-history access."""
+
 import boto3
 from app import config
 

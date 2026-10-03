@@ -1,3 +1,5 @@
+"""Test S3 notification parsing and document keys, with an optional live SQS integration check."""
+
 import pytest
 
 from app.aws.sqs_service import (

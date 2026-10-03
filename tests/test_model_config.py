@@ -1,3 +1,5 @@
+"""Test model selection for test/final modes and errors for invalid or missing settings."""
+
 import pytest
 
 from app import config

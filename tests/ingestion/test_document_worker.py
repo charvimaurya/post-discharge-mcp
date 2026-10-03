@@ -1,3 +1,5 @@
+"""Test Lambda batch handling and retry behavior when indexing or the final state save fails."""
+
 from lambdas.document_processor.handler import (
     lambda_handler,
 )

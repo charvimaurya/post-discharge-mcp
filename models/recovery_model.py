@@ -1,3 +1,5 @@
+"""Define the recovery-state, instruction, and source-evidence dataclasses shared by the application."""
+
 from dataclasses import dataclass, field
 from typing import Optional, Any
 

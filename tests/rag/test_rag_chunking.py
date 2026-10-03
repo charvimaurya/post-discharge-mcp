@@ -1,3 +1,5 @@
+"""Test splitting document text into chunks while preserving useful page information."""
+
 from app.rag.chunking import (
     chunk_document,
 )

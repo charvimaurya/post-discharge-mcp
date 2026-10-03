@@ -1,3 +1,5 @@
+"""Print text extracted from the local synthetic PDF without making AWS calls."""
+
 from pathlib import Path
 import sys
 

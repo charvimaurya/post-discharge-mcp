@@ -1,3 +1,5 @@
+"""Upload and download a test image, then process it with Bedrock and print the recovery state."""
+
 from pathlib import Path
 import sys
 

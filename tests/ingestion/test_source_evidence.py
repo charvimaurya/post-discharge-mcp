@@ -1,3 +1,5 @@
+"""Test that extraction schemas and normalization preserve document, page, and snippet evidence."""
+
 from dataclasses import asdict
 
 import pytest

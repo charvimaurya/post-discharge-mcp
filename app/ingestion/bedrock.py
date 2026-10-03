@@ -1,3 +1,5 @@
+"""Send discharge text to Bedrock and return structured fields using the extraction schema."""
+
 import boto3
 from app import config
 

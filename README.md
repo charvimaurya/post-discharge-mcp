@@ -22,6 +22,7 @@ resources. See [deployment instructions](deployment/README.md) for building
 
 ## Documentation
 
+- [Complete repository guide: setup, file map, workflow, and testing order](docs/REPOSITORY_GUIDE.md)
 - [Architecture](docs/architecture.md)
 - [Testing](docs/testing.md)
 - [AWS setup and troubleshooting](docs/aws-setup.md)

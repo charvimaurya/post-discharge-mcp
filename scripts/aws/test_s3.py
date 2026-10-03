@@ -1,3 +1,5 @@
+"""Upload the synthetic test image to the configured S3 bucket using live AWS."""
+
 from pathlib import Path
 import sys
 

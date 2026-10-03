@@ -1,3 +1,5 @@
+"""Process the sample PDF into a recovery state and print it, without database or vector writes."""
+
 from pathlib import Path
 
 from app.ingestion.pipeline import process_document

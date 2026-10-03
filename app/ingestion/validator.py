@@ -1,3 +1,5 @@
+"""Flag missing or uncertain recovery instructions and mark the locally validated state ready."""
+
 from models.recovery_model import RecoveryState
 
 

@@ -1,3 +1,5 @@
+"""Transcribe image documents with Bedrock, preserving uncertainty markers in numbered page text."""
+
 from pathlib import Path
 import boto3
 from app import config

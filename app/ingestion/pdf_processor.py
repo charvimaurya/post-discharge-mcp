@@ -1,3 +1,5 @@
+"""Read embedded PDF text from a file or bytes and return numbered pages."""
+
 from io import BytesIO
 from pathlib import Path
 from pypdf import PdfReader

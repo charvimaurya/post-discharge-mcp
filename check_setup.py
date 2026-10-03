@@ -1,3 +1,5 @@
+"""Check the active AWS account and construct Bedrock and DynamoDB clients for setup diagnostics."""
+
 import boto3
 from app import config
 

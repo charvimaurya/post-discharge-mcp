@@ -1,3 +1,5 @@
+"""Test document routing and the order of state persistence and RAG indexing using mocks."""
+
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch, sentinel
 
