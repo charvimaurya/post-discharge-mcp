@@ -7,7 +7,7 @@ import boto3
 
 from app import config
 from app.database.event_history import append_event, build_idempotency_key
-from models.recovery_model import RecoveryState
+from app.models.recovery_model import RecoveryState
 
 
 dynamodb = boto3.resource(

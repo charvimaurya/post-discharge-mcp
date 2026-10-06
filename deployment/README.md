@@ -6,16 +6,17 @@ unchanged; the local archive uses the Afterward project name.
 
 ## Build
 
-On a fresh checkout, install the pinned dependencies into an empty staging
-directory (the existing staging directory was preserved during reorganization):
+The builder installs dependencies into fresh temporary staging using Linux
+x86_64 wheels for the deployed Python 3.11 runtime. This works from macOS too.
+Do not package your local virtual environment: native modules such as `rpds`
+must match Lambda, not your laptop.
 
 ```bash
-python -m pip install --target build/lambda_package -r deployment/requirements-lambda.txt
 python -m scripts.deployment.build_document_lambda
 ```
 
-The builder packages current source from `app/`, `models/`, `mcp_server/`, and
-`lambdas/`, plus staged dependencies. It excludes cached bytecode and hidden
+The builder packages current source from `app/` (including `app/models/` and `app/mcp/`), and
+`lambdas/`, plus the freshly installed Linux dependencies. It excludes cached bytecode and hidden
 files. It produces `build/afterward_document_processor.zip` without deploying.
 The pinned boto3/botocore versions include the S3 Vectors client used by RAG.
 Build artifacts are excluded from Git. The previous ZIP is retained locally as

@@ -320,9 +320,9 @@ State saving and history writing are still separate operations, not one transact
 | `app/rag/` | Split, store, and search original document text |
 | `app/aws/` | S3 and SQS helper functions |
 | `app/database/` | Save/read plans and record patient actions |
-| `models/` | Definitions of the data objects |
+| `app/models/` | Definitions of the data objects |
 | `lambdas/` | Code AWS calls when a queue message arrives |
-| `mcp_server/` | MCP server not implemented; preliminary helpers only |
+| `app/mcp/` | MCP server not implemented; preliminary helpers only |
 | `scripts/` | Commands developers run manually |
 | `tests/` | Automated tests run by pytest |
 | `test_data/` | Synthetic PDFs and images |
@@ -344,6 +344,19 @@ Afterward/
 ├── app/                              # Main application code
 │   ├── __init__.py                    # Application package marker
 │   ├── config.py                      # Read environment settings and select models
+│   ├── mcp/                           # MCP scaffolding; server not implemented
+│   │   ├── __init__.py                 # Package marker
+│   │   ├── context.py                  # Request-context placeholder
+│   │   ├── results.py                  # Result-helper placeholder
+│   │   ├── server.py                   # Recovery reader export; no transport yet
+│   │   └── tools/
+│   │       ├── __init__.py             # Package marker
+│   │       ├── actions.py              # Action-tool placeholder
+│   │       ├── rag.py                  # Retrieval-tool placeholder
+│   │       └── recovery.py             # Read current RecoveryState
+│   ├── models/                        # Shared application data definitions
+│   │   ├── __init__.py                 # Package marker
+│   │   └── recovery_model.py           # RecoveryState, instructions, and source evidence
 │   ├── aws/                           # S3 storage and SQS queue helpers
 │   │   ├── __init__.py                 # Package marker
 │   │   ├── s3_service.py               # Upload, download, and parse document keys
@@ -367,22 +380,10 @@ Afterward/
 │       ├── embeddings.py               # Convert text into numerical search vectors
 │       ├── vector_store.py             # Write/query S3 Vectors with patient filtering
 │       └── service.py                  # Coordinate indexing and evidence retrieval
-├── models/                            # Shared data definitions
-│   ├── __init__.py                     # Package marker
-│   └── recovery_model.py               # RecoveryState, instructions, and source evidence
 ├── lambdas/                           # Entry points run by AWS Lambda
 │   └── document_processor/
 │       ├── __init__.py                 # Package marker
 │       └── handler.py                  # Receive SQS batches and report failed messages
-├── mcp_server/                        # NOT IMPLEMENTED — complete MCP server is not available
-│   ├── __init__.py                     # Package scaffolding
-│   ├── server.py                       # Existing reader re-export; does not start a server
-│   ├── services/
-│   │   ├── __init__.py                 # Package scaffolding
-│   │   └── dynamodb_service.py         # Existing DynamoDB table references
-│   └── tools/
-│       ├── __init__.py                 # Package scaffolding
-│       └── get_recovery_plan.py        # Existing reader helper; not a registered MCP server
 ├── scripts/                           # Manual checks; some call/write to live AWS
 │   ├── __init__.py                     # Allow python -m scripts... commands
 │   ├── README.md                       # Manual command overview
@@ -482,7 +483,7 @@ All `__init__.py` files mark Python packages; they are not commands to run.
 | `app/aws/sqs_service.py` | Receive/delete messages and parse S3 notifications |
 | `app/database/recovery_state.py` | Save dataclass/dictionary state; read state, medications, tasks; record completion actions |
 | `app/database/event_history.py` | Stable idempotency-key helper, conditional event writes, event reader |
-| `models/recovery_model.py` | RecoveryState, Medication, Task, Appointment, Monitoring, and Source dataclasses |
+| `app/models/recovery_model.py` | RecoveryState, Medication, Task, Appointment, Monitoring, and Source dataclasses |
 | `app/ingestion/pdf_processor.py` | Extract embedded PDF text into numbered pages with pypdf |
 | `app/ingestion/image_processor.py` | Bedrock image transcription and uncertainty preservation |
 | `app/ingestion/bedrock.py` | Extraction schema, prompt, Converse call, structured tool-output parsing, usage/stop logging |

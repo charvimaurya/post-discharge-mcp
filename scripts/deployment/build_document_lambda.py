@@ -1,18 +1,23 @@
-"""Build the Lambda ZIP from current source and staged Python dependencies."""
+"""Build a Python 3.11 x86_64 Lambda ZIP using Linux-compatible wheels."""
 
+import subprocess
+import sys
+from tempfile import TemporaryDirectory
 from pathlib import Path
 from zipfile import ZipFile, ZIP_DEFLATED
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PACKAGES = ("app", "models", "mcp_server", "lambdas")
+PACKAGES = ("app", "lambdas")
 
 
-def main():
-    staging = ROOT / "build" / "lambda_package"
-    for dependency in ("pypdf", "dotenv", "boto3", "botocore"):
+def build(staging: Path):
+    for dependency in ("pypdf", "dotenv", "boto3", "botocore", "jsonschema", "rpds"):
         if not (staging / dependency / "__init__.py").is_file():
             raise SystemExit(f"Missing staged dependency: {dependency} in {staging}")
+
+    if not list((staging / "rpds").glob("rpds*.so")):
+        raise SystemExit("Missing Linux rpds native extension")
 
     entries = {}
     for path in staging.rglob("*"):
@@ -23,7 +28,7 @@ def main():
         for path in (ROOT / package).rglob("*"):
             entries[path.relative_to(ROOT).as_posix()] = path
 
-    required = ("models/__init__.py", "models/recovery_model.py",
+    required = ("app/models/__init__.py", "app/models/recovery_model.py",
                 "lambdas/document_processor/handler.py", "app/ingestion/document_service.py")
     for name in required:
         if name not in entries or not entries[name].is_file():
@@ -38,6 +43,22 @@ def main():
                 continue
             archive.write(path, name)
     print(f"Built {output} ({output.stat().st_size} bytes)")
+
+
+def main():
+    (ROOT / "build").mkdir(exist_ok=True)
+    # Fresh staging avoids mixing macOS extensions or stale dependencies into Lambda.
+    with TemporaryDirectory(prefix="lambda-linux-", dir=ROOT / "build") as directory:
+        staging = Path(directory)
+        subprocess.run([
+            sys.executable, "-m", "pip", "install",
+            "--platform", "manylinux2014_x86_64",
+            "--implementation", "cp", "--python-version", "3.11",
+            "--abi", "cp311", "--only-binary=:all:",
+            "--target", str(staging),
+            "-r", str(ROOT / "deployment" / "requirements-lambda.txt"),
+        ], check=True)
+        build(staging)
 
 
 if __name__ == "__main__":

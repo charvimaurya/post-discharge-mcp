@@ -11,7 +11,7 @@ S3 upload -> SQS -> `lambdas/document_processor/handler.py` ->
 
 The reusable pipeline extracts text using pypdf for text PDFs or Bedrock for
 images, combines page text, calls structured extraction in `bedrock.py`, then
-normalizes and validates the result. Dataclasses live in `models/recovery_model.py`.
+normalizes and validates the result. Dataclasses live in `app/models/recovery_model.py`.
 Source snippets and page numbers preserve evidence where available.
 
 The worker saves the validated state with `ingestion_status="indexing"`, indexes
@@ -37,8 +37,8 @@ use unique document IDs across patients to avoid collisions in the shared index.
 
 - `app/aws/`: S3 upload/download/key parsing and SQS helpers.
 - `app/database/`: current RecoveryState and Event History operations.
-- `mcp_server/tools/get_recovery_plan.py`: recovery-plan reader; server.py re-exports it.
-- `models/`: shared typed state, including the patient timezone.
+- `app/mcp/tools/recovery.py`: recovery-plan reader; server.py re-exports it.
+- `app/models/`: shared typed state, including the patient timezone.
 
 Medication/task readers return current lists; date arguments do not implement
 occurrence filtering. State updates and history writes are separate operations.

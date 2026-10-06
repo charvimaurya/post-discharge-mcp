@@ -9,39 +9,38 @@ SAMPLE_EXTRACTION = {
     "medications": [
         {
             "name": "Amoxicillin",
-            "dose": "500 mg",
-            "frequency": "three times daily",
-            "duration": "7 days",
-            "notes": None,
+            "strength": "500 mg",
+            "dose": "1 tablet",
+            "times_per_day": 3,
+            "duration_text": "7 days",
+            "instructions": None,
         }
     ],
     "tasks": [
         {
             "description": "Walk for 10 minutes",
-            "timing": "twice daily",
+            "times_per_day": 2,
         }
     ],
     "appointments": [
         {
-            "with": "GP",
+            "title": "GP",
             "date": None,
             "time": None,
             "location": None,
-            "status": "to_arrange",
-            "notes": "Arrange within 7 days",
         }
     ],
-    "restrictions": ["Do not drive for two weeks"],
+    "restrictions": [{"text": "Do not drive for two weeks", "topic": "driving"}],
     "monitoring": [
         {
             "what": "temperature",
-            "how_often": "once daily",
-            "threshold": None,
+            "frequency_text": "once daily",
+            "threshold_text": None,
         }
     ],
     "warning_signs": [
         {
-            "sign": "Chest pain",
+            "text": "Chest pain",
             "action": "Call 999",
         }
     ],
@@ -76,16 +75,16 @@ def test_validation():
     assert state.medications[0].needs_confirmation is False
 
 
-def test_missing_dose():
+def test_missing_dose_is_preserved_without_inventing_it():
     extracted = {
         **SAMPLE_EXTRACTION,
         "medications": [
             {
                 "name": "Amoxicillin",
                 "dose": None,
-                "frequency": "three times daily",
-                "duration": "7 days",
-                "notes": None,
+                "times_per_day": 3,
+                "duration_text": "7 days",
+                "instructions": None,
             }
         ],
     }
@@ -96,7 +95,8 @@ def test_missing_dose():
     )
     state = validate_recovery_plan(state)
 
-    assert state.medications[0].needs_confirmation is True
+    assert state.medications[0].dose is None
+    assert state.medications[0].needs_confirmation is False
 
 
 def test_uncertainty_marker():
@@ -105,7 +105,7 @@ def test_uncertainty_marker():
         "tasks": [
             {
                 "description": "Call [?111?] if symptoms worsen",
-                "timing": None,
+                "details": None,
             }
         ],
     }
@@ -122,6 +122,6 @@ def test_uncertainty_marker():
 if __name__ == "__main__":
     test_normalization()
     test_validation()
-    test_missing_dose()
+    test_missing_dose_is_preserved_without_inventing_it()
     test_uncertainty_marker()
     print("OK — all four Phase 4 tests passed.")

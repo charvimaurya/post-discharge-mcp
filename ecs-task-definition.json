@@ -1,0 +1,84 @@
+{
+  "family": "afterward-mcp",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::992617582533:role/AfterWardEcsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::992617582533:role/AfterWardEcsTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "afterward-mcp",
+      "image": "992617582533.dkr.ecr.eu-west-2.amazonaws.com/afterward-mcp:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "AWS_REGION",
+          "value": "eu-west-2"
+        },
+        {
+          "name": "MODEL_MODE",
+          "value": "test"
+        },
+        {
+          "name": "RECOVERY_STATE_TABLE",
+          "value": "PostDischargeRecoveryState"
+        },
+        {
+          "name": "EVENT_HISTORY_TABLE",
+          "value": "PostDischargeEventHistory"
+        },
+        {
+          "name": "MCP_PROTOCOL_VERSION",
+          "value": "2025-11-25"
+        },
+        {
+          "name": "MCP_ALLOWED_ORIGINS",
+          "value": "http://localhost:3000"
+        },
+        {
+          "name": "DEMO_FIXED_NOW",
+          "value": "2026-10-23T07:00:00+01:00"
+        },
+        {
+          "name": "ALB_HOST",
+          "value": "afterward-mcp-alb-426611083.eu-west-2.elb.amazonaws.com"
+        },
+        {
+          "name": "HTTPS_HOST",
+          "value": "dakpc9juquqks.cloudfront.net"
+        },
+        {
+          "name": "S3_VECTOR_BUCKET",
+          "value": "careloop-vectors-992617582533-london"
+        },
+        {
+          "name": "S3_VECTOR_INDEX",
+          "value": "careloop-discharge-index"
+        },
+        {
+          "name": "EMBEDDING_MODEL_ID",
+          "value": "amazon.titan-embed-text-v2:0"
+        },
+        {
+          "name": "EMBEDDING_DIMENSIONS",
+          "value": "512"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "MCP_AUTH_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:eu-west-2:992617582533:secret:afterward/mcp/auth-token-EkG6Dm"
+        }
+      ]
+    }
+  ]
+}

@@ -2,89 +2,101 @@
 
 import boto3
 from app import config
+import json
+from pathlib import Path
+from jsonschema import validate
+from jsonschema.exceptions import ValidationError
 
-SOURCE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "page": {"type": ["integer", "null"]},
-        "snippet": {"type": ["string", "null"]},
-    },
-    "required": ["page", "snippet"],
-}
-
-# The exact shape every extraction must return.
-EXTRACTION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "discharge_date": {"type": ["string", "null"],
-            "description": "Discharge date exactly as written, or null if not stated."},
-        "medications": {"type": "array", "items": {"type": "object", "properties": {
-            "name": {"type": "string"},
-            "dose": {"type": ["string", "null"]},
-            "frequency": {"type": ["string", "null"]},
-            "duration": {"type": ["string", "null"]},
-            "notes": {"type": ["string", "null"]},
-        }, "required": ["name"]}},
-        "tasks": {"type": "array", "items": {"type": "object", "properties": {
-            "description": {"type": "string"},
-            "timing": {"type": ["string", "null"],
-                "description": "When or how often to do this task, e.g. 'every morning', 'twice daily', 'for 7 days'. Extract this into the field even if it also appears in the description. Null only if the document gives no timing."},
-        }, "required": ["description"]}},
-        "appointments": {"type": "array", "items": {"type": "object", "properties": {
-            "with": {"type": ["string", "null"]},
-            "date": {"type": ["string", "null"]},
-            "time": {"type": ["string", "null"]},
-            "location": {"type": ["string", "null"]},
-            "status": {"type": ["string", "null"],
-                "description": "booked | to_arrange | null. 'booked' if the document states it is already arranged. 'to_arrange' if the appointment still needs to be arranged, whether by the patient or the clinic as the document indicates. null if arrangement status is not indicated."},
-            "notes": {"type": ["string", "null"],
-                "description": "Any extra context about the appointment stated in the document, e.g. its purpose or 'letter to follow'. Null if none."},
-        }}},
-        "restrictions": {"type": "array", "items": {
-            "type": "object", "properties": {"text": {"type": "string"}},
-            "required": ["text"],
-        }},
-        "monitoring": {"type": "array", "items": {"type": "object", "properties": {
-            "what": {"type": "string"},
-            "how_often": {"type": ["string", "null"]},
-            "threshold": {"type": ["string", "null"],
-                "description": "The value or condition that means this reading is a concern, e.g. 'above 38.5 C', 'gain over 2 kg in 3 days'. Capture it here even if the same condition also appears in warning_signs. Null if the document states no threshold."},
-        }, "required": ["what"]}},
-        "warning_signs": {"type": "array", "items": {
-            "type": "object", "properties": {"text": {"type": "string"}},
-            "required": ["text"],
-        }},
-    },
-    "required": ["discharge_date", "medications", "tasks", "appointments",
-                 "restrictions", "monitoring", "warning_signs"],
-}
-
-for category in ("medications", "tasks", "appointments", "monitoring", "restrictions", "warning_signs"):
-    item_schema = EXTRACTION_SCHEMA["properties"][category]["items"]
-    item_schema["properties"]["source"] = SOURCE_SCHEMA
-    item_schema.setdefault("required", []).append("source")
-
-
-PROMPT_CONSTRAINT = (
-    "You extract structured recovery information from a hospital discharge document. "
-    "Use ONLY information explicitly present in the document. "
-    "Never infer or invent a missing dose, frequency, appointment date, monitoring "
-    "threshold, or restriction. If a field is not stated, leave it null or an empty list. "
-    "Preserve the original intent and wording of urgent warning or escalation instructions. "
-    "Do not add advice that is not in the document. "
-    "For appointments, 'location' is a physical place only (hospital, clinic, address). "
-    "If the document says the patient must arrange or book the appointment, do NOT put that "
-    "in location; set status to 'to_arrange'. If it says the appointment is already booked, "
-    "set status to 'booked'. Leave location null when no physical place is given. "
-    "For every extracted medication, task, appointment, monitoring instruction, "
-    "restriction, and warning sign, include source.page and source.snippet. "
-    "Use the supplied [Page N] labels to identify the page; do not guess page numbers. "
-    "Provide a short verbatim supporting snippet from the supplied document text. "
-    "Do not invent source evidence. If a page or snippet cannot be identified "
-    "confidently, set that field to null. Preserve uncertainty markers in snippets. "
-    "For restrictions and warning signs, put the complete instruction, including "
-    "any escalation action, in text. "
+SCHEMA_PATH = (
+    Path(__file__).parent
+    / "schemas"
+    / "discharge-extraction.schema.json"
 )
+
+
+def load_extraction_schema() -> dict:
+    """Load the canonical discharge extraction JSON schema for Bedrock."""
+    with SCHEMA_PATH.open("r", encoding="utf-8") as file:
+        return json.load(file)
+
+
+EXTRACTION_SCHEMA = load_extraction_schema()
+
+
+PROMPT_CONSTRAINT = """You extract structured recovery information from hospital
+discharge documents.
+
+Follow these rules strictly:
+
+1. Use only information explicitly present in the document.
+2. Never guess or infer missing clinical information.
+3. Distinguish medication strength from dose.
+   Example:
+   "Amoxicillin 500 mg - take 1 tablet"
+   strength = "500 mg"
+   dose = "1 tablet"
+4. Do not convert vague timing words into invented clock times.
+   For example:
+   "in the morning"
+   must NOT become "08:00".
+5. Preserve wording in duration_text, instructions,
+   thresholds, restrictions and source snippets.
+6. For as-needed medication:
+   set as_needed=true only when explicitly stated.
+7. For appointments:
+   preserve conflicting dates rather than silently selecting one.
+8. Warning signs must preserve both:
+   - what the warning is
+   - what action the document tells the patient to take
+9. Do not invent document_id.
+   document_id is added later by the Afterward pipeline.
+10. Every extracted item must include source evidence using
+    text from the original document.
+11. If information is not present, use null, false, or an
+    empty list as required by the schema.
+
+IMPORTANT MEDICATION RULE:
+Strength and dose are different fields.
+- strength describes the strength/concentration written for the medicine,
+  such as "500 mg" or "0.1%".
+- dose describes the stated amount the patient takes each time,
+  such as "1 tablet", "2 capsules", "5 mL", or "1 drop".
+- Do NOT copy strength into dose merely because no separate dose is stated.
+
+Source: "Amoxicillin 500 mg, three times daily"
+Return: strength = "500 mg", dose = null.
+
+Source: "Amoxicillin 500 mg, take 1 tablet three times daily"
+Return: strength = "500 mg", dose = "1 tablet".
+
+Never invent dose. Never infer tablet count from strength.
+Preserve null when dose is not actually stated.
+Do not add medication.clock_times: the schema defines clock_times only for tasks.
+Use time_of_day only for time-of-day words explicitly written in the document.
+Do not infer "bedtime" or another label from a clock time such as "20:00".
+Preserve explicit medication clock times and maximum daily amount wording in
+instructions when the schema has no dedicated field for them. For example,
+"Maximum 4 g in 24 hours" belongs in instructions; max_per_day is the stated
+number of administrations, not the mass in grams. Do not invent a limit.
+
+APPOINTMENT DATE CONFLICTS:
+Only populate conflicting_dates when the document genuinely gives two or more
+incompatible dates for the SAME appointment. Preserve a primary date and the
+actual alternatives without silently resolving the conflict.
+Do NOT treat "by 25 September", "within 7 days", "to be arranged in 6 weeks",
+or other deadlines or relative timing phrases as conflicting_dates unless there
+is actually another incompatible appointment date for the same appointment.
+If there is no real date conflict, conflicting_dates = [].
+
+SOURCE EVIDENCE AND COMPLETENESS:
+Use the supplied [Page N] labels for source.page; never invent a page number.
+Preserve short verbatim source snippets and any uncertainty markers.
+Preserve urgent escalation wording in warning text and action.
+Return all seven top-level sections: discharge_date, medications, tasks,
+appointments, restrictions, monitoring, and warning_signs, even when empty.
+Follow the canonical schema exactly; do not add fields it does not define.
+"""
+
 
 _client = None
 def _bedrock():
@@ -103,7 +115,7 @@ def invoke_extraction_model(document_text: str) -> dict:
 
     tool = {"toolSpec": {
         "name": "record_recovery_extraction",
-        "description": "Record the structured recovery information extracted from the document.",
+        "description": "Record structured information read from a discharge document.",
         "inputSchema": {"json": EXTRACTION_SCHEMA},
     }}
     resp = _bedrock().converse(
@@ -114,12 +126,25 @@ def invoke_extraction_model(document_text: str) -> dict:
         ]}],
         toolConfig={"tools": [tool],
                     "toolChoice": {"tool": {"name": "record_recovery_extraction"}}},
-        inferenceConfig={"maxTokens": 3000, "temperature": 0},
+        inferenceConfig={"maxTokens": 5000, "temperature": 0},
     )
     # Temporary diagnostics to investigate truncated model responses.
-    print("BEDROCK_STOP_REASON:", resp.get("stopReason"))
+    stop_reason = resp.get("stopReason")
+    print("BEDROCK_STOP_REASON:", stop_reason)
     print("BEDROCK_USAGE:", resp.get("usage"))
+    if stop_reason == "max_tokens":
+        raise RuntimeError(
+            "Bedrock extraction was truncated because the output token limit was reached."
+        )
     for block in resp["output"]["message"]["content"]:
         if "toolUse" in block:
-            return block["toolUse"]["input"]
+            extracted = block["toolUse"]["input"]
+            try:
+                validate(instance=extracted, schema=EXTRACTION_SCHEMA)
+            except ValidationError as exc:
+                raise ValueError(
+                    "Bedrock returned extraction data that does not match the discharge schema: "
+                    f"{exc.message}"
+                ) from exc
+            return extracted
     raise RuntimeError("Model did not return structured tool output")

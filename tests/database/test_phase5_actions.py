@@ -10,7 +10,7 @@ from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
 import pytest
 
-from models.recovery_model import RecoveryState
+from app.models.recovery_model import RecoveryState
 
 
 @pytest.fixture
@@ -363,3 +363,68 @@ class TestLivePhase5Actions:
         events = event_service.get_events(PATIENT_ID)
         assert isinstance(events, list)
         assert all(event["patient_id"] == PATIENT_ID for event in events)
+
+
+def test_new_schema_state_survives_database_save_read_and_actions(service):
+    """Exercise new fields end-to-end through storage/actions without contacting AWS."""
+    from copy import deepcopy
+    from dataclasses import asdict
+    from boto3.dynamodb.types import TypeSerializer
+    from app.ingestion.normalizer import normalize_recovery_plan
+    from app.ingestion.validator import validate_recovery_plan
+
+    source = {"snippet": "Synthetic evidence", "page": 1,
+              "read_from_image": True, "document_id": "model-invented"}
+    extracted = {
+        "medications": [{"name": "Example", "strength": "500 mg", "dose": None,
+                         "times_per_day": 2, "time_of_day": ["morning"], "as_needed": True,
+                         "max_per_day": 4, "instructions": "Stated instruction", "source": source}],
+        "tasks": [{"description": "Walk every morning", "kind": "walk",
+                   "time_of_day": ["morning"], "clock_times": [], "details": "As stated",
+                   "duration_text": "7 days", "source": source}],
+        "appointments": [{"title": "Review", "date": "2026-10-01",
+                          "conflicting_dates": ["2026-10-02"], "source": source}],
+        "restrictions": [{"text": "Avoid lifting", "topic": "activity", "source": source}],
+        "monitoring": [{"what": "Temperature", "frequency_text": "twice daily",
+                        "threshold_text": "above 38.5 C", "source": source}],
+        "warning_signs": [{"text": "Chest pain", "action": "Call 999 immediately",
+                           "urgency": "emergency", "source": source}],
+    }
+    state = validate_recovery_plan(normalize_recovery_plan(extracted, "patient", "request-doc"))
+    expected = asdict(state)
+    assert state.ingestion_status == "ready"
+    assert state.appointments[0].needs_confirmation is True
+    # Check SDK serialization locally as well as dataclasses.asdict.
+    assert TypeSerializer().serialize(expected)["M"]
+    stored = {}
+
+    def put_item(*, Item):
+        stored.clear()
+        stored.update(deepcopy(Item))
+        return {}
+
+    with patch.object(service, "table") as table, patch.object(service, "append_event") as event:
+        table.put_item.side_effect = put_item
+        table.get_item.side_effect = lambda **_: {"Item": deepcopy(stored)}
+        event.return_value = {"created": True, "duplicate": False}
+        service.save_recovery_state(state)
+        assert stored == expected
+        assert service.get_recovery_state("patient") == expected
+        assert service.get_medications("patient") == expected["medications"]
+        assert service.get_today_tasks("patient") == expected["tasks"]
+
+        med = service.mark_medication_taken("patient", state.medications[0].id, "med-action")
+        task = service.mark_task_completed("patient", state.tasks[0].id, idempotency_key="task-action")
+        for category, result_key, result in [("medications", "medication", med), ("tasks", "task", task)]:
+            completed = result[result_key]
+            assert completed["status"] == "completed"
+            for field, value in expected[category][0].items():
+                if field != "status":
+                    assert completed[field] == value
+            assert stored[category][0] == completed
+        for category in ("appointments", "restrictions", "monitoring", "warning_signs"):
+            assert stored[category] == expected[category]
+        assert event.call_count == 2
+        assert service.mark_medication_taken("patient", state.medications[0].id, "med-action")["already_completed"]
+        assert service.mark_task_completed("patient", state.tasks[0].id, idempotency_key="task-action")["already_completed"]
+        assert event.call_count == 2

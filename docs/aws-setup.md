@@ -32,7 +32,7 @@ python -m scripts.deployment.build_document_lambda
 ```
 
 The archive is build/afterward_document_processor.zip. The handler is
-lambdas.document_processor.handler.lambda_handler. Bundle models/ and the
+lambdas.document_processor.handler.lambda_handler. Bundle app/models/ and the
 current S3 Vectors-capable SDK dependencies. Enable ReportBatchItemFailures on
 the SQS event-source mapping so failed records are retried individually.
 

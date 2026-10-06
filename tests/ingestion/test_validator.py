@@ -1,61 +1,78 @@
-"""Test that validation preserves extracted content and flags uncertainty without inventing provenance."""
+"""Test confirmation flags for canonical recovery fields without changing clinical text."""
 
-import unittest
+from copy import deepcopy
 from dataclasses import asdict
 
+import pytest
+
 from app.ingestion.validator import validate_recovery_plan
-from models.recovery_model import Appointment, Medication, RecoveryState, Source, Task
+from app.models.recovery_model import (
+    Appointment, Medication, Monitoring, RecoveryState, Restriction, WarningSign, Task,
+)
 
 
-class RecoveryStateValidationTests(unittest.TestCase):
-    def make_plan(self):
-        source = Source("discharge_photo_001", 1, "Example source evidence", "image")
-        return RecoveryState(
-            patient_id="patient_001",
-            document_id="discharge_photo_001",
-            medications=[
-                Medication("med_001", "Amoxicillin", source=source),
-                Medication(
-                    "med_002", "Furosemide", dose="[UNREADABLE]",
-                    source=source, needs_confirmation=True,
-                ),
-            ],
-            tasks=[Task("task_001", "[UNREADABLE]", source=source, needs_confirmation=True)],
-            appointments=[
-                Appointment("appt_001", "GP appointment", source=source),
-                Appointment(
-                    "appt_002", "Follow-up", date="[UNREADABLE]",
-                    source=source, needs_confirmation=True,
-                ),
-            ],
-        )
-
-    def test_uncertainty_is_valid_and_validation_preserves_items(self):
-        plan = self.make_plan()
-        before = asdict(plan)
-        self.assertIs(validate_recovery_plan(plan), plan)
-        self.assertEqual(plan.ingestion_status, "ready")
-        after = asdict(plan)
-        for category in ("medications", "tasks", "appointments"):
-            self.assertEqual(len(after[category]), len(before[category]))
-            for original, validated in zip(before[category], after[category]):
-                # Validation can flag missing fields, but must preserve extracted
-                # content, uncertainty markers, and source evidence.
-                original.pop("needs_confirmation")
-                validated.pop("needs_confirmation")
-                self.assertEqual(validated, original)
-        self.assertTrue(plan.medications[0].needs_confirmation)
-
-    def test_validation_preserves_uncertainty_without_inventing_provenance(self):
-        for category in ("medications", "tasks", "appointments"):
-            with self.subTest(category=category):
-                plan = self.make_plan()
-                item = next(item for item in getattr(plan, category) if item.needs_confirmation)
-                item.source = None
-                self.assertIs(validate_recovery_plan(plan), plan)
-                self.assertIsNone(item.source)
-                self.assertTrue(item.needs_confirmation)
+CASES = [
+    ("medications", Medication("med", "Example"), ["name", "strength", "dose", "form", "site", "instructions", "duration_text", "as_needed_reason"]),
+    ("tasks", Task("task", "Example"), ["description", "details", "duration_text"]),
+    ("appointments", Appointment("appt", "Example"), ["title", "date", "time", "location"]),
+    ("restrictions", Restriction("restriction", "Example"), ["text", "topic"]),
+    ("monitoring", Monitoring("monitor", "Example"), ["what", "frequency_text", "threshold_text"]),
+    ("warning_signs", WarningSign("warning", "Example", "Stated action"), ["text", "action"]),
+]
 
 
-if __name__ == "__main__":
-    unittest.main()
+@pytest.mark.parametrize("category,example,field", [
+    (category, example, field) for category, example, fields in CASES for field in fields
+])
+@pytest.mark.parametrize("marker", ["[?uncertain?]", "[UNREADABLE]"])
+def test_uncertainty_in_each_text_field_is_flagged_and_preserved(category, example, field, marker):
+    item = deepcopy(example)
+    setattr(item, field, marker)
+    before = asdict(item)
+    state = RecoveryState("patient", "document", **{category: [item]})
+    assert validate_recovery_plan(state) is state
+    assert state.ingestion_status == "ready"
+    assert item.needs_confirmation is True
+    assert asdict(item) == {**before, "needs_confirmation": True}
+
+
+def test_missing_optional_medication_fields_are_not_errors():
+    medication = Medication("med", "Example")
+    state = RecoveryState("patient", "document", medications=[medication])
+    validate_recovery_plan(state)
+    assert medication.needs_confirmation is False
+    medication.name = ""
+    validate_recovery_plan(state)
+    assert medication.needs_confirmation is True
+
+
+def test_conflicting_dates_and_pending_status_are_preserved():
+    appointment = Appointment("appt", "Review", date="2026-10-01", conflicting_dates=["2026-10-02"])
+    state = RecoveryState("patient", "document", appointments=[appointment])
+    validate_recovery_plan(state)
+    assert appointment.needs_confirmation is True
+    assert appointment.date == "2026-10-01"
+    assert appointment.conflicting_dates == ["2026-10-02"]
+    assert appointment.status == "pending"
+
+
+@pytest.mark.parametrize("urgency,expected", [("contact_care_team", False), ("emergency", False), ("unknown", True), (None, True)])
+def test_warning_urgency(urgency, expected):
+    warning = WarningSign("warning", "Example", "Stated action", urgency=urgency)
+    validate_recovery_plan(RecoveryState("patient", "document", warning_signs=[warning]))
+    assert warning.needs_confirmation is expected
+    assert warning.urgency == urgency
+
+
+@pytest.mark.parametrize("missing", ["text", "action"])
+def test_warning_requires_both_text_and_action(missing):
+    warning = WarningSign("warning", "Example", "Stated action")
+    setattr(warning, missing, "")
+    validate_recovery_plan(RecoveryState("patient", "document", warning_signs=[warning]))
+    assert warning.needs_confirmation is True
+
+
+def test_existing_confirmation_flag_is_not_cleared():
+    medication = Medication("med", "Example", needs_confirmation=True)
+    validate_recovery_plan(RecoveryState("patient", "document", medications=[medication]))
+    assert medication.needs_confirmation is True

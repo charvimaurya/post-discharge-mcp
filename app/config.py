@@ -48,6 +48,22 @@ EMBEDDING_MODEL_ID = os.getenv(
     "amazon.titan-embed-text-v2:0",
 )
 EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "512"))
+# ---------------------------------------------------------
+# MCP HTTP AUTH
+# ---------------------------------------------------------
+# Local development: MCP_AUTH_TOKEN. Deployment: MCP_AUTH_TOKEN_SECRET_ARN
+# (the token is read from Secrets Manager, never stored in code).
+MCP_AUTH_TOKEN = os.getenv("MCP_AUTH_TOKEN", "")
+MCP_AUTH_TOKEN_SECRET_ARN = os.getenv("MCP_AUTH_TOKEN_SECRET_ARN", "")
+MCP_ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "MCP_ALLOWED_ORIGINS",
+        "http://localhost:3000,"
+        "http://127.0.0.1:3000",
+    ).split(",")
+    if origin.strip()
+]
 
 
 def _select_model_id(final_setting: str, final_model_id: str) -> str:

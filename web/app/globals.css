@@ -1,0 +1,31 @@
+/* Lightweight, readable cards for the local document review page. */
+:root { color-scheme: light; --ink: #18332e; --muted: #586c65; --line: #dce5df; --green: #245c48; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #f5f7f3; color: var(--ink); font-family: system-ui, sans-serif; line-height: 1.55; }
+main { max-width: 1080px; padding: 48px 28px 80px; margin: auto; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { font-size: clamp(2rem, 4vw, 3rem); letter-spacing: -.04em; line-height: 1.15; margin-bottom: 18px; }
+h2 { font-size: 1.3rem; margin-bottom: 8px; } h3 { font-size: 1.12rem; line-height: 1.4; margin: 0; }
+.eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: .75rem; font-weight: 700; color: var(--green); margin-bottom: 12px; }
+.intro, .muted { color: var(--muted); }.intro { max-width: 580px; }
+.page-header { margin-bottom: 30px; }
+.upload-panel { background: white; border: 1px solid var(--line); padding: 26px; border-radius: 14px; }
+form { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 20px; margin: 20px 0; }
+.file-picker { flex: 1; min-width: 0; } label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 8px; }
+input { max-width: 100%; font: inherit; font-size: .9rem; }
+input::file-selector-button { background: #edf2ed; border: 1px solid var(--line); border-radius: 6px; padding: 9px 12px; margin-right: 12px; color: var(--ink); cursor: pointer; }
+button { background: var(--green); color: white; border: 0; border-radius: 7px; padding: 12px 25px; font: inherit; font-weight: 600; cursor: pointer; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+a:focus-visible, button:focus-visible, input:focus-visible, summary:focus-visible { outline: 3px solid #408767; outline-offset: 4px; }
+.upload-status { display: flex; align-items: center; gap: 9px; font-size: .9rem; }.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #8a9d93; }.success .status-dot { background: #287e4b; }
+.document-id { font-size: .75rem; color: var(--muted); overflow-wrap: anywhere; margin: 10px 0 0; }
+.error { background: #fff1ed; color: #8d3020; padding: 14px; border-radius: 7px; margin: 16px 0 0; }
+.recovery-plan { margin-top: 42px; }.plan-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }.plan-header h2 { font-size: 1.8rem; letter-spacing: -.025em; }.plan-header .eyebrow { margin-bottom: 4px; }
+.badge { display: inline-block; white-space: nowrap; padding: 4px 10px; border-radius: 5px; font-size: .75rem; font-weight: 600; }.ready { color: #245c48; background: #e1efdf; }.review { background: #fff0ce; color: #735007; }.urgent { background: #fce3de; color: #982f1e; }
+.discharge { color: var(--muted); font-size: .9rem; }
+.section-links { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px 0 22px; border-bottom: 1px solid var(--line); }.section-links a { color: var(--green); text-decoration: none; background: #e8eee7; padding: 6px 12px; border-radius: 5px; font-size: .8rem; }
+.plan-section { scroll-margin-top: 24px; margin-top: 32px; }.section-title { display: flex; align-items: center; gap: 10px; }.section-title h2 { margin: 0; }.count { font-size: .75rem; background: #e4eae3; border-radius: 20px; padding: 1px 8px; }.section-description { font-size: .85rem; margin: 4px 0 16px; }
+.card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }.item-card { background: white; padding: 22px; border: 1px solid var(--line); border-radius: 10px; overflow-wrap: anywhere; }.card-heading { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }.emergency { border-left: 4px solid #b04b37; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 20px; margin: 0; }.field dt { color: var(--muted); font-size: .75rem; margin-bottom: 3px; }.field dd { margin: 0; font-size: .94rem; }.field.dose { grid-column: 1 / -1; background: #f0f5ee; padding: 12px 14px; border-radius: 6px; }.dose dd { font-size: 1.1rem; font-weight: 650; }.dose .missing { font-size: .9rem; font-weight: 500; color: #715624; }.missing { color: var(--muted); }
+.item-status { font-size: .75rem; color: var(--muted); margin: 18px 0 0; }.evidence { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 12px; }.evidence summary { font-size: .8rem; color: var(--green); cursor: pointer; }.evidence .fields { margin-top: 14px; }.evidence blockquote { font-size: .85rem; color: var(--muted); margin: 14px 0; padding-left: 12px; border-left: 2px solid var(--line); }.empty { color: var(--muted); font-size: .9rem; }.raw-json { border: 1px solid var(--line); border-radius: 8px; padding: 18px; margin-top: 36px; }.raw-json summary { cursor: pointer; font-size: .85rem; } pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .75rem; }
+@media (max-width: 650px) { main { padding: 28px 16px 48px; }.card-grid { grid-template-columns: 1fr; }.upload-panel { padding: 20px; } form { align-items: stretch; flex-direction: column; } }

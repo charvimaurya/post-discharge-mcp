@@ -8,3 +8,42 @@ Project notes have moved to maintained documentation:
 
 Older snapshots are available in Git history. This index replaces outdated
 references to removed files and old test paths.
+
+End-to-end ingestion test
+Run from the project root with .venv activated:
+
+python scripts/ingestion/test_full_ingestion.py
+
+Uploads test_data/doc_001.pdf through S3 → SQS → Lambda → Bedrock →
+normalizer → validator → DynamoDB → RAG indexing → ready.
+Waits up to 90 seconds for the new document ID with ingestion_status="ready".
+
+MCP STRUCTURE (updated 4 October 2026)
+====================================
+app/mcp/
+  __init__.py          Package marker.
+  context.py           Placeholder for request context.
+  results.py           Placeholder for shared result helpers.
+  server.py            Re-exports get_recovery_plan; no MCP transport/startup yet.
+  tools/
+    __init__.py        Package marker.
+    actions.py         Placeholder for medication/task action tools.
+    rag.py             Placeholder for evidence-retrieval tools.
+    recovery.py        Existing recovery-plan reader using app/database/.
+
+The previous mcp_server/ and intermediate root mcp/ layout are replaced by
+app/mcp/. The old services/dynamodb_service.py and tools/get_recovery_plan.py
+are removed. Database access is reused from app.database.recovery_state.
+
+get_recovery_plan(patient_id) returns:
+- Found: success=True, patient_id, recovery_plan=<stored item>.
+- Missing: success=False, error=<patient-specific not-found message>.
+It reads the current snapshot, not a historical document, and does not check
+document_id or ingestion_status. AWS errors propagate to the caller.
+
+Read-only test from the project root with .venv activated and AWS credentials:
+python -c 'from pprint import pprint; from app.mcp.server import get_recovery_plan; pprint(get_recovery_plan("demo_patient_001"))'
+
+MCP registration, authentication, context handling, and server transport remain
+unimplemented. Running app.mcp.server does not start a service. The web UI and
+ingestion flow do not call this reader. Lambda packaging includes it through app/.

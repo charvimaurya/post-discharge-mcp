@@ -10,12 +10,12 @@ from app.ingestion.validator import validate_recovery_plan
 
 
 ITEMS = {
-    "medications": {"name": "Amoxicillin", "dose": "500 mg", "frequency": "daily"},
+    "medications": {"name": "Amoxicillin", "strength": "500 mg", "times_per_day": 1},
     "tasks": {"description": "Walk"},
-    "appointments": {"with": "GP", "status": "booked"},
+    "appointments": {"title": "GP"},
     "monitoring": {"what": "Temperature"},
     "restrictions": {"text": "Do not drive"},
-    "warning_signs": {"text": "Chest pain: call [?999?]"},
+    "warning_signs": {"text": "Chest pain", "action": "call [?999?]"},
 }
 
 
@@ -30,7 +30,7 @@ def test_source_survives_normalization_validation_and_serialization(category):
     saved = asdict(state)[category][0]
     assert saved["source"] == {
         "document_id": "request-document", "page": 2,
-        "snippet": snippet, "source_type": "document",
+        "snippet": snippet, "read_from_image": False,
     }
     assert item["source"]["document_id"] == "model-invented-id"
 
@@ -41,26 +41,29 @@ def test_missing_evidence_is_not_invented(category, source):
     item = {**ITEMS[category], "source": source}
     state = normalize_recovery_plan({category: [item]}, "patient", "document")
     saved_source = asdict(state)[category][0]["source"]
-    assert saved_source["document_id"] == "document"
-    assert saved_source["page"] is None
-    assert saved_source["snippet"] is None
+    assert saved_source is None
 
 
-def test_older_text_and_warning_dicts_are_preserved():
+def test_restrictions_and_warning_actions_are_preserved():
     state = normalize_recovery_plan({
-        "restrictions": [" Do not drive ", ""],
-        "warning_signs": ["Call 999", {"sign": "Chest pain", "action": "Call 999"}],
+        "restrictions": [{"text": " Do not drive ", "topic": "driving"}],
+        "warning_signs": [{"text": "Chest pain", "action": "Call 999", "urgency": "emergency"}],
     }, "patient", "document")
-    assert len(state.restrictions) == 1
-    assert state.restrictions[0]["text"] == "Do not drive"
-    assert state.warning_signs[0]["text"] == "Call 999"
-    assert state.warning_signs[1]["sign"] == "Chest pain"
-    assert state.warning_signs[1]["action"] == "Call 999"
-    assert state.warning_signs[0]["source"]["snippet"] is None
+    assert state.restrictions[0].text == "Do not drive"
+    assert state.restrictions[0].topic == "driving"
+    assert state.warning_signs[0].text == "Chest pain"
+    assert state.warning_signs[0].action == "Call 999"
+    assert state.warning_signs[0].urgency == "emergency"
+    assert state.warning_signs[0].source is None
 
 
 @pytest.mark.parametrize("category", ITEMS)
 def test_schema_requires_source_on_every_item(category):
     schema = EXTRACTION_SCHEMA["properties"][category]["items"]
     assert "source" in schema["required"]
-    assert schema["properties"]["source"]["required"] == ["page", "snippet"]
+    source = schema["properties"]["source"]
+    assert "snippet" in source["required"]
+    assert source["properties"]["snippet"]["type"] == "string"
+    # Canonical schema permits an unknown page; known pages are retained above.
+    assert {"type": "integer"} in source["properties"]["page"]["anyOf"]
+    assert {"type": "null"} in source["properties"]["page"]["anyOf"]

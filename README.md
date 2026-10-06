@@ -13,7 +13,7 @@ must refer to an existing bucket; changing the project name does not rename AWS
 resources. See [deployment instructions](deployment/README.md) for building
 `build/afterward_document_processor.zip` and the updated configuration paths.
 
-- `mcp_server/`: MCP server Python package
+- `app/mcp/`: MCP scaffolding and recovery-plan reader (server not implemented)
 - `app/`: ingestion, RAG, AWS services, and database operations
 - `lambdas/`: Lambda entry points
 - `deployment/`: deployment configuration and dependency pins
