@@ -54,10 +54,15 @@ async def get_recovery_plan() -> dict:
 @mcp.tool(
     name="get_today_tasks",
     description=(
-        "Returns the authenticated patient's recovery tasks "
-        "for today. Today is determined by the server; do not "
-        "pass a date. Use this for questions like 'what do I "
-        "need to do today?'"
+        "Get the patient's current recovery tasks for today. "
+        "Today is determined by the server; do not pass a date. "
+        "Use this for questions like 'what do I need to do "
+        "today?', and whenever the patient asks what is left, "
+        "what is next, what they still need to do, what remains "
+        "today, or what they have not completed yet. Always use "
+        "this tool for those questions because task completion "
+        "state may have changed since the previous conversation "
+        "turn."
     ),
     annotations=ToolAnnotations(
         read_only_hint=True,
@@ -122,53 +127,55 @@ async def search_discharge_instructions(
 @mcp.tool(
     name="report_task_completed",
     description=(
-        "Marks one of today's recovery tasks as completed for "
-        "the authenticated patient and records the action in "
-        "Event History. Pass the task's id from get_today_tasks. "
-        "Use this when the patient says they completed a task "
-        "such as a walk or exercise. Reporting the same task "
-        "twice on the same day is safe."
+        "Use this tool when the patient reports completing a "
+        "recovery task such as a walk, exercise, weighing, or "
+        "monitoring task. This is the ONLY tool that records task "
+        "completion; reading get_today_tasks does not record "
+        "anything. Pass the occurrence_id from get_today_tasks. "
+        "Each occurrence is recorded independently, so completing "
+        "one walk does not complete another walk later in the day."
     ),
     annotations=ToolAnnotations(
         idempotent_hint=True,
     ),
 )
 async def report_task_completed(
-    task_id: str,
+    occurrence_id: str,
 ) -> dict:
 
     context = get_current_patient_context()
 
     return report_task_completed_for_context(
         context,
-        task_id,
+        occurrence_id,
     )
 
 
 @mcp.tool(
     name="report_medication_taken",
     description=(
-        "Records one medication as taken today for the "
-        "authenticated patient and writes the matching Event "
-        "History entry. Pass the medication's id from "
-        "get_medications. Use this only when the patient "
-        "clearly identifies the medication they have taken. "
-        "Reporting the same medication twice on the same day "
-        "is safe."
+        "Use this tool when the patient reports that they have "
+        "taken a specific medication dose. This is the ONLY tool "
+        "that records medication completion; reading "
+        "get_medications does not record anything. Pass the "
+        "occurrence_id from get_medications. Use this only when "
+        "the patient clearly identifies the medication they have "
+        "taken. Each dose is recorded independently, so recording "
+        "the morning dose does not record a later dose that day."
     ),
     annotations=ToolAnnotations(
         idempotent_hint=True,
     ),
 )
 async def report_medication_taken(
-    medication_id: str,
+    occurrence_id: str,
 ) -> dict:
 
     context = get_current_patient_context()
 
     return report_medication_taken_for_context(
         context,
-        medication_id,
+        occurrence_id,
     )
 
 @mcp.custom_route(

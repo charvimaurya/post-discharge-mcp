@@ -7,6 +7,10 @@ This module coordinates:
 - retrieval
 """
 
+from app.database.recovery_state import (
+    get_recovery_state,
+)
+
 from app.rag.chunking import (
     chunk_document,
 )
@@ -67,14 +71,49 @@ def search_discharge_instructions(
     patient_id: str,
     top_k: int = 5,
 ) -> list[dict]:
-    """Return matching discharge evidence for one patient, without generating advice."""
-    if not isinstance(patient_id, str) or not patient_id.strip():
-        raise ValueError("patient_id must be a non-empty string")
+    """
+    Return discharge evidence from the authenticated
+    patient's CURRENT recovery-plan document only.
 
+    RecoveryState tells us which document is currently
+    authoritative for this patient.
+    """
+
+    if not isinstance(patient_id, str) or not patient_id.strip():
+        raise ValueError(
+            "patient_id must be a non-empty string"
+        )
+
+    # -------------------------------------------------
+    # 1. LOAD CURRENT RECOVERY STATE
+    # -------------------------------------------------
+    #
+    # A patient may have older documents in the vector
+    # index. RecoveryState tells us which document is the
+    # current authoritative one.
+    #
+    state = get_recovery_state(
+        patient_id
+    )
+
+    if not state:
+        return []
+
+    document_id = state.get(
+        "document_id"
+    )
+
+    if not document_id:
+        return []
+
+    # -------------------------------------------------
+    # 2. SEARCH ONLY THAT DOCUMENT
+    # -------------------------------------------------
     query_embedding = embed_text(query)
     matches = query_chunks(
         query_embedding=query_embedding,
         patient_id=patient_id,
+        document_id=document_id,
         top_k=top_k,
     )
 

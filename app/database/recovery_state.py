@@ -6,7 +6,12 @@ from datetime import datetime, timezone, date
 import boto3
 
 from app import config
-from app.database.event_history import append_event, build_idempotency_key
+from app.clock import get_current_datetime
+from app.database.event_history import (
+    append_event,
+    build_idempotency_key,
+    get_events,
+)
 from app.models.recovery_model import RecoveryState
 
 
@@ -49,33 +54,312 @@ def get_recovery_state(
     return response.get("Item")
 
 
+def _medication_occurrence_count(medication: dict) -> int:
+    """How many doses of a medication are due in one day."""
+
+    # PRN medicines should not be expanded into guessed
+    # scheduled doses.
+    if medication.get("as_needed"):
+        return 1
+
+    # DynamoDB returns numbers as Decimal, which
+    # range() does not accept.
+    return max(
+        int(medication.get("times_per_day") or 0),
+        len(medication.get("time_of_day") or []),
+        1,
+    )
+
+
+def _parse_date(value) -> date | None:
+    """Parse "YYYY-MM-DD" (or an ISO timestamp); None if invalid."""
+
+    if not value:
+        return None
+
+    try:
+        return date.fromisoformat(str(value).strip()[:10])
+    except ValueError:
+        return None
+
+
+def _is_before_discharge(
+    state: dict,
+    date_text: str,
+) -> bool:
+    """
+    True when date_text falls before the plan's discharge_date.
+
+    No occurrences exist before the patient goes home. A missing
+    or invalid discharge_date (or requested date) keeps the
+    existing behaviour, so this returns False.
+    """
+
+    discharge = _parse_date(state.get("discharge_date"))
+    requested = _parse_date(date_text)
+
+    if discharge is None or requested is None:
+        return False
+
+    return requested < discharge
+
+
 def get_medications(
     patient_id: str,
     date: str | None = None,
 ) -> list[dict]:
     """
-    Return the patient's medications from their current
-    RecoveryState.
+    Return medication occurrences for the requested day.
 
-    `date` is accepted now because the service will later
-    support date/occurrence filtering.
+    Repeated scheduled medicines become separate daily
+    occurrences, such as morning, midday, evening and bedtime.
 
-    For the current MVP, medications are stored as part of
-    the current RecoveryState, so we return the list as-is.
+    PRN medicines remain as a single untimed occurrence.
     """
-    # Read the patient's current state from DynamoDB.
+
     state = get_recovery_state(
         patient_id
     )
-    # Patient does not have a RecoveryState yet.
+
     if not state:
         return []
-    # Return medications.
-    # Using .get(..., []) safely handles a missing medications field.
-    return state.get(
+
+    if not date:
+        raise ValueError(
+            "date is required when building medication occurrences"
+        )
+
+    # Nothing is due before the patient is discharged.
+    if _is_before_discharge(state, date):
+        return []
+
+    # -------------------------------------------------
+    # READ COMPLETED MEDICATION OCCURRENCES
+    # -------------------------------------------------
+
+    events = get_events(
+        patient_id
+    )
+
+    completed = {}
+
+    for event in events:
+
+        if event.get("event_type") != "medication_taken":
+            continue
+
+        details = event.get(
+            "details",
+            {},
+        )
+
+        occurrence_id = details.get(
+            "occurrence_id"
+        )
+
+        if not occurrence_id:
+            # Ignore older pre-occurrence medication events.
+            continue
+
+        completed[
+            occurrence_id
+        ] = (
+            details.get("completed_at")
+            or event.get("recorded_at")
+        )
+
+    # -------------------------------------------------
+    # EXPAND MEDICATIONS INTO DAILY OCCURRENCES
+    # -------------------------------------------------
+
+    occurrences = []
+
+    for medication in state.get(
         "medications",
         [],
+    ):
+
+        time_of_day = (
+            medication.get("time_of_day")
+            or []
+        )
+
+        occurrence_count = _medication_occurrence_count(
+            medication
+        )
+
+        for index in range(
+            occurrence_count
+        ):
+
+            occurrence_number = (
+                index + 1
+            )
+
+            occurrence_id = build_occurrence_id(
+                medication["id"],
+                date,
+                occurrence_number,
+            )
+
+            occurrence = dict(
+                medication
+            )
+
+            occurrence[
+                "medication_id"
+            ] = medication["id"]
+
+            occurrence[
+                "occurrence_id"
+            ] = occurrence_id
+
+            occurrence[
+                "occurrence_number"
+            ] = occurrence_number
+
+            occurrence[
+                "occurrence_total"
+            ] = occurrence_count
+
+            occurrence[
+                "time_of_day_label"
+            ] = (
+                time_of_day[index]
+                if index < len(time_of_day)
+                else None
+            )
+
+            if occurrence_id in completed:
+
+                occurrence[
+                    "status"
+                ] = "completed"
+
+                occurrence[
+                    "completed_at"
+                ] = completed[
+                    occurrence_id
+                ]
+
+            else:
+
+                occurrence[
+                    "status"
+                ] = "pending"
+
+                occurrence.pop(
+                    "completed_at",
+                    None,
+                )
+
+            occurrences.append(
+                occurrence
+            )
+
+    return occurrences
+
+
+def build_occurrence_id(
+    item_id: str,
+    date_text: str,
+    occurrence_number: int,
+) -> str:
+    """
+    Build a stable ID for one occurrence on one day.
+
+    Example:
+
+    task_de859a844c#2026-10-23#1
+    """
+    return (
+        f"{item_id}"
+        f"#{date_text}"
+        f"#{occurrence_number}"
     )
+
+
+def parse_occurrence_id(
+    occurrence_id: str,
+) -> tuple[str, str, int]:
+    """
+    Split an occurrence ID back into:
+
+    base item ID
+    date
+    occurrence number
+    """
+    try:
+        item_id, date_text, number_text = (
+            occurrence_id.rsplit("#", 2)
+        )
+        occurrence_number = int(
+            number_text
+        )
+    except (AttributeError, ValueError):
+        raise ValueError(
+            f"Invalid occurrence id: {occurrence_id}"
+        ) from None
+
+    if not item_id or not date_text or occurrence_number < 1:
+        raise ValueError(
+            f"Invalid occurrence id: {occurrence_id}"
+        )
+
+    return item_id, date_text, occurrence_number
+
+
+def _occurrence_count(task: dict) -> int:
+    """How many times a task is due in one day (at least once)."""
+    times_per_day = task.get("times_per_day")
+
+    if times_per_day:
+        return max(int(times_per_day), 1)
+
+    return max(
+        len(task.get("clock_times") or []),
+        len(task.get("time_of_day") or []),
+        1,
+    )
+
+
+def _completed_task_occurrences(
+    patient_id: str,
+    date_text: str,
+) -> dict[str, str]:
+    """
+    Return {occurrence_id: completed_at} for one day,
+    rebuilt from Event History.
+
+    Events written before occurrences existed have no
+    occurrence_id and are ignored.
+    """
+    completed = {}
+
+    for event in get_events(patient_id):
+
+        if event.get("event_type") != "task_completed":
+            continue
+
+        details = event.get("details") or {}
+        occurrence_id = details.get("occurrence_id")
+
+        if not occurrence_id:
+            continue
+
+        if details.get("date") != date_text:
+            continue
+
+        # New events carry the demo-clock completed_at;
+        # older events fall back to the real write time.
+        completed[
+            occurrence_id
+        ] = (
+            details.get("completed_at")
+            or event.get("recorded_at")
+        )
+
+    return completed
 
 
 def get_today_tasks(
@@ -83,24 +367,119 @@ def get_today_tasks(
     date: str | None = None,
 ) -> list[dict]:
     """
-    Return the patient's current recovery tasks.
+    Build today's task occurrences from the base RecoveryState.
 
-    Later we can interpret scheduling fields such as
-    "daily", "morning", etc.
+    A task due multiple times a day becomes multiple
+    occurrences.
 
-    For the current MVP, return the current task list.
+    Example:
+
+        walk twice daily
+
+    becomes:
+
+        walk occurrence 1 of 2
+        walk occurrence 2 of 2
+
+    The base task itself stays unchanged in RecoveryState.
+    Completion comes from Event History, per occurrence.
     """
-    # Load the current RecoveryState.
+
     state = get_recovery_state(
         patient_id
     )
-    # No state means no tasks.
+
     if not state:
         return []
-    return state.get(
-        "tasks",
-        [],
+
+    # Use the supplied application-controlled date.
+    #
+    # The caller currently gets this from app.clock, so
+    # the browser/patient is not allowed to choose the date.
+    if date is None:
+        date = datetime.now(
+            timezone.utc
+        ).date().isoformat()
+
+    # Nothing is due before the patient is discharged.
+    if _is_before_discharge(state, date):
+        return []
+
+    completed = _completed_task_occurrences(
+        patient_id,
+        date,
     )
+
+    occurrences = []
+
+    for task in state.get("tasks", []):
+
+        total = _occurrence_count(task)
+        clock_times = task.get("clock_times") or []
+        time_of_day = task.get("time_of_day") or []
+
+        for index in range(total):
+
+            occurrence_number = index + 1
+
+            occurrence_id = build_occurrence_id(
+                task["id"],
+                date,
+                occurrence_number,
+            )
+
+            occurrence = dict(task)
+
+            occurrence["task_id"] = task["id"]
+            occurrence["occurrence_id"] = occurrence_id
+            occurrence["occurrence_number"] = occurrence_number
+            occurrence["occurrence_total"] = total
+
+            occurrence[
+                "clock_time"
+            ] = (
+                clock_times[index]
+                if index < len(
+                    clock_times
+                )
+                else None
+            )
+
+            occurrence[
+                "time_of_day_label"
+            ] = (
+                time_of_day[index]
+                if index < len(
+                    time_of_day
+                )
+                else None
+            )
+
+            # Completion belongs to the occurrence,
+            # not the base task.
+            if occurrence_id in completed:
+                occurrence[
+                    "status"
+                ] = "completed"
+                occurrence[
+                    "completed_at"
+                ] = completed[
+                    occurrence_id
+                ]
+            else:
+                occurrence[
+                    "status"
+                ] = "pending"
+                occurrence.pop(
+                    "completed_at",
+                    None,
+                )
+
+            occurrences.append(
+                occurrence
+            )
+
+    return occurrences
 
 
 def _find_medication(
@@ -127,113 +506,222 @@ def _find_task(
     return None
 
 
+def _find_occurrence(
+    occurrences: list[dict],
+    occurrence_id: str,
+) -> dict | None:
+    """Find one occurrence in a reader's result by its ID."""
+
+    return next(
+        (
+            item
+            for item in occurrences
+            if item.get("occurrence_id") == occurrence_id
+        ),
+        None,
+    )
+
+
 def mark_medication_taken(
     patient_id: str,
-    medication_id: str,
-    idempotency_key: str,
+    occurrence_id: str,
+    today: str,
 ) -> dict:
-    """Complete a current medication, persist state, and record its history."""
-    if not idempotency_key or not idempotency_key.strip():
-        raise ValueError("idempotency_key must not be empty")
-    state = get_recovery_state(patient_id)
+    """
+    Record exactly one medication occurrence as taken.
+
+    The base medication in RecoveryState is not marked
+    completed. Completion is stored in Event History.
+    """
+
+    state = get_recovery_state(
+        patient_id
+    )
+
     if not state:
-        raise ValueError(f"No RecoveryState found for patient {patient_id}")
+        raise ValueError(
+            f"No RecoveryState found for patient {patient_id}"
+        )
 
-    medication = _find_medication(state, medication_id)
+    # -------------------------------------------------
+    # PARSE OCCURRENCE
+    # -------------------------------------------------
 
-    if medication is None:
-        raise ValueError(f"Medication not found: {medication_id}")
+    (
+        medication_id,
+        occurrence_date,
+        occurrence_number,
+    ) = parse_occurrence_id(
+        occurrence_id
+    )
 
-    old_status = medication.get("status", "pending")
-    if old_status == "completed":
-        return {
-            "success": True,
-            "already_completed": True,
-            "medication": medication,
-            "event": None,
-        }
+    # -------------------------------------------------
+    # THE OCCURRENCE MUST BE DUE TODAY
+    #
+    # Use the same reader the patient sees, so a forged ID
+    # (wrong day, before discharge, unknown medicine, or a
+    # dose number that does not exist) can never be written.
+    # -------------------------------------------------
 
-    completed_at = datetime.now(timezone.utc).isoformat()
-    medication["status"] = "completed"
-    medication["completed_at"] = completed_at
-    state["last_updated"] = completed_at
-    save_recovery_state(state)
+    occurrence = _find_occurrence(
+        get_medications(patient_id, today),
+        occurrence_id,
+    )
 
-    event = append_event(
+    if occurrence is None:
+        raise ValueError(
+            "There is no matching dose scheduled for today."
+        )
+
+    # -------------------------------------------------
+    # ONE EVENT PER OCCURRENCE
+    #
+    # The occurrence is the idempotency key, so reporting
+    # the same dose twice is safe.
+    # -------------------------------------------------
+
+    idempotency_key = build_idempotency_key(
+        patient_id,
+        medication_id,
+        f"{occurrence_date}#{occurrence_number}",
+    )
+
+    # Use the shared clock so DEMO_FIXED_NOW also controls
+    # the time the patient sees.
+    completed_at = get_current_datetime().isoformat()
+
+    event_result = append_event(
         patient_id=patient_id,
         event_type="medication_taken",
         details={
             "medication_id": medication_id,
-            "name": medication.get("name"),
-            "old_status": old_status,
-            "new_status": "completed",
+            "occurrence_id": occurrence_id,
+            "occurrence_number": occurrence_number,
+            "occurrence_total": occurrence["occurrence_total"],
+            "date": occurrence_date,
+            "name": occurrence.get("name"),
             "completed_at": completed_at,
         },
         idempotency_key=idempotency_key,
     )
+
+    # -------------------------------------------------
+    # REBUILD TODAY'S OCCURRENCES
+    #
+    # get_medications() reads Event History, so this gives
+    # us the authoritative state after the write.
+    # -------------------------------------------------
+
+    taken_occurrence = _find_occurrence(
+        get_medications(patient_id, occurrence_date),
+        occurrence_id,
+    )
+
     return {
         "success": True,
-        "already_completed": False,
-        "medication": medication,
-        "event": event,
+        "already_completed": event_result[
+            "duplicate"
+        ],
+        "medication": taken_occurrence,
+        "event": event_result,
     }
 
 
 def mark_task_completed(
     patient_id: str,
-    task_id: str,
-    occurrence_key: str | None = None,
-    *,
-    idempotency_key: str | None = None,
+    occurrence_id: str,
+    today: str,
 ) -> dict:
-    """Complete a current task, persist state, and append its history event."""
-    if idempotency_key is not None and not idempotency_key.strip():
-        raise ValueError("idempotency_key must not be empty")
+    """
+    Record ONE task occurrence as completed.
+
+    Only Event History is written. The base task in
+    RecoveryState is left unchanged; get_today_tasks()
+    rebuilds each occurrence's status from these events,
+    so completing walk 1 never completes walk 2.
+    """
+
+    # -------------------------------------------------
+    # 1. PARSE THE OCCURRENCE ID
+    # -------------------------------------------------
+    task_id, occurrence_date, occurrence_number = (
+        parse_occurrence_id(occurrence_id)
+    )
+
+    # -------------------------------------------------
+    # 2. LOAD CURRENT RECOVERY STATE
+    # -------------------------------------------------
     state = get_recovery_state(patient_id)
     if not state:
         raise ValueError("Recovery state not found")
 
-    task = _find_task(state, task_id)
+    # -------------------------------------------------
+    # 3-5. THE OCCURRENCE MUST BE DUE TODAY
+    #
+    # Use the same reader the patient sees, so a forged ID
+    # (wrong day, before discharge, unknown task, or an
+    # occurrence number that does not exist) can never be
+    # written.
+    # -------------------------------------------------
+    occurrence = _find_occurrence(
+        get_today_tasks(patient_id, today),
+        occurrence_id,
+    )
 
-    if task is None:
-        raise ValueError(f"Task not found: {task_id}")
+    if occurrence is None:
+        raise ValueError(
+            "There is no matching task scheduled for today."
+        )
 
-    old_status = task.get("status", "pending")
-    if old_status == "completed":
-        return {
-            "success": True,
-            "already_completed": True,
-            "task": task,
-            "event": None,
-        }
+    # -------------------------------------------------
+    # 6. ONE EVENT PER OCCURRENCE
+    #
+    # The occurrence is the idempotency key, so reporting
+    # the same occurrence twice is safe.
+    # -------------------------------------------------
+    idempotency_key = build_idempotency_key(
+        patient_id,
+        task_id,
+        f"{occurrence_date}#{occurrence_number}",
+    )
 
-    if idempotency_key is None:
-        if occurrence_key is None:
-            occurrence_key = date.today().isoformat()
-        idempotency_key = build_idempotency_key(patient_id, task_id, occurrence_key)
+    # Use the shared clock so DEMO_FIXED_NOW also controls
+    # the completion time the patient sees.
+    completed_at = get_current_datetime().isoformat()
 
-    completed_at = datetime.now(timezone.utc).isoformat()
-    task["status"] = "completed"
-    task["completed_at"] = completed_at
-    state["last_updated"] = completed_at
-
-    save_recovery_state(state)
-
-    event = append_event(
+    event_result = append_event(
         patient_id=patient_id,
         event_type="task_completed",
         details={
             "task_id": task_id,
-            "description": task.get("description"),
-            "old_status": old_status,
-            "new_status": "completed",
+            "occurrence_id": occurrence_id,
+            "occurrence_number": occurrence_number,
+            "occurrence_total": occurrence["occurrence_total"],
+            "date": occurrence_date,
+            "description": occurrence.get(
+                "description"
+            ),
             "completed_at": completed_at,
         },
         idempotency_key=idempotency_key,
     )
+
+    # -------------------------------------------------
+    # 7. REBUILD TODAY'S OCCURRENCES
+    #
+    # get_today_tasks() reads Event History, so this gives
+    # us the authoritative state after the write.
+    # -------------------------------------------------
+    completed_occurrence = _find_occurrence(
+        get_today_tasks(patient_id, occurrence_date),
+        occurrence_id,
+    )
+
     return {
         "success": True,
-        "already_completed": False,
-        "task": task,
-        "event": event,
+        "already_completed": event_result[
+            "duplicate"
+        ],
+        "task": completed_occurrence,
+        "event": event_result,
     }

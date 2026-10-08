@@ -1,16 +1,16 @@
 """
 Exercise the AfterWard MCP tools over HTTP.
 
-Target is controlled by environment variables so the same script
-works against both local uvicorn and the deployed ALB:
+Both environment variables are required:
 
-  Local:
-    MCP_URL defaults to http://127.0.0.1:8000/mcp
-    MCP_TEST_TOKEN defaults to afterward-local-dev-token
+  MCP_URL          Full URL including /mcp path, e.g.
+                   https://dakpc9juquqks.cloudfront.net/mcp
+  MCP_TEST_TOKEN   Bearer token (from Secrets Manager or local dev)
 
-  Deployed:
-    export MCP_URL=http://afterward-mcp-alb-426611083.eu-west-2.elb.amazonaws.com/mcp
-    export MCP_TEST_TOKEN=<token from Secrets Manager>
+Example:
+  MCP_URL=https://dakpc9juquqks.cloudfront.net/mcp \\
+  MCP_TEST_TOKEN=<token> \\
+  python scripts/test_mcp_http.py
 """
 
 import asyncio
@@ -29,9 +29,18 @@ import httpx
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
+# Loads .env, so MCP_URL and MCP_AUTH_TOKEN work without exporting.
+from app import config
+from app.clock import get_current_date
+
 
 MCP_URL = os.environ["MCP_URL"]
-MCP_TEST_TOKEN = os.environ["MCP_TEST_TOKEN"]
+
+# An explicit MCP_TEST_TOKEN wins; otherwise use the .env token.
+MCP_TEST_TOKEN = (
+    os.environ.get("MCP_TEST_TOKEN")
+    or config.MCP_AUTH_TOKEN
+)
 
 
 def tool_data(result) -> dict:
@@ -68,6 +77,31 @@ async def main():
             "Origin": "http://localhost:3000",
         },
     )
+
+    # The SDK hides HTTP status codes behind a generic MCPError, so check auth first.
+    probe = await http.post(
+        MCP_URL,
+        headers={
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        },
+        json={
+            "jsonrpc": "2.0",
+            "id": 0,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-11-25",
+                "capabilities": {},
+                "clientInfo": {"name": "preflight", "version": "1"},
+            },
+        },
+    )
+    if probe.status_code != 200:
+        sys.exit(
+            f"Server at {MCP_URL} returned HTTP {probe.status_code}: {probe.text[:200]}\n"
+            "401 means MCP_TEST_TOKEN does not match this server "
+            "(local uses afterward-local-dev-token; deployed uses the Secrets Manager token)."
+        )
 
     # Pass the context manager itself to Client — it enters it internally.
     transport = streamable_http_client(
@@ -111,6 +145,9 @@ async def main():
         # { "ok": true, "data": { "date": "...", "tasks": [...] } }
         tasks = tasks_data["data"]["tasks"]
 
+        # The server's "today" (honours DEMO_FIXED_NOW if set there).
+        today = tasks_data["data"].get("date") or get_current_date()
+
         pending_task = next(
             (
                 task for task in tasks
@@ -124,16 +161,16 @@ async def main():
                 "\n(No pending tasks — skipping write tests)"
             )
         else:
-            task_id = pending_task["id"]
+            occurrence_id = pending_task["occurrence_id"]
 
-            # 4. Mark one pending task complete
+            # 4. Mark one pending task occurrence complete
             print(
-                f"\nMARKING TASK COMPLETE: {task_id}"
+                f"\nMARKING TASK COMPLETE: {occurrence_id}"
             )
 
             write_1 = await client.call_tool(
                 "report_task_completed",
-                {"task_id": task_id},
+                {"occurrence_id": occurrence_id},
             )
 
             print(
@@ -154,12 +191,12 @@ async def main():
 
             # 6. Repeat the exact same call — must be idempotent
             print(
-                f"\nREPEATING SAME TASK COMPLETION: {task_id}"
+                f"\nREPEATING SAME TASK COMPLETION: {occurrence_id}"
             )
 
             write_2 = await client.call_tool(
                 "report_task_completed",
-                {"task_id": task_id},
+                {"occurrence_id": occurrence_id},
             )
 
             print(
@@ -207,7 +244,7 @@ async def main():
 
         invalid_result = await client.call_tool(
             "report_task_completed",
-            {"task_id": "this_task_does_not_exist"},
+            {"occurrence_id": f"this_task_does_not_exist#{today}#1"},
         )
 
         print(json.dumps(tool_data(invalid_result), indent=2))

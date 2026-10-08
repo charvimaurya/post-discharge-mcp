@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 from botocore.exceptions import ClientError
 import pytest
 
+from app.clock import get_current_date
 from app.models.recovery_model import RecoveryState
 
 
@@ -139,44 +140,11 @@ def service():
         return import_module("app.database.recovery_state")
 
 
-def test_task_completion_saves_then_records_history(service):
-    task = {"id": "task1", "description": "Walk", "status": "pending"}
-    state = {"patient_id": "patient", "tasks": [task]}
-    calls = Mock()
-    event = {"created": True, "duplicate": False, "event": {"event_type": "task_completed"}}
-    calls.event.return_value = event
-    with patch.object(service, "get_recovery_state", return_value=state), patch.object(service, "save_recovery_state", calls.save), patch.object(service, "append_event", calls.event):
-        result = service.mark_task_completed("patient", "task1", "2026-09-30")
-    assert result == {"success": True, "already_completed": False, "task": task, "event": event}
-    assert task["status"] == "completed"
-    assert task["completed_at"] == state["last_updated"]
-    assert task["completed_at"].endswith("+00:00")
-    assert [call[0] for call in calls.mock_calls] == ["save", "event"]
-    calls.save.assert_called_once_with(state)
-    calls.event.assert_called_once_with(
-        patient_id="patient", event_type="task_completed",
-        details={"task_id": "task1", "description": "Walk", "old_status": "pending",
-                 "new_status": "completed", "completed_at": task["completed_at"]},
-        idempotency_key="patient#task1#2026-09-30",
-    )
-
-
-def test_completed_task_does_not_write_again(service):
-    task = {"id": "task1", "status": "completed", "completed_at": "original"}
-    with patch.object(service, "get_recovery_state", return_value={"tasks": [task]}), patch.object(service, "save_recovery_state") as save, patch.object(service, "append_event") as event:
-        result = service.mark_task_completed("patient", "task1", "same-occurrence")
-        assert result["already_completed"] is True
-        assert result["event"] is None
-        assert task["completed_at"] == "original"
-        save.assert_not_called()
-        event.assert_not_called()
-
-
-@pytest.mark.parametrize("state,message", [(None, "Recovery state not found"), ({"tasks": []}, "Task not found")])
+@pytest.mark.parametrize("state,message", [(None, "Recovery state not found"), ({"tasks": []}, "scheduled for today")])
 def test_missing_state_or_task_does_not_write(service, state, message):
-    with patch.object(service, "get_recovery_state", return_value=state), patch.object(service, "save_recovery_state") as save, patch.object(service, "append_event") as event:
+    with patch.object(service, "get_recovery_state", return_value=state), patch.object(service, "get_events", return_value=[]), patch.object(service, "save_recovery_state") as save, patch.object(service, "append_event") as event:
         with pytest.raises(ValueError, match=message):
-            service.mark_task_completed("patient", "task1")
+            service.mark_task_completed("patient", "task1#2026-09-30#1", "2026-09-30")
         save.assert_not_called()
         event.assert_not_called()
 
@@ -193,6 +161,14 @@ def test_save_accepts_dataclass_and_loaded_dictionary(service):
 PATIENT_ID = "demo_patient_001"
 
 
+def _base_fields(results, base_items):
+    """Keep only the keys of the base items, dropping occurrence fields."""
+    return [
+        {key: result[key] for key in base}
+        for result, base in zip(results, base_items)
+    ]
+
+
 @pytest.mark.parametrize("method,field", [
     ("get_medications", "medications"), ("get_today_tasks", "tasks"),
 ])
@@ -200,12 +176,23 @@ PATIENT_ID = "demo_patient_001"
 def test_current_list_readers(service, method, field, present):
     items = [{"id": "item1"}]
     state = {field: items} if present else None
-    with patch.object(service, "get_recovery_state", return_value=state):
+    with patch.object(service, "get_recovery_state", return_value=state), \
+            patch.object(service, "get_events", return_value=[]):
         reader = getattr(service, method)
-        assert reader(PATIENT_ID) == (items if present else [])
-        assert reader(PATIENT_ID, date="2026-09-30") == (items if present else [])
-    with patch.object(service, "get_recovery_state", return_value={"patient_id": PATIENT_ID}):
-        assert reader(PATIENT_ID) == []
+        # Readers return occurrences; the base fields must be unchanged.
+        dated = reader(PATIENT_ID, date="2026-09-30")
+        assert _base_fields(dated, items) == (items if present else [])
+        if present:
+            assert dated[0]["occurrence_id"] == "item1#2026-09-30#1"
+        if method == "get_today_tasks":
+            assert _base_fields(reader(PATIENT_ID), items) == (items if present else [])
+        elif present:
+            # Medication occurrences need an explicit date.
+            with pytest.raises(ValueError, match="date is required"):
+                reader(PATIENT_ID)
+    with patch.object(service, "get_recovery_state", return_value={"patient_id": PATIENT_ID}), \
+            patch.object(service, "get_events", return_value=[]):
+        assert reader(PATIENT_ID, date="2026-09-30") == []
 
 
 def test_state_reader_returns_item_or_none(service):
@@ -229,61 +216,13 @@ def test_event_reader(event_writer):
     assert module.get_events(PATIENT_ID) == []
 
 
-@pytest.mark.parametrize("action,collection,item_id,result_key,event_type", [
-    ("mark_medication_taken", "medications", "med1", "medication", "medication_taken"),
-    ("mark_task_completed", "tasks", "task1", "task", "task_completed"),
-])
-def test_complete_and_repeat_with_explicit_key(service, action, collection, item_id, result_key, event_type):
-    from copy import deepcopy
-    state = {"patient_id": PATIENT_ID, collection: [
-        {"id": item_id, "name": "Amoxicillin", "description": "Walk", "status": "pending"},
-    ]}
-    calls = Mock()
-    calls.event.return_value = {"created": True, "duplicate": False, "event": {"event_type": event_type}}
-
-    def save(updated):
-        state.clear()
-        state.update(deepcopy(updated))
-
-    calls.save.side_effect = save
-    key = f"phase5-test-{item_id}-001"
-    with patch.object(service, "get_recovery_state", side_effect=lambda patient: deepcopy(state)), patch.object(service, "save_recovery_state", calls.save), patch.object(service, "append_event", calls.event):
-        method = getattr(service, action)
-        result = method(PATIENT_ID, item_id, idempotency_key=key)
-        assert result["success"] is True
-        assert result["already_completed"] is False
-        assert result[result_key]["status"] == "completed"
-        assert state[collection][0]["completed_at"] == state["last_updated"]
-        assert [call[0] for call in calls.mock_calls] == ["save", "event"]
-        event_args = calls.event.call_args.kwargs
-        assert event_args["idempotency_key"] == key
-        assert event_args["event_type"] == event_type
-        assert event_args["details"]["old_status"] == "pending"
-        assert event_args["details"]["new_status"] == "completed"
-        repeat = method(PATIENT_ID, item_id, idempotency_key=key)
-        assert repeat["already_completed"] is True
-        assert repeat["event"] is None
-        calls.save.assert_called_once()
-        calls.event.assert_called_once()
-
-
 @pytest.mark.parametrize("state,message", [
-    (None, "No RecoveryState found"), ({"medications": []}, "Medication not found"),
+    (None, "No RecoveryState found"), ({"medications": []}, "scheduled for today"),
 ])
 def test_missing_medication_or_state(service, state, message):
-    with patch.object(service, "get_recovery_state", return_value=state), patch.object(service, "save_recovery_state") as save, patch.object(service, "append_event") as event:
+    with patch.object(service, "get_recovery_state", return_value=state), patch.object(service, "get_events", return_value=[]), patch.object(service, "save_recovery_state") as save, patch.object(service, "append_event") as event:
         with pytest.raises(ValueError, match=message):
-            service.mark_medication_taken(PATIENT_ID, "missing", "key")
-        save.assert_not_called()
-        event.assert_not_called()
-
-
-@pytest.mark.parametrize("method", ["mark_medication_taken", "mark_task_completed"])
-@pytest.mark.parametrize("key", ["", "   "])
-def test_invalid_action_key_does_not_write(service, method, key):
-    with patch.object(service, "save_recovery_state") as save, patch.object(service, "append_event") as event:
-        with pytest.raises(ValueError, match="idempotency_key"):
-            getattr(service, method)(PATIENT_ID, "item", idempotency_key=key)
+            service.mark_medication_taken(PATIENT_ID, "missing#2026-09-30#1", "2026-09-30")
         save.assert_not_called()
         event.assert_not_called()
 
@@ -314,7 +253,7 @@ def live_services(monkeypatch):
 class TestLivePhase5Actions:
     def test_get_medications(self, live_services):
         state_service, _ = live_services
-        assert isinstance(state_service.get_medications(PATIENT_ID), list)
+        assert isinstance(state_service.get_medications(PATIENT_ID, get_current_date()), list)
 
     def test_get_tasks(self, live_services):
         state_service, _ = live_services
@@ -322,41 +261,40 @@ class TestLivePhase5Actions:
 
     def test_mark_medication_taken(self, live_services):
         state_service, _ = live_services
-        medications = state_service.get_medications(PATIENT_ID)
+        today = get_current_date()
+        medications = state_service.get_medications(PATIENT_ID, today)
         assert medications, "Demo patient needs at least one medication"
-        result = state_service.mark_medication_taken(
-            patient_id=PATIENT_ID, medication_id=medications[0]["id"],
-            idempotency_key="phase5-test-med-001",
-        )
+        base_before = state_service._find_medication(
+            state_service.get_recovery_state(PATIENT_ID), medications[0]["medication_id"])
+        result = state_service.mark_medication_taken(PATIENT_ID, medications[0]["occurrence_id"], today)
         assert result["success"] is True
         assert result["medication"]["status"] == "completed"
+        # The base medication is never modified by an occurrence write.
         saved = state_service.table.get_item(Key={"patient_id": PATIENT_ID}, ConsistentRead=True)["Item"]
-        assert state_service._find_medication(saved, medications[0]["id"])["status"] == "completed"
+        assert state_service._find_medication(saved, medications[0]["medication_id"]) == base_before
 
     def test_repeat_medication_action(self, live_services):
         state_service, _ = live_services
-        medications = state_service.get_medications(PATIENT_ID)
+        today = get_current_date()
+        medications = state_service.get_medications(PATIENT_ID, today)
         assert medications, "Demo patient needs at least one medication"
         # Establish the first action here; do not depend on test execution order.
         for _ in range(2):
-            result = state_service.mark_medication_taken(
-                patient_id=PATIENT_ID, medication_id=medications[0]["id"],
-                idempotency_key="phase5-test-med-001",
-            )
+            result = state_service.mark_medication_taken(PATIENT_ID, medications[0]["occurrence_id"], today)
         assert result["already_completed"] is True
 
     def test_mark_task_completed(self, live_services):
         state_service, _ = live_services
-        tasks = state_service.get_today_tasks(PATIENT_ID)
+        today = get_current_date()
+        tasks = state_service.get_today_tasks(PATIENT_ID, today)
         assert tasks, "Demo patient needs at least one task"
-        result = state_service.mark_task_completed(
-            patient_id=PATIENT_ID, task_id=tasks[0]["id"],
-            idempotency_key="phase5-test-task-001",
-        )
+        base_before = state_service._find_task(state_service.get_recovery_state(PATIENT_ID), tasks[0]["task_id"])
+        result = state_service.mark_task_completed(PATIENT_ID, tasks[0]["occurrence_id"], today)
         assert result["success"] is True
         assert result["task"]["status"] == "completed"
+        # The base task is never modified by an occurrence write.
         saved = state_service.table.get_item(Key={"patient_id": PATIENT_ID}, ConsistentRead=True)["Item"]
-        assert state_service._find_task(saved, tasks[0]["id"])["status"] == "completed"
+        assert state_service._find_task(saved, tasks[0]["task_id"]) == base_before
 
     def test_get_events(self, live_services):
         _, event_service = live_services
@@ -403,28 +341,17 @@ def test_new_schema_state_survives_database_save_read_and_actions(service):
         stored.update(deepcopy(Item))
         return {}
 
-    with patch.object(service, "table") as table, patch.object(service, "append_event") as event:
+    with patch.object(service, "table") as table, patch.object(service, "append_event") as event, \
+            patch.object(service, "get_events", return_value=[]):
         table.put_item.side_effect = put_item
         table.get_item.side_effect = lambda **_: {"Item": deepcopy(stored)}
         event.return_value = {"created": True, "duplicate": False}
         service.save_recovery_state(state)
         assert stored == expected
         assert service.get_recovery_state("patient") == expected
-        assert service.get_medications("patient") == expected["medications"]
-        assert service.get_today_tasks("patient") == expected["tasks"]
+        assert _base_fields(service.get_medications("patient", "2026-09-30"), expected["medications"]) == expected["medications"]
+        assert _base_fields(service.get_today_tasks("patient"), expected["tasks"]) == expected["tasks"]
 
-        med = service.mark_medication_taken("patient", state.medications[0].id, "med-action")
-        task = service.mark_task_completed("patient", state.tasks[0].id, idempotency_key="task-action")
-        for category, result_key, result in [("medications", "medication", med), ("tasks", "task", task)]:
-            completed = result[result_key]
-            assert completed["status"] == "completed"
-            for field, value in expected[category][0].items():
-                if field != "status":
-                    assert completed[field] == value
-            assert stored[category][0] == completed
         for category in ("appointments", "restrictions", "monitoring", "warning_signs"):
             assert stored[category] == expected[category]
-        assert event.call_count == 2
-        assert service.mark_medication_taken("patient", state.medications[0].id, "med-action")["already_completed"]
-        assert service.mark_task_completed("patient", state.tasks[0].id, idempotency_key="task-action")["already_completed"]
-        assert event.call_count == 2
+

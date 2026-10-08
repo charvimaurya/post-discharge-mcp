@@ -114,14 +114,19 @@ def query_chunks(
     *,
     query_embedding: list[float],
     patient_id: str,
+    document_id: str,
     top_k: int = 5,
 ) -> list[dict]:
     """
-    Search the vector index.
+    Search discharge vectors belonging ONLY to the
+    authenticated patient's current document.
 
-    SECURITY REQUIREMENT:
+    Both patient_id and document_id are enforced inside
+    the S3 Vectors query.
 
-    Every query MUST be restricted by patient_id.
+    This prevents:
+    - another patient's chunks being returned
+    - old documents for the same demo patient being returned
     """
 
     if (
@@ -154,9 +159,22 @@ def query_chunks(
             topK=
                 top_k,
 
+            # SECURITY:
+            # Search only the authenticated patient's
+            # CURRENT discharge document.
             filter={
-                "patient_id":
-                    patient_id
+                "$and": [
+                    {
+                        "patient_id": {
+                            "$eq": patient_id
+                        }
+                    },
+                    {
+                        "document_id": {
+                            "$eq": document_id
+                        }
+                    },
+                ]
             },
 
             returnMetadata=

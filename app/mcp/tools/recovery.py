@@ -73,23 +73,37 @@ def get_today_tasks_for_context(
         message=(
             f"You have {len(tasks)} recovery "
             "items today."
+            if tasks
+            else "There are no recovery tasks scheduled for today."
         ),
     )
 
 def get_medications_for_context(
     patient_context,
 ) -> dict:
+    """
+    Return today's medication occurrences for the
+    authenticated patient.
+
+    "Today" comes from the shared clock, never the caller.
+    """
+
+    today = get_current_date()
 
     medications = get_medications(
-        patient_context.patient_id
+        patient_context.patient_id,
+        today,
     )
 
     return success_result(
         data={
+            "date": today,
             "medications": medications,
         },
         message=(
-            f"I found {len(medications)} medications "
-            "in your current recovery plan."
+            f"I found {len(medications)} medication doses "
+            "scheduled for today."
+            if medications
+            else "There are no medication doses scheduled for today."
         ),
     )

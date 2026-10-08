@@ -86,3 +86,18 @@ def test_today_tasks_uses_context_patient_and_shared_clock(monkeypatch):
     assert result["ok"] is True
     assert result["data"] == {"date": "2026-03-15", "tasks": [{"id": "task_1", "description": "Walk"}]}
     assert result["message"] == "You have 1 recovery items today."
+
+
+def test_empty_day_messages_say_nothing_is_scheduled(monkeypatch):
+    from app.auth.patient_scope import PatientContext
+    from app.mcp.tools import recovery
+
+    monkeypatch.setattr(recovery, "get_today_tasks", lambda *args: [])
+    monkeypatch.setattr(recovery, "get_medications", lambda *args: [])
+    context = PatientContext("user", "patient", "session")
+    assert recovery.get_today_tasks_for_context(context)["message"] == (
+        "There are no recovery tasks scheduled for today."
+    )
+    assert recovery.get_medications_for_context(context)["message"] == (
+        "There are no medication doses scheduled for today."
+    )

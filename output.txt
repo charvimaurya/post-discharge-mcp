@@ -1,3 +1,14 @@
+Run the end-to-end pipeline test from the project root:
+
+python3 scripts/ingestion/test_full_ingestion.py
+
+This uploads test_data/doc_001.pdf and tests:
+S3 → SQS → Lambda → Bedrock → DynamoDB.
+It waits up to 90 seconds for ingestion_status=ready, then prints
+FULL PIPELINE TEST PASSED.
+
+Your AWS credentials and deployed pipeline must be configured.
+
 Project notes have moved to maintained documentation:
 
 - docs/REPOSITORY_GUIDE.md — complete setup, file map, workflows, and component testing order

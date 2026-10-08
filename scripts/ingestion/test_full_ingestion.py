@@ -49,8 +49,14 @@ from app.database.recovery_state import (
 
 PATIENT_ID = "demo_patient_001"
 
-# Change this if your clean synthetic PDF lives elsewhere.
-FILE_PATH = str(PROJECT_ROOT / "test_data" / "doc_001.pdf")
+# Margaret's synthetic knee-replacement discharge letter.
+# This is the golden demo patient used by AfterWard.
+FILE_PATH = str(
+    PROJECT_ROOT
+    / "tests"
+    / "fixtures"
+    / "letter1_margaret_knee_replacement_SYNTHETIC.pdf"
+)
 
 # Maximum amount of time we'll wait for:
 #
