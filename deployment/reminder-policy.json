@@ -1,0 +1,22 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadPlanAndStoreCheckin",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:UpdateItem"
+      ],
+      "Resource": "arn:aws:dynamodb:eu-west-2:992617582533:table/PostDischargeRecoveryState"
+    },
+    {
+      "Sid": "ReadCompletionEvents",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:Query"
+      ],
+      "Resource": "arn:aws:dynamodb:eu-west-2:992617582533:table/PostDischargeEventHistory"
+    }
+  ]
+}

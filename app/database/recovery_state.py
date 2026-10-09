@@ -4,6 +4,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone, date
 
 import boto3
+from botocore.exceptions import ClientError
 
 from app import config
 from app.clock import get_current_datetime
@@ -52,6 +53,81 @@ def get_recovery_state(
     )
 
     return response.get("Item")
+
+
+def save_pending_checkin(
+    patient_id: str,
+    pending_checkin: dict,
+    checkin_key: str,
+) -> bool:
+    """
+    Atomically store a reminder unless this key was already used.
+
+    Returns True when written, False when last_checkin_key already
+    equals checkin_key (the reminder was already created).
+    """
+
+    try:
+        table.update_item(
+            Key={
+                "patient_id": patient_id,
+            },
+            UpdateExpression=(
+                "SET pending_checkin = :pending, "
+                "last_checkin_key = :checkin_key"
+            ),
+            ConditionExpression=(
+                "attribute_not_exists(last_checkin_key) "
+                "OR last_checkin_key <> :checkin_key"
+            ),
+            ExpressionAttributeValues={
+                ":pending": pending_checkin,
+                ":checkin_key": checkin_key,
+            },
+        )
+
+    except ClientError as exc:
+        error_code = exc.response.get("Error", {}).get("Code")
+
+        if error_code == "ConditionalCheckFailedException":
+            return False
+
+        raise
+
+    return True
+
+
+def clear_pending_checkin(
+    patient_id: str,
+) -> None:
+    """
+    Remove the waiting reminder.
+
+    last_checkin_key is kept on purpose, so the same occurrence is
+    not reminded again after the patient responds.
+    """
+
+    table.update_item(
+        Key={
+            "patient_id": patient_id,
+        },
+        UpdateExpression="REMOVE pending_checkin",
+    )
+
+
+def get_pending_checkin(
+    patient_id: str,
+) -> dict | None:
+    """Return the waiting reminder, or None."""
+
+    response = table.get_item(
+        Key={
+            "patient_id": patient_id,
+        },
+        ProjectionExpression="pending_checkin",
+    )
+
+    return (response.get("Item") or {}).get("pending_checkin")
 
 
 def _medication_occurrence_count(medication: dict) -> int:

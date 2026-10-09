@@ -1,0 +1,6 @@
+{
+  "Variables": {
+    "RECOVERY_STATE_TABLE": "PostDischargeRecoveryState",
+    "EVENT_HISTORY_TABLE": "PostDischargeEventHistory"
+  }
+}

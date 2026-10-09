@@ -293,6 +293,7 @@ async def chat(
             "response": patient-facing reply,
             "tool_trace": MCP tools Claude called, in order,
             "source": RAG evidence for paperwork answers, or None,
+            "completed": False if the tool-round limit was hit,
         }
     """
 
@@ -321,6 +322,7 @@ async def chat(
             "response": response_text,
             "tool_trace": tool_trace,
             "source": source,
+            "completed": True,
         }
 
     tool_config = await build_bedrock_tool_config()
@@ -345,6 +347,9 @@ async def chat(
     empty_schedules: set[str] = set()
 
     grounding_nudged = False
+
+    # False only when the tool-round limit stopped the turn early.
+    completed = True
 
     for _ in range(MAX_TOOL_ROUNDS + 1):
 
@@ -520,6 +525,7 @@ async def chat(
         )
 
     else:
+        completed = False
         response_text = (
             "Sorry, I couldn't finish that. "
             "Please try asking again."
@@ -575,4 +581,5 @@ async def chat(
         "response": response_text,
         "tool_trace": tool_trace,
         "source": source,
+        "completed": completed,
     }

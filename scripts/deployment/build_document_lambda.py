@@ -29,7 +29,8 @@ def build(staging: Path):
             entries[path.relative_to(ROOT).as_posix()] = path
 
     required = ("app/models/__init__.py", "app/models/recovery_model.py",
-                "lambdas/document_processor/handler.py", "app/ingestion/document_service.py")
+                "lambdas/document_processor/handler.py", "app/ingestion/document_service.py",
+                "lambdas/reminder_checker/handler.py")
     for name in required:
         if name not in entries or not entries[name].is_file():
             raise SystemExit(f"Missing required Lambda source: {name}")

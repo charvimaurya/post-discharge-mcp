@@ -1,60 +1,388 @@
-Run the end-to-end pipeline test from the project root:
+DETAILED CODEBASE SUMMARY — 9 October 2026
 
-python3 scripts/ingestion/test_full_ingestion.py
+Scope: this describes the source files in the local workspace, including the
+uncommitted Phase 14 work after commit a7efd38. Code, tests and file contents
+were checked on 9 October. Deployed AWS state was not re-checked for this
+revision; section 14 repeats the earlier read-only check.
 
-This uploads test_data/doc_001.pdf and tests:
-S3 → SQS → Lambda → Bedrock → DynamoDB.
-It waits up to 90 seconds for ingestion_status=ready, then prints
-FULL PIPELINE TEST PASSED.
+1. PRODUCT AND WHAT IS IN THE REPO
 
-Your AWS credentials and deployed pipeline must be configured.
+AfterWard (previously CareLoop) is a post-discharge companion prototype. It
+extracts a recovery plan from discharge paperwork, keeps searchable source
+passages, exposes patient-scoped MCP tools, runs a conversational agent, and
+(Phase 14) creates proactive reminders shortly before timed tasks. Some AWS
+resources and package names still use CareLoop naming.
 
-Project notes have moved to maintained documentation:
+Main parts:
+- Python code: ingestion, persistence, retrieval, auth, MCP, agent, reminders.
+- An SQS-triggered document-processing Lambda (deployed as
+  CareLoopDocumentProcessor).
+- A reminder-checker Lambda (Phase 14). Written and tested, not deployed.
+- A local Python web bridge serving /today and /chat to the web app.
+- A Next.js web app: the upload/plan viewer, and a simulated Alexa+ client at
+  /assistant.
+- MCP server hosting files: Dockerfile, ecs-task-definition.json (ECS Fargate)
+  and cloudfront-config.json (HTTPS in front of an ALB).
+- A separate AgentCore starter project in AfterWardMCP/ (not the real tools).
+- Tests, manual integration scripts, one synthetic fixture letter, docs.
 
-- docs/REPOSITORY_GUIDE.md — complete setup, file map, workflows, and component testing order
-- docs/architecture.md — current codebase and processing flow
-- docs/testing.md — automated tests and manual test commands
-- docs/aws-setup.md — configuration and troubleshooting
-- deployment/README.md — dependency setup, build, and deployment commands
+Some maintained guides in docs/ are behind the code. The code described here
+takes precedence.
 
-Older snapshots are available in Git history. This index replaces outdated
-references to removed files and old test paths.
+2. DOCUMENT INGESTION AND THE ASYNCHRONOUS PIPELINE
 
-End-to-end ingestion test
-Run from the project root with .venv activated:
+Main files: app/ingestion/, app/aws/, lambdas/document_processor/handler.py.
 
-python scripts/ingestion/test_full_ingestion.py
+Full path:
+PDF/image upload -> S3 -> SQS -> document Lambda -> download -> text extraction
+-> Bedrock structured extraction -> normalization -> validation -> DynamoDB
+(indexing) -> original-page chunking and embedding -> S3 Vectors -> DynamoDB
+(ready).
 
-Uploads test_data/doc_001.pdf through S3 → SQS → Lambda → Bedrock →
-normalizer → validator → DynamoDB → RAG indexing → ready.
-Waits up to 90 seconds for the new document ID with ingestion_status="ready".
+- app/aws/s3_service.py: builds and parses patient/document object keys;
+  upload and download.
+- app/aws/sqs_service.py: queue and notification helpers.
+- The Lambda handles each message separately and reports failed message IDs
+  through batchItemFailures, so SQS retries only those.
+- app/ingestion/pdf_processor.py: pypdf text extraction into numbered pages.
+- app/ingestion/image_processor.py: Bedrock transcription of image input.
+- app/ingestion/pipeline.py: dispatches by file type, joins page text, runs
+  extraction, normalization and validation.
+- app/ingestion/bedrock.py: extraction prompt, Converse call, structured
+  output and schema validation. Schema:
+  app/ingestion/schemas/discharge-extraction.schema.json. The schema allows
+  clock_times on tasks only; the prompt tells the model never to add
+  clock_times to medicines, and never to turn a word like "morning" into a
+  clock time.
+- app/ingestion/normalizer.py: maps extracted fields to typed models and keeps
+  source evidence.
+- app/ingestion/validator.py: sets needs_confirmation when a field contains
+  "[?" or "[unreadable]", a required field is missing, or an appointment has
+  conflicting dates. The flag applies to the whole item; there is no record of
+  which field was unclear (no unclear_fields).
+- app/ingestion/document_service.py: S3 notification processing, duplicate
+  checks, persistence and retrieval indexing. Retries can repeat extraction
+  and embedding calls. There is no lock for simultaneous uploads.
 
-MCP STRUCTURE (updated 4 October 2026)
-====================================
-app/mcp/
-  __init__.py          Package marker.
-  context.py           Placeholder for request context.
-  results.py           Placeholder for shared result helpers.
-  server.py            Re-exports get_recovery_plan; no MCP transport/startup yet.
-  tools/
-    __init__.py        Package marker.
-    actions.py         Placeholder for medication/task action tools.
-    rag.py             Placeholder for evidence-retrieval tools.
-    recovery.py        Existing recovery-plan reader using app/database/.
+3. SHARED RECOVERY DATA MODEL
 
-The previous mcp_server/ and intermediate root mcp/ layout are replaced by
-app/mcp/. The old services/dynamodb_service.py and tools/get_recovery_plan.py
-are removed. Database access is reused from app.database.recovery_state.
+app/models/recovery_model.py defines dataclasses: Source, Medication, Task,
+Appointment, Restriction, Monitoring, WarningSign and RecoveryState.
 
-get_recovery_plan(patient_id) returns:
-- Found: success=True, patient_id, recovery_plan=<stored item>.
-- Missing: success=False, error=<patient-specific not-found message>.
-It reads the current snapshot, not a historical document, and does not check
-document_id or ingestion_status. AWS errors propagate to the caller.
+RecoveryState fields: patient_id, document_id, discharge_date, medications,
+tasks, appointments, restrictions, monitoring, warning_signs,
+ingestion_status, pending_checkin, last_updated, timezone (default
+Europe/London).
 
-Read-only test from the project root with .venv activated and AWS credentials:
-python -c 'from pprint import pprint; from app.mcp.server import get_recovery_plan; pprint(get_recovery_plan("demo_patient_001"))'
+Not on the model:
+- last_checkin_key. It is written straight to DynamoDB by
+  save_pending_checkin. save_recovery_state uses put_item with the whole
+  record, so any save that starts from a RecoveryState dataclass (for example
+  re-ingestion) drops it. Saves that start from the stored dictionary (the
+  reset script) keep whatever is in the dictionary.
+- demo_now (the plan's per-record demo clock). Not built.
+- A patient name. Reminders greet the patient as "there" unless the stored
+  record has first_name or patient_name.
 
-MCP registration, authentication, context handling, and server transport remain
-unimplemented. Running app.mcp.server does not start a service. The web UI and
-ingestion flow do not call this reader. Lambda packaging includes it through app/.
+Tasks carry clock_times (a list). Medicines have no clock time field.
+
+4. DYNAMODB STORAGE, DAILY OCCURRENCES AND CHECK-INS
+
+app/database/recovery_state.py:
+- save_recovery_state (put_item of the whole record) and get_recovery_state.
+- Builds daily occurrences for a date. Repeated items get separate IDs, for
+  example task_abc#2026-10-23#1. Task occurrences get clock_time from the
+  task's clock_times by position, plus time_of_day_label. Medicine occurrences
+  get time_of_day_label but never a clock_time. As-needed medicines stay
+  untimed. Nothing is scheduled before the discharge date.
+- get_today_tasks returns tasks only; get_medications returns medicines.
+- Completion functions check the occurrence against that day's schedule and
+  record completion in Event History. Readers combine the plan with
+  completion events to give pending/completed status.
+- Check-in helpers (moved here from the deleted app/reminders/store.py):
+  - save_pending_checkin(patient_id, pending_checkin, checkin_key): one
+    conditional UpdateItem that sets pending_checkin and last_checkin_key
+    only if last_checkin_key is absent or different. Returns False on
+    ConditionalCheckFailedException; other errors are raised.
+  - clear_pending_checkin(patient_id): removes pending_checkin only, keeping
+    last_checkin_key so the same occurrence is not reminded twice. Not
+    conditional on which reminder is being cleared.
+  - get_pending_checkin(patient_id).
+
+app/database/event_history.py: event writes with deterministic idempotency
+keys and conditional writes, and history reads (Query).
+
+5. TIME HANDLING
+
+app/clock.py is the shared clock:
+- get_current_datetime(): real UTC time, or DEMO_FIXED_NOW when set.
+- get_current_date(): today's date (UTC calendar date) from the shared clock.
+- get_patient_datetime(tz_name, now=None): the shared clock, or a supplied
+  test time, converted to the patient's timezone. Plan clock times such as
+  "07:30" are local, so reminder checks use this.
+- parse_demo_now(value): parses a manual test timestamp; a UTC offset is
+  required.
+- get_clock_label(tz_name): display text such as "Friday 23 October, 07:00".
+
+Moving the clock still means setting DEMO_FIXED_NOW and restarting or
+redeploying the process, or passing demo_now in a manual Lambda invoke.
+scripts/set_demo_clock.py does not exist, and the reset script does not set
+the clock.
+
+datetime.now() is still called directly in app/database/recovery_state.py
+(fallback when no date is passed), app/database/event_history.py and
+app/ingestion/normalizer.py.
+
+6. DOCUMENT RETRIEVAL (RAG)
+
+- app/rag/chunking.py: overlapping chunks of original page text, keeping
+  document and page information.
+- app/rag/embeddings.py: Titan embeddings, with a dimension check.
+- app/rag/vector_store.py: S3 Vectors put and query, with a patient filter.
+- app/rag/service.py: document indexing and question search.
+Search results are source passages with page metadata, not generated advice.
+
+7. MCP SERVER, AUTHENTICATION AND THE AGENT
+
+- app/mcp/server.py registers six tools: get_recovery_plan, get_today_tasks,
+  get_medications, search_discharge_instructions, report_task_completed,
+  report_medication_taken. Tools take the patient from request context, never
+  from model arguments.
+- app/mcp/http_server.py: stateless streamable HTTP at /mcp plus /health.
+- app/mcp/http_auth.py and app/auth/: a bearer token mapped to
+  demo_patient_001. Per-user resolution is not implemented.
+- app/mcp/context.py: request context, plus get_demo_patient_context().
+- app/mcp/client.py: in-process MCP client used by the agent and the bridge.
+
+app/agent/service.py runs a Bedrock Converse tool loop: patient message ->
+model -> MCP tool calls -> results -> reply.
+- app/agent/safety.py: removes "Alexa" anywhere in the sentence, catches
+  ambiguous medicine reports, checks that a real write tool ran before a
+  completion is claimed.
+- app/agent/evidence.py: picks source evidence only from
+  search_discharge_instructions results.
+- chat() returns response, tool_trace, source and completed. completed is
+  False only when the tool-round limit stopped the turn.
+- app/agent/session.py: up to 12 messages per session, in memory only.
+
+8. WEB BRIDGE AND WEB APP
+
+app/web_bridge.py (new) is a small Starlette app, run locally with
+python scripts/run_web_bridge.py on 127.0.0.1:8002. It has no login and is
+for local use only. The patient always comes from get_demo_patient_context();
+nothing in the query or body can choose the patient, date or time. The MCP
+token stays in the Python process.
+- GET /today returns clock_label, tasks (from the get_today_tasks MCP tool)
+  and pending_checkin (from Recovery State, or null). Failures return 502.
+- POST /chat {message, session_id} runs the agent. If a reminder was waiting
+  when the message arrived and the turn completed, it then clears
+  pending_checkin. Agent errors return 502 and the reminder stays. Replying
+  never marks anything done; a tick only happens if the agent calls a report
+  tool.
+
+web/ is a Next.js 16 / React 19 / TypeScript app bound to 127.0.0.1:
+- app/page.tsx and app/recovery-plan.tsx: upload a PDF and view the plan
+  (unchanged).
+- app/api/upload and app/api/recovery-state: S3 upload and DynamoDB read
+  (unchanged; the only browser-facing routes that touch AWS directly, through
+  lib/aws.ts on the server).
+- app/api/today and app/api/chat (new): server-side pass-throughs to the
+  bridge at AGENT_API_URL (lib/bridge.ts, default http://127.0.0.1:8002).
+  Only message and session_id are forwarded.
+- app/assistant/page.tsx (new): simulated Alexa+ client with a Start button,
+  chat bubbles and a text box. It polls /api/today every 5 seconds. A new
+  reminder is shown as "AfterWard speaks first" and spoken once, only after
+  Start. The last spoken checkin_id is kept in sessionStorage. Polling stops
+  when the page closes. Chat replies are shown but not spoken.
+- lib/speech.ts: the only speech code (browser speechSynthesis, en-GB).
+- lib/checkin.ts: show/speak rules and the non-overlapping poller.
+- lib/poll.ts: the ingestion-status poller for the upload page.
+
+Not built yet from the Phase 15 screen: the plan panel, "+ N more today",
+letter view, tool-call panel, developer view, microphone input, and the
+five-component layout from the mock-ups.
+
+9. PROACTIVE REMINDERS (PHASE 14)
+
+Flow: EventBridge Scheduler (every 5 minutes, planned) -> reminder Lambda ->
+read plan and today's occurrences -> pick one due item -> fixed text ->
+conditional save of pending_checkin -> web client polls, shows and speaks it
+-> patient replies in chat -> pending_checkin cleared.
+
+app/reminders/selector.py: find_due_reminder(tasks, medications, now) is pure
+(no AWS). An occurrence is eligible when it is pending, not
+needs_confirmation, not as-needed (medicines), has a clock_time, and is 25 to
+30 minutes away (so a 5-minute schedule hits it once or twice; the second hit
+is stopped by last_checkin_key). When several are due: walks first, then other
+tasks, then medicines; ties by occurrence number, then occurrence ID.
+
+In practice only tasks can be reminded, because medicine occurrences never
+have a clock_time (section 4). The medicine branch of the selector is correct
+but has nothing to act on.
+
+app/reminders/text.py: build_reminder_text(first_name, item, now) builds the
+sentence in code, with no LLM. At 07:00 for the 07:30 morning walk it returns:
+  "Good morning, Margaret. I hope you're doing well. You have about thirty
+  minutes until your morning walk, at half past seven."
+Differences from the demo script:
+- The warm line is "I hope you're doing well.", not "I hope you slept well."
+- "thirty minutes" is fixed text, not worked out from the times.
+- The name is "there" unless first_name or patient_name is on the record.
+- Times other than :00, :15, :30 and :45 are spoken as, for example,
+  "seven 10 am".
+
+lambdas/reminder_checker/handler.py is a thin orchestrator: optional demo_now
+in the event (validated first; a bad value returns invalid_demo_now) -> load
+plan (patient_not_found) -> patient-local now and today -> get_today_tasks and
+get_medications -> find_due_reminder (nothing_due) -> text -> checkin_key
+"{today}#{occurrence_id}" -> save_pending_checkin (already_reminded or
+created). It makes no Bedrock or MCP calls and writes no completions or
+events. patient_id defaults to demo_patient_001 and can be passed in the
+event.
+
+The repeat key is per occurrence, not per time slot as the plan says
+("2026-10-23#morning"). If one item in a slot is ticked before the window
+closes, the next run can remind a different item in the same slot.
+
+Deployment files in deployment/ (written, not applied):
+- reminder-env.json: table names only; no DEMO_FIXED_NOW.
+- reminder-policy.json: RecoveryState GetItem/UpdateItem, EventHistory Query.
+- scheduler-trust-policy.json and scheduler-invoke-policy.json: let
+  EventBridge Scheduler invoke only AfterwardReminderChecker.
+- reminder-schedule-target.json: the target, with input {}.
+- README.md: AWS CLI commands to create AfterwardReminderRole, the function
+  (handler lambdas.reminder_checker.handler.handler, Python 3.11, x86_64), the
+  scheduler role and one rate(5 minutes) schedule, plus a manual invoke with
+  demo_now "2026-10-23T07:00:00+01:00".
+The reminder Lambda reuses build/afterward_document_processor.zip; the build
+script (scripts/deployment/build_document_lambda.py) now also requires the
+reminder handler.
+
+The plan expects five cron schedules (7:00, 12:30, 14:30, 17:30, 21:00) in
+infra/template.yaml. The code uses one 5-minute schedule created by CLI, and
+there is no infra/ folder or SAM template.
+
+Not built: the "confirmed appointment tomorrow" follow-up line, so no
+appointment is ever announced.
+
+10. MCP HOSTING FILES
+
+- Dockerfile: python:3.11-slim, installs requirements.txt, copies app/, runs
+  uvicorn app.mcp.http_server:app on port 8000.
+- ecs-task-definition.json: family afterward-mcp, FARGATE, image
+  992617582533.dkr.ecr.eu-west-2.amazonaws.com/afterward-mcp:latest.
+- cloudfront-config.json: "AfterWard MCP HTTPS distribution" with an ALB
+  origin (afterward-mcp-alb-...eu-west-2.elb.amazonaws.com).
+So the MCP server is set up for the ECS Fargate fallback, not AgentCore
+Runtime.
+
+11. SEPARATE AGENTCORE STARTER
+
+AfterWardMCP/ contains AgentCore configuration (agentcore/agentcore.json,
+aws-targets.json), a CDK project and an application package. Its tools
+(add_numbers, multiply_numbers, greet_user) are starter examples, not the
+recovery tools.
+
+12. CONFIGURATION, SCRIPTS AND GENERATED FILES
+
+- app/config.py loads region (AWS_REGION is required), models, storage,
+  queues, tables, vector index and MCP settings from the environment. Secrets
+  and local env files are not reproduced here.
+- No SAM template or samconfig. Lambdas are deployed with the AWS CLI
+  commands in deployment/README.md.
+- requirements.txt and deployment/requirements-lambda.txt pin dependencies.
+- build/ is generated and ignored by Git. lambda_package/ is generated but not
+  ignored, and it is tracked. careloop_document_processor.zip and
+  lambda-smoke-response.json sit at the repo root.
+- Root helper scripts: check_setup.py, list_models.py, verify_models.py,
+  run_ingestion.py.
+- scripts/: reset_demo_patient.py (deletes the patient's Event History, resets
+  completion fields, clears pending_checkin and last_checkin_key; does not set
+  the clock), run_test_mcp.py, run_web_bridge.py, test_agent.py,
+  test_mcp_http.py, test_mcp_tools_list.py, schema checks, and folders aws/,
+  deployment/, ingestion/, rag/ of manual integration scripts.
+- tests/fixtures/ holds only letter1_margaret_knee_replacement_SYNTHETIC.pdf.
+  The other three letters (Arjun, Grace, Maya) are not in this repo.
+- docs/: REPOSITORY_GUIDE.md, architecture.md, aws-setup.md, testing.md.
+
+13. TESTS
+
+Run from the repository root with .venv active.
+
+    pytest -q                          297 passed, 10 integration deselected
+    pytest -v -m integration           live AWS checks only
+    cd web && npm test                 14 passed
+    cd web && npm run typecheck        clean
+
+(The pytest, npm test and typecheck results above were re-run on 9 October.)
+
+Phase 14 test files:
+- tests/test_reminder_selector.py: the 25-30 minute window (07:30 at 07:00,
+  09:15 at 08:45, 09:17 at 08:50 and 08:45, missing time), completed,
+  needs_confirmation, as-needed.
+- tests/test_reminder_text.py: reminder wording.
+- tests/database/test_pending_checkin.py: conditional save, duplicate key,
+  different key, other errors raised, clear keeps last_checkin_key.
+- tests/test_reminder_handler.py: patient not found, nothing due, created,
+  duplicate suppressed, occurrence stored, BST handling, demo_now valid,
+  empty, UTC and invalid forms, no completion or event writes.
+- tests/aws/test_reminder_deployment.py: least-privilege policy, no clock
+  override, one 5-minute schedule, schedule input never sets demo_now.
+- tests/test_web_bridge.py: /today with and without a reminder, caller cannot
+  choose patient/date/time, errors.
+- tests/test_web_bridge_chat.py: "Thanks, Alexa" clears without completing;
+  a walk report uses report_task_completed, then clears; an agent failure or
+  unfinished turn keeps the reminder; empty message; patient override.
+- web/tests/checkin.test.ts: show/speak rules, Start gating, no repeats,
+  5-second polling and cleanup, no overlapping reads.
+
+Not covered by a saved test: the priority order when several items are due,
+the chat tests with live Bedrock (they use a scripted model), and the React
+page in a real browser.
+
+Local end-to-end run (four terminals):
+    python scripts/run_test_mcp.py --now 2026-10-23T07:00:00+01:00 --port 8001
+    DEMO_FIXED_NOW=2026-10-23T07:00:00+01:00 MCP_URL=http://127.0.0.1:8001/mcp \
+        python scripts/run_web_bridge.py
+    cd web && AGENT_API_URL=http://127.0.0.1:8002 npm run dev
+        (open http://127.0.0.1:3000/assistant)
+    Run the reminder handler with a demo_now event to create a reminder
+    (this writes to live DynamoDB).
+    Reply test:
+    curl -s -X POST http://127.0.0.1:8002/chat \
+      -H "Content-Type: application/json" \
+      -d '{"message": "I am back from my walk.", "session_id": "phase14-test"}'
+Ports: 8001 is the MCP server, 8002 the bridge (/today, /chat), 3000 Next.js
+(/api/today, /api/chat, /assistant).
+
+14. LIMITS AND VERIFICATION STATUS
+
+Phase 14 against the plan:
+- Done: pure selector with dynamic times; completed, needs_confirmation,
+  as-needed and missing-time filtering; priority order; fixed-text reminder;
+  conditional save; Lambda handler using patient-local time; manual demo_now;
+  no completion writes from the Lambda; /today; chat clearing; client polling
+  and speak-once rules.
+- Differs from the plan: warm line wording; per-occurrence instead of
+  per-slot repeat key; one 5-minute schedule instead of five slot schedules;
+  CLI deployment instead of infra/template.yaml.
+- Gap: medicines can never be reminded, because they have no clock_time.
+- Gap: a medicine whose only unclear part is its duration is flagged
+  needs_confirmation as a whole. Fixing this needs per-field uncertainty
+  (unclear_fields) from the validator.
+- Gap: no patient name, so the reminder says "Good morning, there."
+- Not deployed. The earlier read-only check (9 October, account
+  992617582533, eu-west-2) found only CareLoopDocumentProcessor; no
+  AfterwardReminderRole or reminder function, and the CareLoop user could not
+  list schedules. Not re-checked for this revision.
+- Not built: appointment follow-up line; demo_now on the record;
+  scripts/set_demo_clock.py.
+
+Other limits:
+- All Phase 14 work after commit a7efd38 is uncommitted.
+- The live record may hold an old-format last_checkin_key, so run
+  python scripts/reset_demo_patient.py --confirm before a demo.
+- Clearing a reminder after chat is not tied to its checkin_id; a new
+  reminder saved during a reply could be cleared before it is seen.
+- The bridge and /assistant page have no login and are local tools only.
+- Agent history is in memory only; the bearer-token mapping is demo-only.

@@ -2,6 +2,7 @@
 
 import os
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 
 def get_current_datetime() -> datetime:
@@ -25,6 +26,51 @@ def get_current_datetime() -> datetime:
         return parsed
 
     return datetime.now(timezone.utc)
+
+
+def parse_demo_now(value: str) -> datetime:
+    """
+    Parse a manual test timestamp such as "2026-10-23T07:00:00+01:00".
+
+    An offset is required: without one the time is ambiguous and a
+    demo could silently run an hour out. Raises ValueError.
+    """
+
+    parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+
+    if parsed.tzinfo is None:
+        raise ValueError(
+            "demo_now must include a UTC offset, e.g. "
+            "2026-10-23T07:00:00+01:00"
+        )
+
+    return parsed
+
+
+def get_patient_datetime(
+    tz_name: str = "Europe/London",
+    now: datetime | None = None,
+) -> datetime:
+    """
+    Return the shared clock (or a supplied test time) in the
+    patient's local timezone.
+
+    Plan clock times such as "07:30" are local, so reminder
+    checks must compare them against local time, not UTC.
+    """
+
+    return (now or get_current_datetime()).astimezone(ZoneInfo(tz_name))
+
+
+def get_clock_label(
+    tz_name: str = "Europe/London",
+    now: datetime | None = None,
+) -> str:
+    """Patient-local time for display, e.g. "Friday 23 October, 07:00"."""
+
+    local = get_patient_datetime(tz_name, now)
+
+    return f"{local:%A} {local.day} {local:%B}, {local:%H:%M}"
 
 
 def get_current_date() -> str:
