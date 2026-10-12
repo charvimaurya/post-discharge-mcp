@@ -1,6 +1,5 @@
 """Store patient action history in DynamoDB, reject duplicate event keys, and read saved events."""
 
-from datetime import datetime, timezone
 import hashlib
 
 import boto3
@@ -8,6 +7,7 @@ from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from app import config
+from app.clock import system_now_utc
 
 
 dynamodb = boto3.resource(
@@ -62,9 +62,8 @@ def append_event(
     event_key = "event#" + hashlib.sha256(
         idempotency_key.encode("utf-8")
     ).hexdigest()
-    now = datetime.now(
-        timezone.utc
-    ).isoformat()
+    # When the event was really written (an audit time, not the demo clock).
+    now = system_now_utc().isoformat()
 
     item = {
         "patient_id": patient_id,

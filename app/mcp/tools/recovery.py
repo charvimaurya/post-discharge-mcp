@@ -58,7 +58,7 @@ def get_today_tasks_for_context(
     the shared clock so DEMO_FIXED_NOW controls demo time.
     """
 
-    today = get_current_date()
+    today = get_current_date((get_recovery_state(patient_context.patient_id) or {}).get("timezone") or "Europe/London")
 
     tasks = get_today_tasks(
         patient_context.patient_id,
@@ -88,7 +88,7 @@ def get_medications_for_context(
     "Today" comes from the shared clock, never the caller.
     """
 
-    today = get_current_date()
+    today = get_current_date((get_recovery_state(patient_context.patient_id) or {}).get("timezone") or "Europe/London")
 
     medications = get_medications(
         patient_context.patient_id,

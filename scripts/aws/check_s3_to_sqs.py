@@ -47,9 +47,9 @@ def main():
     timeout_seconds = 30
 
     # Time when we should stop checking.
-    end_time = time.time() + timeout_seconds
+    end_time = time.monotonic() + timeout_seconds
 
-    while time.time() < end_time:
+    while time.monotonic() < end_time:
 
         print("Polling SQS...")
 

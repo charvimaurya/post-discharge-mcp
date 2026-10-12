@@ -112,3 +112,44 @@ def test_cleared_key_still_blocks_a_repeat(table):
     recovery_state.clear_pending_checkin(PATIENT_ID)
 
     assert recovery_state.save_pending_checkin(PATIENT_ID, _checkin(KEY_A), KEY_A) is False
+
+
+# ---------- The proactive rules: every value sent must be used (DynamoDB rejects unused ones) ----------
+
+import re as _re
+
+
+class StrictTable:
+    """Rejects a request whose ExpressionAttributeValues are not all used, like DynamoDB."""
+
+    def __init__(self, stored_date=None):
+        self.stored_date = stored_date
+        self.requests = []
+
+    def get_item(self, Key, ProjectionExpression):
+        return {"Item": {"checkins_today_date": self.stored_date}} if self.stored_date else {}
+
+    def update_item(self, Key, UpdateExpression, ConditionExpression=None, ExpressionAttributeValues=None, **_):
+        used = set(_re.findall(r":[a-z_]+", f"{UpdateExpression} {ConditionExpression or ''}"))
+        unused = set(ExpressionAttributeValues or {}) - used
+        if unused:
+            raise ClientError({"Error": {"Code": "ValidationException",
+                                         "Message": f"unused in expressions: {sorted(unused)}"}}, "UpdateItem")
+        self.requests.append((UpdateExpression, ConditionExpression))
+
+
+@pytest.mark.parametrize("stored_date", [None, "2026-10-22", "2026-10-23"])
+def test_proactive_save_uses_every_value_on_every_branch(monkeypatch, stored_date):
+    table = StrictTable(stored_date)
+    monkeypatch.setattr(recovery_state, "table", table)
+
+    assert recovery_state.save_pending_checkin(
+        PATIENT_ID, _checkin(KEY_A), KEY_A, today="2026-10-23", max_per_day=6,
+    ) is True
+
+    update, condition = table.requests[0]
+    assert "attribute_not_exists(pending_checkin)" in condition
+    if stored_date == "2026-10-23":
+        assert "size(checkins_today_ids) < :max" in condition
+    else:
+        assert "checkins_today_date = :today" in update

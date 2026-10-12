@@ -9,3 +9,6 @@ node_modules/
 dist/
 .DS_Store
 build/
+
+# Local snapshots of live AWS settings (for undo); not committed.
+infra/security/backup/

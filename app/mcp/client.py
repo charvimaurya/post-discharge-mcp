@@ -23,6 +23,8 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
+from app.observability.log import get_request_id
+
 
 def _get_mcp_headers() -> dict[str, str]:
     """
@@ -38,10 +40,17 @@ def _get_mcp_headers() -> dict[str, str]:
         "http://localhost:3000",
     )
 
-    return {
+    headers = {
         "Authorization": f"Bearer {token}",
         "Origin": origin,
     }
+
+    # The same id the bridge logged, so a tool's log line can be matched to the chat turn.
+    request_id = get_request_id()
+    if request_id:
+        headers["X-Request-ID"] = request_id
+
+    return headers
 
 
 async def call_mcp_tool(

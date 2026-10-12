@@ -15,6 +15,11 @@ from app.mcp.context import (
     set_current_patient_context,
 )
 
+from app.observability.log import (
+    reset_request_id,
+    set_request_id,
+)
+
 
 class MCPAuthenticationMiddleware:
     """
@@ -160,6 +165,12 @@ class MCPAuthenticationMiddleware:
             )
         )
 
+        # The caller's request id (the bridge sends the one it logged),
+        # so each tool's log line can be matched to the chat turn.
+        request_token = set_request_id(
+            headers.get("x-request-id")
+        )
+
         try:
 
             await self.app(
@@ -172,4 +183,8 @@ class MCPAuthenticationMiddleware:
 
             reset_current_patient_context(
                 context_token
+            )
+
+            reset_request_id(
+                request_token
             )

@@ -2,6 +2,10 @@
 
 from pathlib import Path
 
+from app.ingestion.document_validation import validate_discharge_document
+from app.ingestion.patient_name import read_first_name
+from app.observability.log import Timer, service_log
+
 from app.ingestion.bedrock import (
     invoke_extraction_model,
 )
@@ -17,6 +21,9 @@ from app.ingestion.pdf_processor import (
 from app.ingestion.validator import (
     validate_recovery_plan,
 )
+
+
+log = service_log("document_lambda")
 
 
 def process_text(
@@ -41,9 +48,15 @@ def process_text(
     RecoveryState
     """
 
+    validate_discharge_document(text)
+
+    timer = Timer()
+
     extracted = invoke_extraction_model(
         text
     )
+
+    log("ingest_stage", stage="extracted", document_id=document_id, ms=timer.ms)
 
     state = normalize_recovery_plan(
         extracted=extracted,
@@ -51,9 +64,16 @@ def process_text(
         document_id=document_id,
     )
 
+    # The letter text lets validation keep only word-for-word diet lines.
     state = validate_recovery_plan(
-        state
+        state,
+        document_text=text,
     )
+
+    # The patient's first name, from the letter's own "Patient:" line. Never guessed.
+    state.first_name = read_first_name(text)
+
+    log("ingest_stage", stage="checked", document_id=document_id, ms=timer.ms)
 
     return state
 

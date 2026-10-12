@@ -7,6 +7,11 @@ from pathlib import Path
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
+from app.observability.log import service_log
+
+
+log = service_log("document_lambda")
+
 SCHEMA_PATH = (
     Path(__file__).parent
     / "schemas"
@@ -54,6 +59,19 @@ Follow these rules strictly:
     text from the original document.
 11. If information is not present, use null, false, or an
     empty list as required by the schema.
+12. diet_advice: one item per diet, food or drink line in the
+    letter (for example under a DIET heading), with text copied
+    word for word. kind = "avoid" when the line tells the patient
+    not to eat or drink something (for example "Do not drink
+    alcohol ..."); kind = "advice" for every other diet line.
+    Never add diet advice the letter does not give, and never
+    reword a line.
+13. tasks.follow_on: only when the letter says to do a task for
+    a stated time straight after another task, e.g. "Ice pack on
+    the knee for 20 minutes after each set of exercises." Put it
+    on the ice-pack task: after_task = the letter's words for the
+    earlier task ("each set of exercises"), duration_minutes = 20,
+    source.snippet = the sentence word for word. Otherwise null.
 
 IMPORTANT MEDICATION RULE:
 Strength and dose are different fields.
@@ -92,8 +110,9 @@ SOURCE EVIDENCE AND COMPLETENESS:
 Use the supplied [Page N] labels for source.page; never invent a page number.
 Preserve short verbatim source snippets and any uncertainty markers.
 Preserve urgent escalation wording in warning text and action.
-Return all seven top-level sections: discharge_date, medications, tasks,
-appointments, restrictions, monitoring, and warning_signs, even when empty.
+Return all eight top-level sections: discharge_date, medications, tasks,
+appointments, restrictions, monitoring, warning_signs and diet_advice,
+even when empty.
 Follow the canonical schema exactly; do not add fields it does not define.
 """
 
@@ -104,6 +123,23 @@ def _bedrock():
     if _client is None:
         _client = boto3.client("bedrock-runtime", region_name=config.REGION)
     return _client
+
+def _field_names(exc: ValidationError) -> str:
+    """Unexpected or missing FIELD names (from the schema), never their values."""
+
+    instance = exc.instance if isinstance(exc.instance, dict) else {}
+
+    if exc.validator == "additionalProperties":
+        allowed = set((exc.schema or {}).get("properties", {}))
+        names = sorted(str(key) for key in instance if key not in allowed)
+        return f": unexpected {', '.join(names)}" if names else ""
+
+    if exc.validator == "required":
+        names = [str(key) for key in exc.validator_value if key not in instance]
+        return f": missing {', '.join(names)}" if names else ""
+
+    return ""
+
 
 def invoke_extraction_model(document_text: str) -> dict:
     """Turn discharge text into schema-valid structured data.
@@ -128,10 +164,11 @@ def invoke_extraction_model(document_text: str) -> dict:
                     "toolChoice": {"tool": {"name": "record_recovery_extraction"}}},
         inferenceConfig={"maxTokens": 5000, "temperature": 0},
     )
-    # Temporary diagnostics to investigate truncated model responses.
+    # Why the model stopped and how many tokens it used (a truncated answer shows as max_tokens).
     stop_reason = resp.get("stopReason")
-    print("BEDROCK_STOP_REASON:", stop_reason)
-    print("BEDROCK_USAGE:", resp.get("usage"))
+    usage = resp.get("usage") or {}
+    log("extraction_model", model=model_id, reason=stop_reason,
+        tokens_in=usage.get("inputTokens"), tokens_out=usage.get("outputTokens"))
     if stop_reason == "max_tokens":
         raise RuntimeError(
             "Bedrock extraction was truncated because the output token limit was reached."
@@ -142,9 +179,12 @@ def invoke_extraction_model(document_text: str) -> dict:
             try:
                 validate(instance=extracted, schema=EXTRACTION_SCHEMA)
             except ValidationError as exc:
+                # Where it failed and which rule, never the value: the value
+                # is letter text, and this message can reach the logs.
+                where = "/".join(str(part) for part in exc.absolute_path) or "(root)"
                 raise ValueError(
-                    "Bedrock returned extraction data that does not match the discharge schema: "
-                    f"{exc.message}"
-                ) from exc
+                    "Bedrock returned extraction data that does not match the discharge schema "
+                    f"at {where} ({exc.validator}{_field_names(exc)})"
+                ) from None
             return extracted
     raise RuntimeError("Model did not return structured tool output")

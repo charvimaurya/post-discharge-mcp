@@ -35,6 +35,15 @@ class Medication:
 
 
 @dataclass
+class FollowOn:
+    """Do this task for duration_minutes straight after another task (from the letter)."""
+
+    after_task_id: str
+    duration_minutes: Optional[int] = None
+    source: Optional[Source] = None
+
+
+@dataclass
 class Task:
     id: str
     description: str
@@ -49,6 +58,8 @@ class Task:
     needs_confirmation: bool = False
 
     source: Optional[Source] = None
+
+    follow_on: Optional[FollowOn] = None
 
 
 @dataclass
@@ -95,11 +106,24 @@ class WarningSign:
 
 
 @dataclass
+class DietAdvice:
+    id: str
+    text: str
+    kind: str = "advice"          # "avoid" or "advice"
+    needs_confirmation: bool = False
+    source: Optional[Source] = None
+
+
+@dataclass
 class RecoveryState:
     patient_id: str
     document_id: str
 
     discharge_date: Optional[str] = None
+
+    # From the letter's "Patient:" line (app/ingestion/patient_name.py). Only the
+    # first name is kept; None means AfterWard greets without a name.
+    first_name: Optional[str] = None
 
     medications: list[Medication] = field(default_factory=list)
     tasks: list[Task] = field(default_factory=list)
@@ -108,6 +132,7 @@ class RecoveryState:
     restrictions: list[Restriction] = field(default_factory=list)
     monitoring: list[Monitoring] = field(default_factory=list)
     warning_signs: list[WarningSign] = field(default_factory=list)
+    diet_advice: list[DietAdvice] = field(default_factory=list)
 
     ingestion_status: str = "processing"
 

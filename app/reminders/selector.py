@@ -6,12 +6,12 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 
-# EventBridge checks every 5 minutes rather than at patient-specific
-# times, so an occurrence is eligible while it is 25-30 minutes away.
-# Every check lands in that window once or twice; the second hit is
-# suppressed by last_checkin_key.
+# The reminder window for an item with a clock time: from 30 minutes
+# before it until the time itself. Outside the window it is never a
+# candidate, so the same time always gives the same reminder. A second
+# check inside the window is suppressed by last_checkin_key.
 REMINDER_EARLIEST_MINUTES = 30
-REMINDER_LATEST_MINUTES = 25
+REMINDER_LATEST_MINUTES = 0
 
 
 def _parse_clock_time(clock_time: str) -> time:
@@ -55,14 +55,14 @@ def _is_due_for_reminder(
     now: datetime,
 ) -> bool:
     """
-    Return True when the occurrence is 25-30 minutes away.
+    Return True from 30 minutes before the occurrence until its time.
 
     Example, due_at = 07:30:
 
         now 06:59 -> False  (31 minutes away)
         now 07:00 -> True   (30 minutes away)
-        now 07:05 -> True   (25 minutes away)
-        now 07:06 -> False  (24 minutes away)
+        now 07:30 -> True   (its time)
+        now 07:31 -> False  (the window is over)
 
     Duplicate protection is handled separately by last_checkin_key.
     """
@@ -126,6 +126,7 @@ def find_due_reminder(
     tasks: list[dict[str, Any]],
     medications: list[dict[str, Any]],
     now: datetime,
+    force_next: bool = False,
 ) -> dict[str, Any] | None:
     """
     Return ONE occurrence that should generate a reminder now.
@@ -154,7 +155,7 @@ def find_due_reminder(
         if task.get("needs_confirmation") is True:
             continue
 
-        if not _is_due_for_reminder(task, now):
+        if not force_next and not _is_due_for_reminder(task, now):
             continue
 
         candidates.append(
@@ -176,7 +177,7 @@ def find_due_reminder(
         if medication.get("as_needed") is True:
             continue
 
-        if not _is_due_for_reminder(medication, now):
+        if not force_next and not _is_due_for_reminder(medication, now):
             continue
 
         candidates.append(
@@ -189,6 +190,16 @@ def find_due_reminder(
     if not candidates:
         return None
 
-    candidates.sort(key=_reminder_priority)
+    if force_next:
+        # Prefer the next timed item; after the last one, allow an earlier
+        # pending item so the recording hook remains usable at any time.
+        def next_priority(item):
+            due = _occurrence_due_datetime(item, now)
+            bucket = 0 if due is not None and due >= now else 1 if due is None else 2
+            return bucket, due or now, _reminder_priority(item)
+
+        candidates.sort(key=next_priority)
+    else:
+        candidates.sort(key=_reminder_priority)
 
     return candidates[0]

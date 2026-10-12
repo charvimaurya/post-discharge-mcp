@@ -49,6 +49,8 @@ def bridge(monkeypatch):
             "last_checkin_key": CHECKIN_KEY,
         },
         patients=[],
+        chats=[],
+        scheduled=[],
     )
 
     def converse(**kwargs):
@@ -78,6 +80,8 @@ def bridge(monkeypatch):
     monkeypatch.setattr(service, "get_agent_model_id", lambda: "test-model")
     monkeypatch.setattr(web_bridge, "get_recovery_state", get_state)
     monkeypatch.setattr(web_bridge, "clear_pending_checkin", clear)
+    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: run.chats.append(at))
+    monkeypatch.setattr(web_bridge, "add_scheduled_checkin", lambda patient_id, entry: run.scheduled.append(entry))
 
     run.client = TestClient(web_bridge.app)
     return run
@@ -92,14 +96,14 @@ def test_wake_word_removed_mid_sentence():
 
 
 def test_acknowledgement_clears_reminder_without_completing(bridge):
-    bridge.model_turns = [_text("No rush. Enjoy your walk when you're ready.")]
-
     response = bridge.client.post(
         "/chat", json={"message": "Thanks, Alexa. I'm just getting ready.", "session_id": "s-ack"}
     )
 
     assert response.status_code == 200
-    assert bridge.seen_messages[0] == "Thanks, I'm just getting ready."
+    # Answered in code: no model call, nothing written, the reminder is not repeated.
+    assert bridge.seen_messages == []
+    assert response.json()["response"].startswith("Lovely.")
     assert _write_calls(bridge) == []
     assert "pending_checkin" not in bridge.state
     assert bridge.state["last_checkin_key"] == CHECKIN_KEY
@@ -121,9 +125,12 @@ def test_completion_report_uses_write_tool_then_clears(bridge):
     assert response.status_code == 200
     assert bridge.seen_messages[0] == "I'm back from my 7:30 am walk."
     assert ("report_task_completed", {"occurrence_id": WALK_ID}) in bridge.tool_calls
-    assert [step["tool"] for step in body["tool_trace"]] == ["get_today_tasks", "report_task_completed"]
+    # Today's facts are read first; "7:30" names the walk, so the model chooses and writes it.
+    assert [step["tool"] for step in body["tool_trace"]] == [
+        "get_today_tasks", "get_medications", "get_today_tasks", "report_task_completed",
+    ]
     assert body["session_id"] == "s-walk"
-    assert set(body) == {"response", "tool_trace", "source", "session_id"}
+    assert set(body) == {"response", "tool_trace", "source", "session_id", "request_id"}
     assert "pending_checkin" not in bridge.state
     assert bridge.state["last_checkin_key"] == CHECKIN_KEY
 
@@ -134,7 +141,7 @@ def test_agent_failure_returns_error_and_keeps_reminder(bridge, monkeypatch):
 
     monkeypatch.setattr(service.bedrock, "converse", broken)
 
-    response = bridge.client.post("/chat", json={"message": "Thanks, Alexa.", "session_id": "s-fail"})
+    response = bridge.client.post("/chat", json={"message": "What's next, Alexa?", "session_id": "s-fail"})
 
     assert response.status_code == 502
     assert response.json() == {"error": web_bridge.CHAT_ERROR}

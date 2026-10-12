@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AfterWard observability: alarms on the metrics the app writes in its log lines
+  (CloudWatch Embedded Metric Format), a log group with 30-day retention, and saved
+  Logs Insights queries. NOT DEPLOYED. See docs/observability.md.
+
+Parameters:
+  ToolErrorThreshold:
+    Type: Number
+    Default: 3
+    Description: Alarm when MCP tool errors in 5 minutes are more than this.
+  DeadLetterQueueName:
+    Type: String
+    Default: CareLoopDocumentProcessingDLQ
+    Description: The document queue's dead-letter queue.
+  AlarmEmail:
+    Type: String
+    Default: ''
+    Description: Optional. An address to email when an alarm fires.
+  QueryLogGroups:
+    Type: CommaDelimitedList
+    Default: /aws/lambda/CareLoopDocumentProcessor,/aws/lambda/AfterwardReminderChecker
+    Description: >
+      Existing log groups the saved queries search. Add the MCP server's ECS log group
+      here; the bridge log group below is added automatically.
+
+Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
+
+Resources:
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: afterward-alarms
+
+  AlarmEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlarmEmail
+    Properties:
+      TopicArn: !Ref AlarmTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  # New log group for the web bridge when it runs on AWS. 30 days, like the others.
+  BridgeLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      LogGroupName: /afterward/bridge
+      RetentionInDays: 30
+
+  # tool_errors is written by app/mcp/server.py: 1 when a tool raises, 0 otherwise.
+  # An expected "no" from a tool (nothing to undo, no evidence) is not an error.
+  ToolErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: afterward-tool-errors
+      AlarmDescription: MCP tool calls are failing. Search the logs for event = "tool_call" and status = "error".
+      Namespace: AfterWard
+      MetricName: tool_errors
+      Dimensions:
+        - Name: service
+          Value: mcp
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Ref ToolErrorThreshold
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  # Any message here is a letter that failed every retry.
+  DeadLetterQueueAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: afterward-document-dlq-not-empty
+      AlarmDescription: A discharge letter failed processing and is in the dead-letter queue.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !Ref DeadLetterQueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions: [!Ref AlarmTopic]
+
+  TraceOneRequestQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: AfterWard/Trace one request
+      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref BridgeLogGroup]]]
+      QueryString: |
+        fields @timestamp, service, event, route, tool, kind, status, ms, reason, error_type, error_code
+        | filter request_id = "PASTE_REQUEST_ID_HERE"
+        | sort @timestamp asc
+
+  ChatTimeQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: AfterWard/Chat time p50 and p90
+      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref BridgeLogGroup]]]
+      QueryString: |
+        filter event = "agent_turn"
+        | stats count() as turns, pct(ms, 50) as p50_ms, pct(ms, 90) as p90_ms by bin(1h), kind
+
+  UploadToReadyQuery:
+    Type: AWS::Logs::QueryDefinition
+    Properties:
+      Name: AfterWard/Upload to ready time
+      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref BridgeLogGroup]]]
+      QueryString: |
+        filter event = "ingest_ready"
+        | stats count() as uploads, pct(upload_to_ready_ms, 50) as p50_ms, pct(upload_to_ready_ms, 90) as p90_ms, max(upload_to_ready_ms) as slowest_ms by bin(1d)
+
+Outputs:
+  AlarmTopicArn:
+    Value: !Ref AlarmTopic
+  BridgeLogGroupName:
+    Value: !Ref BridgeLogGroup

@@ -170,3 +170,297 @@ def strip_markdown_emphasis(text: str) -> str:
     """
 
     return re.sub(r"\*\*|__", "", text)
+
+
+_SCREEN_PATTERN = re.compile(r"\bscreens?\b|\bthe app\b", re.IGNORECASE)
+
+
+def remove_screen_references(text: str) -> str:
+    """
+    Drop any sentence that mentions a screen or the app.
+
+    Alexa+ may have no screen, so a reply must make sense when
+    only heard. The prompt forbids these sentences; this makes
+    sure one never reaches the patient.
+    """
+
+    sentences = re.split(r"(?<=[.!?])\s+", (text or "").strip())
+
+    return " ".join(
+        sentence
+        for sentence in sentences
+        if sentence and not _SCREEN_PATTERN.search(sentence)
+    )
+
+
+_HOLLOW_OPENER = re.compile(
+    r"^\s*(you'?re|you are)\s+(absolutely\s+|quite\s+)?right\b[\s,.!:;-]*",
+    re.IGNORECASE,
+)
+
+
+def remove_hollow_openers(text: str) -> str:
+    """
+    Drop a leading "You're right," and similar.
+
+    The patient has not corrected anything, so the reply should
+    start with the answer.
+    """
+
+    stripped = _HOLLOW_OPENER.sub("", text or "", count=1)
+
+    if stripped == text:
+        return text
+
+    return stripped[:1].upper() + stripped[1:]
+
+
+# ---------- Prompts she did not ask for ----------
+
+# How a reply nudges: "next is", "when you're ready", "you still have", "have you taken".
+_PROMPT_SHAPE = re.compile(
+    r"\b(next|when you'?re ready|don'?t forget|remember|you (still |also )?(have|need)|have you (taken|done|had)|"
+    r"it'?s time|time (for|to)|(is|are) due|still to (do|take)|left to|after that|and then|then your|"
+    r"whenever you'?re ready|ready for)\b"
+)
+_REPLY_SENTENCE = re.compile(r"(?<=[.!?])\s+")
+
+NOTHING_MORE_TO_SAY = "I'm here whenever you need me."
+
+
+def remove_unasked_prompts(reply: str, message: str, names: list[str]) -> str:
+    """
+    Drop sentences that prompt her about a medicine or task she did not mention.
+
+    Used when she neither reported anything nor asked about her plan
+    ("the weather is nice"). A sentence goes only if it names one of today's
+    unfinished items AND reads as a prompt, so an answer from the letter that
+    happens to name a medicine is kept.
+    """
+
+    said = _plain(message)
+    unasked = [name for name in names if name and name not in said]
+
+    if not unasked or not reply:
+        return reply
+
+    kept = [
+        sentence for sentence in _REPLY_SENTENCE.split(reply.strip())
+        if not (
+            _PROMPT_SHAPE.search(_plain(sentence))
+            and any(re.search(rf"\b{re.escape(name)}\b", _plain(sentence)) for name in unasked)
+        )
+    ]
+
+    return " ".join(kept).strip() or NOTHING_MORE_TO_SAY
+
+
+# ---------- Negative and "not yet" answers ----------
+
+# Phrases that contain "no" or "not" but are not a negative answer.
+_NOT_A_NEGATIVE = re.compile(
+    r"\b(no (problem|problems|worries|trouble|pain)|not (too )?bad)\b"
+)
+
+_NEGATIVE = re.compile(
+    r"\b(no|nope|nah|not|never|"
+    r"haven't|havent|hasn't|hadn't|didn't|didnt|don't|dont|"
+    r"won't|wont|can't|cant|cannot|couldn't|"
+    r"forgot|forgotten|forget|later|skip|skipped|skipping|missed)\b"
+)
+
+
+def _plain(message: str) -> str:
+    """Lower case, with curly apostrophes made straight."""
+
+    return (message or "").lower().replace("’", "'").replace("‘", "'")
+
+
+def is_negative_report(message: str) -> bool:
+    """
+    True when the patient says she has NOT done something, or not yet.
+
+    Examples: "no I have not taken it", "I haven't taken my blood
+    thinner yet", "Not yet", "I forgot", "I'll do it later".
+
+    Run on the message after the wake word is removed. Anything
+    negative blocks every report_* write for the turn: recording a
+    dose that was not taken is worse than asking again.
+    """
+
+    text = _NOT_A_NEGATIVE.sub(" ", _plain(message))
+
+    return bool(_NEGATIVE.search(text))
+
+
+_TAKE_WORDS = re.compile(r"\b(take|taken|took|tablets?|dose|medicines?|medication)\b")
+_DO_WORDS = re.compile(r"\b(walk|walks|exercises?|done|back|finished)\b")
+
+
+def asked_about_completion(text: str) -> str | None:
+    """
+    If AfterWard's last message asked whether something was done,
+    the write tool it was about; otherwise None.
+
+    "Have you taken your paracetamol yet?" -> "report_medication_taken"
+    "Are you back from your walk?"          -> "report_task_completed"
+    """
+
+    text = _plain(text)
+
+    if "?" not in text:
+        return None
+
+    if _TAKE_WORDS.search(text):
+        return "report_medication_taken"
+
+    if _DO_WORDS.search(text):
+        return "report_task_completed"
+
+    return None
+
+
+# ---------- Tidy the spoken reply ----------
+
+_LEADING_FRAGMENT = re.compile(r"^[\s—–\-….,;:]+")
+_PREMATURE_PROMISE = re.compile(r"\blet me (record|mark|log|note)\b", re.IGNORECASE)
+
+
+def tidy_reply(text: str) -> str:
+    """
+    Remove a stray leading dash or fragment and any "let me record"
+    sentence, so the patient only hears a finished reply.
+    """
+
+    sentences = re.split(r"(?<=[.!?])\s+", (text or "").strip())
+    kept = " ".join(s for s in sentences if s and not _PREMATURE_PROMISE.search(s))
+    kept = _LEADING_FRAGMENT.sub("", kept)
+
+    return kept[:1].upper() + kept[1:]
+
+
+# ---------- "Thanks, I'm just getting ready" ----------
+
+_ACKNOWLEDGEMENT = re.compile(
+    r"\b(thanks|thank you|cheers|ok|okay|alright|all right|sure|great|lovely|"
+    r"got it|will do|on my way|getting ready|get ready|nearly ready|not ready|"
+    r"not yet|in a (minute|moment|bit)|just a (minute|moment|sec)|shortly|soon)\b"
+)
+
+
+def is_acknowledgement(message: str) -> bool:
+    """
+    True for a short answer to a reminder that is not a question:
+    "Thanks, I'm just getting ready", "Okay", "Not yet".
+    """
+
+    text = _plain(message)
+
+    return "?" not in text and bool(_ACKNOWLEDGEMENT.search(text))
+
+
+# ---------- "What's next?" ----------
+
+_NEXT_UP_QUESTION = re.compile(
+    r"\bwhat'?s (next|left)\b|\bwhat is (next|left)\b|\bwhat else\b|\bwhat remains\b|"
+    r"\bwhat (do|should|have) i (got |need |have |got )?(to )?do\b|\bwhat now\b|"
+    r"\banything else (to do|today)\b"
+)
+
+_YES = re.compile(r"^\W*(yes|yeah|yep|please|go on|go ahead|sure|ok|okay|read them|yes please)\b")
+
+
+def is_next_up_question(message: str) -> bool:
+    """'What's next?', 'What do I need to do now?', 'What's left today?'"""
+
+    return bool(_NEXT_UP_QUESTION.search(_plain(message)))
+
+
+def accepts_offer(message: str, last_reply: str) -> bool:
+    """She said yes to 'Would you like me to read them?'."""
+
+    return (
+        "would you like me to" in _plain(last_reply)
+        and bool(_YES.search(_plain(message)))
+        and not is_negative_report(message)
+    )
+
+
+def is_permission_question(message: str) -> bool:
+    """Questions about allowed activities need fresh discharge-letter evidence."""
+    return bool(re.search(
+        r"\b(?:am i allowed|can i|may i|could i|is it (?:safe|okay|ok)|"
+        r"allowed to|permitted to|when can i|when may i)\b",
+        _plain(message),
+    ))
+
+
+# ---------- Missed doses ----------
+
+_AFFIRMATIVE = re.compile(
+    r"^\W*(yes|yeah|yep|yup|i have|i did|i've taken|i have taken|i took|took it|taken it|done|had it|"
+    r"already did|already have|already taken)\b"
+)
+
+# Questions about a missed or extra dose. Only the letter answers these.
+_MISSED_DOSE_WORDS = re.compile(
+    r"\b(miss(ed|ing)? (a |my |the )?(dose|tablet)|missed it|forgot|forget|forgotten|double|"
+    r"two doses|take two|two tablets|extra (dose|tablet)|catch up|too late)\b"
+)
+
+
+def is_affirmative(message: str) -> bool:
+    """'Yes', 'I have', 'I took it' as an answer to 'Have you taken it?'."""
+
+    return bool(_AFFIRMATIVE.search(_plain(message))) and not is_negative_report(message)
+
+
+def is_missed_dose_question(message: str) -> bool:
+    """'Should I take two?', 'What if I missed it?', 'I forgot my dose, what now?'."""
+
+    text = _plain(message)
+
+    return bool(_MISSED_DOSE_WORDS.search(text)) and (
+        "?" in text or text.startswith(("should", "can", "what", "do i", "is it"))
+    )
+
+
+
+# ---------- Corrections ----------
+
+_CORRECTION = re.compile(
+    r"\b(that'?s wrong|that is wrong|wrong|undo|mistake|change (it|that) back|take (it|that) back|"
+    r"not true|i didn'?t (take|do|have)|i did not (take|do|have)|i haven'?t (taken|done|had))\b"
+)
+
+
+def is_correction(message: str) -> bool:
+    """'That's wrong', 'undo that', "No, I didn't take the blood thinner"."""
+
+    return bool(_CORRECTION.search(_plain(message)))
+
+
+
+# ---------- One step at a time ----------
+
+_AFTER_THAT = re.compile(
+    r"\b(and )?after that\b|\bwhat'?s after (that|this)\b|\bwhat is after (that|this)\b|"
+    r"\b(and )?then what\b|\bwhat comes after\b|\band next\b"
+)
+
+_WHATS_LEFT_TODAY = re.compile(
+    r"\b(what'?s|what is) left (to do )?(for )?today\b|\bleft today\b|\bwhat else\b|"
+    r"\brest of (the|my) day\b|\bwhat do i (still )?have (left )?today\b|\bwhat remains\b"
+)
+
+
+def asks_after_that(message: str) -> bool:
+    """'And after that?', 'What's after that?', 'Then what?'."""
+
+    return bool(_AFTER_THAT.search(_plain(message)))
+
+
+def asks_whats_left_today(message: str) -> bool:
+    """'What's left today?', 'What else do I have today?' (a bare 'What's left?' is the next step)."""
+
+    return bool(_WHATS_LEFT_TODAY.search(_plain(message)))

@@ -211,8 +211,11 @@ def select_rag_source(
     # 1. The model's citation, if it really supports the reply.
     cited = _cited_item(rag_matches, cited_chunk_id, cited_line)
 
+    # What the excerpt should answer: the reply first, then the question.
+    answer_text = " ".join([response_text or "", *context_texts])
+
     if cited is not None and scorer.supports(cited[1]):
-        return _source(*cited)
+        return _source(*cited, answer_text)
 
     # 2. Best supporting item across every returned result.
     best = None
@@ -231,7 +234,7 @@ def select_rag_source(
     if best is None:
         return None
 
-    return _source(*best)
+    return _source(*best, answer_text)
 
 
 def _cited_item(
@@ -458,13 +461,251 @@ def _unique_items(rag_matches: list[dict]) -> list[tuple[dict, str]]:
     return unique
 
 
-def _source(match: dict, item: str) -> dict:
-    """Build the API source from one RAG match and its item."""
+def _source(match: dict, item: str, answer_text: str = "") -> dict:
+    """
+    Build the API source from one RAG match and its item.
+
+    section, text and highlight are the clean excerpt for the letter
+    panel (clean_passage). passage and highlighted_line are kept for
+    older readers: the raw chunk and the matched item.
+    """
+
+    excerpt = clean_passage(match.get("text") or "", answer_text, item) or {}
 
     return {
         "document_id": match.get("document_id"),
         "page": match.get("page"),
         "chunk_id": match.get("chunk_id"),
+        "section": excerpt.get("section"),
+        "text": excerpt.get("text") or item,
+        "highlight": excerpt.get("highlight") or item,
         "passage": match.get("text"),
         "highlighted_line": item,
+    }
+
+
+# ---------- A clean, readable excerpt for the letter panel ----------
+
+# Most sentences an excerpt keeps.
+MAX_EXCERPT_SENTENCES = 3
+
+_NUMBER_ONLY = re.compile(r"^\s*(\d+)\.\s*$")
+_NUMBER_LEAD = re.compile(r"^\s*(\d+)\.\s+(\S.*)$")
+_BULLET_LEAD = re.compile(r"^\s*(?:[\x7f•▪●◦‣∙·*]|-\s)\s*")
+_SENTENCE_END = re.compile(r"[.!?:]\s*$")
+_SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9(\"'])")
+
+# Everyday words patients use for a medicine, so "blood thinner"
+# can find the Apixaban item. Matching only; the letter's words
+# are never replaced.
+_EVERYDAY_TERMS = {
+    "blood thinner": (
+        "apixaban", "rivaroxaban", "edoxaban", "dabigatran",
+        "warfarin", "enoxaparin", "dalteparin", "heparin",
+    ),
+}
+
+
+def _blocks(chunk_text: str) -> list[dict]:
+    """
+    Rebuild the letter's own blocks from a chunk.
+
+    PDF line wraps are re-joined (a line that does not end in
+    . ! ? : continues on the next). A numbered item, a bullet or an
+    ALL-CAPS heading always starts a new block. Each block keeps the
+    nearest heading above it as its section.
+    """
+
+    blocks: list[dict] = []
+    section: str | None = None
+    current: dict | None = None
+    pending_number: str | None = None
+
+    def close():
+        nonlocal current
+        if current and current["text"].strip():
+            blocks.append(current)
+        current = None
+
+    def start(kind: str, text: str, number: str | None = None):
+        nonlocal current
+        close()
+        current = {"kind": kind, "number": number, "text": text.strip(), "section": section}
+
+    for raw in (chunk_text or "").split("\n"):
+        line = raw.strip()
+
+        if not line:
+            # A blank line ends a paragraph, but not a numbered item
+            # whose text has not started yet.
+            if pending_number is None:
+                close()
+            continue
+
+        number_only = _NUMBER_ONLY.match(line)
+        if number_only:
+            close()
+            pending_number = number_only.group(1)
+            continue
+
+        if _is_heading(line) and pending_number is None:
+            close()
+            section = line.strip()
+            continue
+
+        if pending_number is not None:
+            start("item", line, pending_number)
+            pending_number = None
+            continue
+
+        number_lead = _NUMBER_LEAD.match(line)
+        if number_lead:
+            start("item", number_lead.group(2), number_lead.group(1))
+            continue
+
+        if _BULLET_LEAD.match(line):
+            start("bullet", _BULLET_LEAD.sub("", line, count=1))
+            continue
+
+        if current is None:
+            start("para", line)
+        elif current["kind"] == "para" and _SENTENCE_END.search(current["text"]):
+            # A finished sentence followed by a new line: a new paragraph.
+            start("para", line)
+        else:
+            # A wrapped line, or the text after a bullet glyph on its own line.
+            current["text"] = f"{current['text']} {line}".strip()
+
+    close()
+    return blocks
+
+
+def _sentences(text: str) -> list[str]:
+    return [s.strip() for s in _SENTENCE_SPLIT.split(text.strip()) if s.strip()]
+
+
+def _trim_partial_edges(blocks: list[dict]) -> list[dict]:
+    """Drop the cut-off sentence at the start and end of the chunk."""
+
+    if blocks:
+        first = blocks[0]
+        # A chunk that starts mid-sentence ("akfast. 2.") begins lower case.
+        if first["kind"] == "para" and first["text"][:1].islower():
+            sentences = _sentences(first["text"])
+            rest = " ".join(sentences[1:]) if len(sentences) > 1 else ""
+            if rest:
+                first["text"] = rest
+            else:
+                blocks = blocks[1:]
+
+    if blocks:
+        last = blocks[-1]
+        if not _SENTENCE_END.search(last["text"]):
+            sentences = _sentences(last["text"])
+            complete = [s for s in sentences if _SENTENCE_END.search(s)]
+            if complete:
+                last["text"] = " ".join(complete)
+            else:
+                blocks = blocks[:-1]
+
+    return blocks
+
+
+def _expanded_words(text: str) -> set[str]:
+    """Words of `text`, plus medicine names for an everyday term it uses."""
+
+    words = _words(text)
+    lowered = (text or "").lower()
+
+    for term, names in _EVERYDAY_TERMS.items():
+        if term in lowered:
+            words |= set(names)
+
+    return words
+
+
+def _block_text(block: dict) -> str:
+    if block["kind"] == "item":
+        return f"{block['number']}. {block['text']}"
+    if block["kind"] == "bullet":
+        return f"- {block['text']}"
+    return block["text"]
+
+
+def clean_passage(
+    chunk_text: str,
+    query_or_answer: str,
+    item: str | None = None,
+) -> dict | None:
+    """
+    A short, readable excerpt of the letter for the panel.
+
+    Returns {"section", "text", "highlight"}:
+      text       the one block that answers (a numbered item, a bullet
+                 or a paragraph), at most about three sentences, with
+                 PDF line wraps re-joined and bullets as "- ".
+      highlight  the one sentence in `text` that answers.
+      section    the nearest ALL-CAPS heading above it, title-cased,
+                 or None if the chunk has none above it.
+
+    `item` is the letter item the evidence check chose; when given,
+    the block containing it wins. Otherwise the block sharing the most
+    rare words with `query_or_answer` wins. Only whitespace, bullet
+    glyphs and trimming change; the letter's words never do.
+    """
+
+    blocks = _trim_partial_edges(_blocks(chunk_text))
+
+    if not blocks:
+        return None
+
+    target_words = _expanded_words(query_or_answer)
+
+    # How many blocks each word is in, so rare words count most.
+    frequency: dict[str, int] = {}
+    for block in blocks:
+        for word in _words(block["text"]):
+            frequency[word] = frequency.get(word, 0) + 1
+
+    def weight(word: str) -> float:
+        return math.log((len(blocks) + 1) / (frequency.get(word, 0) + 1)) + 1
+
+    def score(text: str) -> float:
+        return sum(weight(w) for w in _words(text) & target_words)
+
+    chosen = None
+
+    if item:
+        wanted = _normalise(item)
+        for block in blocks:
+            have = _normalise(block["text"])
+            if wanted and (wanted in have or have in wanted):
+                chosen = block
+                break
+
+    if chosen is None:
+        chosen = max(blocks, key=lambda block: score(block["text"]))
+        if score(chosen["text"]) == 0:
+            return None
+
+    sentences = _sentences(chosen["text"])
+    best = max(range(len(sentences)), key=lambda i: (score(sentences[i]), -i))
+
+    # About three sentences: a block of up to four is kept whole, so a
+    # numbered medicine keeps its name and dose. A longer block is cut
+    # to three sentences in a row that include the answering one;
+    # sentences are never skipped from the middle.
+    if len(sentences) > MAX_EXCERPT_SENTENCES + 1:
+        start = max(0, min(best - 1, len(sentences) - MAX_EXCERPT_SENTENCES))
+        sentences = sentences[start:start + MAX_EXCERPT_SENTENCES]
+        best -= start
+
+    chosen = dict(chosen, text=" ".join(sentences))
+
+    section = chosen.get("section")
+
+    return {
+        "section": section.title() if section else None,
+        "text": _block_text(chosen),
+        "highlight": sentences[best],
     }

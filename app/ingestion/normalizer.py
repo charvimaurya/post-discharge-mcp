@@ -1,12 +1,13 @@
 """Map canonical extraction fields to recovery dataclasses and application-owned IDs/statuses."""
 
 import hashlib
+import re
 import json
-from datetime import datetime, timezone
+from app.clock import system_now_utc
 
 from app.models.recovery_model import (
     Appointment, Medication, Monitoring, RecoveryState, Restriction,
-    Source, Task, WarningSign,
+    DietAdvice, FollowOn, Source, Task, WarningSign,
 )
 
 
@@ -40,6 +41,51 @@ def normalize_source(source_data: dict | None, document_id: str) -> Source | Non
         page=source_data.get("page"),
         read_from_image=bool(source_data.get("read_from_image", False)),
     )
+
+
+def _significant_words(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]+", (text or "").lower()) if len(w) >= 4}
+
+
+def _same_word(a: str, b: str) -> bool:
+    """'exercise' matches 'exercises'."""
+
+    return a.startswith(b) or b.startswith(a)
+
+
+def _link_follow_ons(tasks: list, raw_tasks: list, document_id) -> None:
+    """
+    Turn each follow_on's "after_task" words into the id of that task.
+
+    "each set of exercises" -> the "Knee exercises ..." task. A follow_on
+    that does not clearly point at exactly one other task is dropped.
+    """
+
+    by_description = {t.description: t for t in tasks}
+
+    for raw in raw_tasks:
+        follow = raw.get("follow_on")
+        task = by_description.get(clean(raw.get("description")))
+
+        if not follow or task is None:
+            continue
+
+        wanted = _significant_words(follow.get("after_task"))
+        matches = [
+            other for other in tasks
+            if other is not task
+            and any(_same_word(w, d) for w in wanted for d in _significant_words(other.description))
+        ]
+
+        if len(matches) != 1:
+            continue
+
+        minutes = follow.get("duration_minutes")
+        task.follow_on = FollowOn(
+            after_task_id=matches[0].id,
+            duration_minutes=minutes if isinstance(minutes, int) and minutes > 0 else None,
+            source=normalize_source(follow.get("source"), document_id),
+        )
 
 
 def normalize_recovery_plan(
@@ -93,6 +139,8 @@ def normalize_recovery_plan(
             needs_confirmation=False,
             source=normalize_source(item.get("source"), document_id),
         ))
+
+    _link_follow_ons(tasks, extracted.get("tasks", []), document_id)
 
     appointments = []
     for item in extracted.get("appointments", []):
@@ -150,7 +198,22 @@ def normalize_recovery_plan(
             source=normalize_source(item.get("source"), document_id),
         ))
 
-    current_timestamp = datetime.now(timezone.utc).isoformat()
+    diet_advice = []
+    for item in extracted.get("diet_advice", []):
+        text = clean(item.get("text"))
+        if not text:
+            continue
+        kind = item.get("kind")
+        diet_advice.append(DietAdvice(
+            id=make_id("diet", text),
+            text=text,
+            kind=kind if kind in ("avoid", "advice") else "advice",
+            # An unknown kind means the model was unsure: hold it for confirmation.
+            needs_confirmation=kind not in ("avoid", "advice"),
+            source=normalize_source(item.get("source"), document_id),
+        ))
+
+    current_timestamp = system_now_utc().isoformat()
     return RecoveryState(
         patient_id=patient_id,
         document_id=document_id,
@@ -161,6 +224,7 @@ def normalize_recovery_plan(
         restrictions=restrictions,
         monitoring=monitoring,
         warning_signs=warning_signs,
+        diet_advice=diet_advice,
         ingestion_status="processing",
         pending_checkin=None,
         last_updated=current_timestamp,

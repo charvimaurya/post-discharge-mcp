@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+import re
+from datetime import datetime, time
 from typing import Any
 
 
@@ -16,7 +17,44 @@ def _greeting(now: datetime) -> str:
     return "Good evening"
 
 
-def _time_to_words(clock_time: str) -> str:
+def _warm_line(now: datetime) -> str:
+    # A statement, not a question: AfterWard does not ask about symptoms.
+    if now.hour < 12:
+        return "I hope you slept well."
+
+    return "I hope you're doing well."
+
+
+def build_opening_greeting(first_name: str | None, now: datetime) -> str:
+    """Welcome the patient using the shared clock's local time, even on empty days."""
+    name = f", {first_name}" if first_name else ""
+    return f"{_greeting(now)}{name}. {_warm_line(now)}"
+
+
+def _part_of_day(clock_time: str | None) -> str | None:
+    """'07:30' -> 'morning'. Describes a time; never sets one."""
+
+    if not clock_time:
+        return None
+
+    hour = int(clock_time.split(":")[0])
+
+    if hour < 12:
+        return "morning"
+
+    if hour < 14:
+        return "midday"
+
+    if hour < 17:
+        return "afternoon"
+
+    if hour < 21:
+        return "evening"
+
+    return "bedtime"
+
+
+def time_to_words(clock_time: str) -> str:
     """
     Small speech helper for demo/recovery times.
 
@@ -84,52 +122,76 @@ def _item_description(item: dict[str, Any]) -> str:
     ).lower()
 
     if item.get("item_type") == "task" and "walk" in text:
-        label = item.get("time_of_day_label")
+        # Margaret's letter gives the walks clock times (07:30, 15:00)
+        # but no time-of-day word, so name the part of day from the time.
+        label = item.get("time_of_day_label") or _part_of_day(
+            item.get("clock_time")
+        )
 
         if label:
             return f"{label} walk"
 
         return "walk"
 
-    if item.get("item_type") == "medication":
-        return str(
-            item.get("name")
-            or item.get("title")
-            or "medication"
-        )
+    label = item.get("time_of_day_label") or _part_of_day(item.get("clock_time"))
+    prefix = f"{label} " if label else ""
 
-    return str(
-        item.get("title")
-        or item.get("name")
-        or item.get("label")
-        or "recovery activity"
-    )
+    if item.get("item_type") == "medication":
+        return prefix + str(item.get("name") or item.get("title") or "medication").lower()
+
+    name = item.get("description") or item.get("title") or item.get("name") or item.get("label")
+
+    return prefix + (short_task_name(str(name)) if name else "recovery activity")
+
+
+def short_task_name(description: str) -> str:
+    """
+    A short spoken name for a task, from the letter's own words:
+    "Knee exercises from your physiotherapy sheet" -> "knee exercises",
+    "Walking: one short walk ..." -> "walk".
+    """
+
+    if "walk" in description.lower():
+        return "walk"
+
+    first = re.split(r"(?<=[.!?])\s", description.strip())[0]
+    first = re.split(r":|,| from | for ", first)[0]
+
+    return first.strip().rstrip(".").lower()
 
 
 def build_reminder_text(
-    first_name: str,
+    first_name: str | None,
     item: dict[str, Any],
     now: datetime,
 ) -> str:
     """
     Build the reminder using deterministic application code.
 
-    No LLM is involved.
+    No LLM is involved. The greeting fits the time of day. "About
+    thirty minutes" is said only when that is true; a reminder made
+    at another time (forced for testing, or an item with no clock
+    time) just says what is next.
     """
 
+    opening = (
+        f"{_greeting(now)}{', ' + first_name if first_name else ''}. "
+        f"{_warm_line(now)} "
+    )
+    description = _item_description(item)
     clock_time = item.get("clock_time")
 
     if not clock_time:
-        raise ValueError(
-            "Cannot build timed reminder without clock_time."
+        return f"{opening}Next is your {description}."
+
+    spoken_time = time_to_words(clock_time)
+    due = datetime.combine(now.date(), time.fromisoformat(clock_time), tzinfo=now.tzinfo)
+    minutes = (due - now).total_seconds() / 60
+
+    if 20 <= minutes <= 35:
+        return (
+            f"{opening}You have about thirty minutes until your "
+            f"{description}, at {spoken_time}."
         )
 
-    description = _item_description(item)
-    spoken_time = _time_to_words(clock_time)
-
-    return (
-        f"{_greeting(now)}, {first_name}. "
-        f"I hope you're doing well. "
-        f"You have about thirty minutes until your "
-        f"{description}, at {spoken_time}."
-    )
+    return f"{opening}Next is your {description}, at {spoken_time}."

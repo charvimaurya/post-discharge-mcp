@@ -131,12 +131,12 @@ def main():
         "S3 → SQS → Lambda → Bedrock → DynamoDB..."
     )
 
-    started_at = time.time()
+    started_at = time.monotonic()
 
 
     while True:
         elapsed = (
-            time.time()
+            time.monotonic()
             - started_at
         )
 
@@ -305,7 +305,7 @@ def main():
         ):
 
             duration = (
-                time.time()
+                time.monotonic()
                 - started_at
             )
 

@@ -357,6 +357,93 @@
             ],
             "title": "SourceEvidence",
             "type": "object"
+          },
+          "follow_on": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "description": "Set only when the letter says to do THIS task for a stated time straight after ANOTHER task, e.g. 'Ice pack on the knee for 20 minutes after each set of exercises.'",
+                "properties": {
+                  "after_task": {
+                    "description": "The letter's own words for the task this one follows, e.g. 'each set of exercises'.",
+                    "title": "After Task",
+                    "type": "string"
+                  },
+                  "duration_minutes": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Minutes, only if the letter states a number of minutes.",
+                    "title": "Duration Minutes"
+                  },
+                  "source": {
+                    "additionalProperties": false,
+                    "description": "Where in the letter an item came from.",
+                    "properties": {
+                      "snippet": {
+                        "description": "The sentence from the letter, copied word for word.",
+                        "title": "Snippet",
+                        "type": "string"
+                      },
+                      "page": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Page number in the letter, starting at 1.",
+                        "title": "Page"
+                      },
+                      "document_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set by the pipeline, not by the model.",
+                        "title": "Document Id"
+                      },
+                      "read_from_image": {
+                        "default": false,
+                        "description": "True if this text was read from a photo or scan.",
+                        "title": "Read From Image",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "snippet"
+                    ],
+                    "title": "SourceEvidence",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "after_task",
+                  "source"
+                ],
+                "title": "FollowOn",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Follow On"
           }
         },
         "required": [
@@ -741,6 +828,85 @@
         "type": "object"
       },
       "title": "Warning Signs",
+      "type": "array"
+    },
+    "diet_advice": {
+      "description": "Each diet or food/drink line from the letter, one item per line, copied word for word.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "The diet line, word for word, as written in the letter.",
+            "title": "Text",
+            "type": "string"
+          },
+          "kind": {
+            "description": "'avoid' for a line telling the patient not to eat or drink something; 'advice' for any other diet line.",
+            "enum": [
+              "avoid",
+              "advice"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "text",
+          "kind",
+          "source"
+        ],
+        "title": "DietAdvice",
+        "type": "object"
+      },
+      "title": "Diet Advice",
       "type": "array"
     }
   },

@@ -1,3 +1,5 @@
+import functools
+
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
 from starlette.requests import Request
@@ -8,9 +10,12 @@ from app.mcp.context import (
     get_current_patient_context,
 )
 
+from app.observability.log import Timer, service_log
+
 from app.mcp.tools.actions import (
     report_medication_taken_for_context,
     report_task_completed_for_context,
+    undo_report_for_context,
 )
 
 from app.mcp.tools.rag import (
@@ -29,6 +34,53 @@ mcp = MCPServer(
 )
 
 
+log = service_log("mcp")
+
+
+def logged_tool(kind: str):
+    """
+    Log one tool_call line per call: the tool, read or write, its status, and ms.
+
+    Never the arguments or the result: those hold the letter's content.
+    """
+
+    def wrap(tool):
+
+        @functools.wraps(tool)
+        async def run(*args, **kwargs):
+            timer = Timer()
+
+            try:
+                result = await tool(*args, **kwargs)
+            except Exception as exc:
+                log("tool_call", level="error", error=exc, tool=tool.__name__, kind=kind,
+                    status="error", ms=timer.ms, tool_ms=timer.ms, tool_errors=1)
+                raise
+
+            # ok: False is an expected answer ("nothing to undo", "no evidence"), not a failure.
+            # Only an exception counts as a tool error.
+            rejected = isinstance(result, dict) and result.get("ok") is False
+            failure = result.get("error") if rejected else None
+            code = failure.get("code") if isinstance(failure, dict) else None
+
+            log(
+                "tool_call",
+                tool=tool.__name__,
+                kind=kind,
+                status="rejected" if rejected else "ok",
+                error_code=code,
+                ms=timer.ms,
+                tool_ms=timer.ms,
+                tool_errors=0,
+            )
+
+            return result
+
+        return run
+
+    return wrap
+
+
 @mcp.tool(
     name="get_recovery_plan",
     description=(
@@ -43,6 +95,7 @@ mcp = MCPServer(
         read_only_hint=True,
     ),
 )
+@logged_tool("read")
 async def get_recovery_plan() -> dict:
     context = get_current_patient_context()
 
@@ -68,6 +121,7 @@ async def get_recovery_plan() -> dict:
         read_only_hint=True,
     ),
 )
+@logged_tool("read")
 async def get_today_tasks() -> dict:
     context = get_current_patient_context()
 
@@ -89,6 +143,7 @@ async def get_today_tasks() -> dict:
         read_only_hint=True,
     ),
 )
+@logged_tool("read")
 async def get_medications() -> dict:
 
     context = get_current_patient_context()
@@ -112,6 +167,7 @@ async def get_medications() -> dict:
         read_only_hint=True,
     ),
 )
+@logged_tool("read")
 async def search_discharge_instructions(
     query: str,
 ) -> dict:
@@ -139,6 +195,7 @@ async def search_discharge_instructions(
         idempotent_hint=True,
     ),
 )
+@logged_tool("write")
 async def report_task_completed(
     occurrence_id: str,
 ) -> dict:
@@ -167,6 +224,7 @@ async def report_task_completed(
         idempotent_hint=True,
     ),
 )
+@logged_tool("write")
 async def report_medication_taken(
     occurrence_id: str,
 ) -> dict:
@@ -177,6 +235,35 @@ async def report_medication_taken(
         context,
         occurrence_id,
     )
+
+@mcp.tool(
+    name="undo_report",
+    description=(
+        "Use this ONLY straight after the patient says a dose or "
+        "task you just recorded is wrong (for example 'No, I didn't "
+        "take the blood thinner' or 'undo that'). It changes that "
+        "one occurrence back to not done. History is kept: an "
+        "'undone' event is added, nothing is deleted. Pass the "
+        "occurrence_id that was recorded. Never use it on your own "
+        "initiative."
+    ),
+    annotations=ToolAnnotations(
+        idempotent_hint=True,
+        destructive_hint=False,
+    ),
+)
+@logged_tool("write")
+async def undo_report(
+    occurrence_id: str,
+) -> dict:
+
+    context = get_current_patient_context()
+
+    return undo_report_for_context(
+        context,
+        occurrence_id,
+    )
+
 
 @mcp.custom_route(
     "/health",

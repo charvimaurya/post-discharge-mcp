@@ -101,3 +101,9 @@ def test_empty_day_messages_say_nothing_is_scheduled(monkeypatch):
     assert recovery.get_medications_for_context(context)["message"] == (
         "There are no medication doses scheduled for today."
     )
+
+
+@pytest.fixture(autouse=True)
+def fake_patient_timezone(monkeypatch):
+    from app.mcp.tools import recovery
+    monkeypatch.setattr(recovery, "get_recovery_state", lambda patient_id: {"timezone": "Europe/London"})

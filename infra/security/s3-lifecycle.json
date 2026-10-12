@@ -1,0 +1,12 @@
+{
+  "Rules": [
+    {
+      "ID": "delete-uploaded-letters-after-30-days",
+      "Status": "Enabled",
+      "Filter": {"Prefix": "patients/"},
+      "Expiration": {"Days": 30},
+      "NoncurrentVersionExpiration": {"NoncurrentDays": 1},
+      "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}
+    }
+  ]
+}

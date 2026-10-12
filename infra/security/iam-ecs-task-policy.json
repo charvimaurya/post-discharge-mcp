@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadAndUpdateThePlan",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem"],
+      "Resource": "arn:aws:dynamodb:eu-west-2:992617582533:table/PostDischargeRecoveryState"
+    },
+    {
+      "Sid": "ReadAndAppendEventHistory",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:Query", "dynamodb:ConditionCheckItem"],
+      "Resource": "arn:aws:dynamodb:eu-west-2:992617582533:table/PostDischargeEventHistory"
+    },
+    {
+      "Sid": "SearchTheLetter",
+      "Effect": "Allow",
+      "Action": ["s3vectors:QueryVectors", "s3vectors:GetVectors"],
+      "Resource": "arn:aws:s3vectors:eu-west-2:992617582533:bucket/careloop-vectors-992617582533-london/index/careloop-discharge-index"
+    },
+    {
+      "Sid": "EmbedSearchQueries",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel"],
+      "Resource": "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v2:0"
+    },
+    {
+      "Sid": "ReadTheMcpTokenOnly",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": "arn:aws:secretsmanager:eu-west-2:992617582533:secret:afterward/mcp/auth-token*"
+    }
+  ]
+}

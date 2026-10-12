@@ -92,3 +92,69 @@ def clear_session(session_id: str) -> None:
     """
 
     _sessions.pop(session_id, None)
+    _offers.pop(session_id, None)
+    _saved.pop(session_id, None)
+    _last_prompts.pop(session_id, None)
+    _step_pointers.pop(session_id, None)
+
+# What AfterWard has just offered in a session ("Shall I remind you
+# again in 30 minutes?"), so a "yes" on the next turn can act on it.
+# Kept for one turn only; DynamoDB stays the source of truth.
+_offers: dict[str, dict] = {}
+
+
+def set_offer(session_id: str, offer: dict) -> None:
+    _offers[session_id] = offer
+
+
+def pop_offer(session_id: str) -> dict | None:
+    """The offer made on the previous turn, removed so it is answered once."""
+
+    return _offers.pop(session_id, None)
+
+
+
+# What was saved on the previous turn, so "no, I didn't take the blood
+# thinner" can change exactly that back. Kept for one turn only.
+_saved: dict[str, list[dict]] = {}
+
+
+def set_last_saved(session_id: str, items: list[dict]) -> None:
+    if items:
+        _saved[session_id] = items
+    else:
+        _saved.pop(session_id, None)
+
+
+def pop_last_saved(session_id: str) -> list[dict]:
+    return _saved.pop(session_id, [])
+
+
+
+# The step of the day last mentioned ("Next is ..."), so "and after
+# that?" moves one step on each time. Reset by any new completion.
+_step_pointers: dict[str, dict] = {}
+
+
+# The step the last reply prompted her about ("Next is your blood thinner"), so the
+# same medicine prompt is never given twice in a row unless she asks.
+_last_prompts: dict[str, list[str]] = {}
+
+
+def set_last_prompt(session_id: str, occurrence_ids: list[str] | None) -> None:
+    if occurrence_ids:
+        _last_prompts[session_id] = occurrence_ids
+    else:
+        _last_prompts.pop(session_id, None)
+
+
+def get_last_prompt(session_id: str) -> list[str] | None:
+    return _last_prompts.get(session_id)
+
+
+def set_step_pointer(session_id: str, index: int, occurrence_ids: list[str]) -> None:
+    _step_pointers[session_id] = {"index": index, "ids": occurrence_ids}
+
+
+def get_step_pointer(session_id: str) -> dict | None:
+    return _step_pointers.get(session_id)

@@ -1,0 +1,77 @@
+{
+  "Version": "2012-10-17",
+  "Id": "afterward-patient-data",
+  "Statement": [
+    {
+      "Sid": "AccountAdministersTheKey",
+      "Effect": "Allow",
+      "Principal": {"AWS": "arn:aws:iam::992617582533:root"},
+      "Action": [
+        "kms:Create*", "kms:Describe*", "kms:Enable*", "kms:List*", "kms:Put*", "kms:Update*",
+        "kms:Revoke*", "kms:Disable*", "kms:Get*", "kms:Delete*", "kms:TagResource",
+        "kms:UntagResource", "kms:ScheduleKeyDeletion", "kms:CancelKeyDeletion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AppRolesUseTheKeyOnlyThroughS3DynamoDBAndSQS",
+      "Effect": "Allow",
+      "Principal": {"AWS": [
+        "arn:aws:iam::992617582533:role/CareLoopDocumentProcessorRole",
+        "arn:aws:iam::992617582533:role/AfterwardReminderRole",
+        "arn:aws:iam::992617582533:role/AfterWardEcsTaskRole",
+        "arn:aws:iam::992617582533:user/CareLoop"
+      ]},
+      "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*", "kms:ReEncrypt*", "kms:DescribeKey"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {"kms:CallerAccount": "992617582533"},
+        "ForAnyValue:StringEquals": {"kms:ViaService": [
+          "s3.eu-west-2.amazonaws.com",
+          "dynamodb.eu-west-2.amazonaws.com",
+          "sqs.eu-west-2.amazonaws.com"
+        ]}
+      }
+    },
+    {
+      "Sid": "DynamoDBCreatesGrantsForTheTables",
+      "Effect": "Allow",
+      "Principal": {"AWS": [
+        "arn:aws:iam::992617582533:user/CareLoop",
+        "arn:aws:iam::992617582533:role/CareLoopDocumentProcessorRole",
+        "arn:aws:iam::992617582533:role/AfterwardReminderRole",
+        "arn:aws:iam::992617582533:role/AfterWardEcsTaskRole"
+      ]},
+      "Action": ["kms:CreateGrant"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {"kms:ViaService": "dynamodb.eu-west-2.amazonaws.com", "kms:CallerAccount": "992617582533"},
+        "Bool": {"kms:GrantIsForAWSResource": "true"}
+      }
+    },
+    {
+      "Sid": "S3SendsUploadEventsToTheEncryptedQueue",
+      "Effect": "Allow",
+      "Principal": {"Service": "s3.amazonaws.com"},
+      "Action": ["kms:GenerateDataKey", "kms:Decrypt"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {"aws:SourceAccount": "992617582533"},
+        "ArnLike": {"aws:SourceArn": "arn:aws:s3:::careloop-documents-992617582533-london"}
+      }
+    },
+    {
+      "Sid": "CloudWatchLogsEncryptsTheLambdaLogs",
+      "Effect": "Allow",
+      "Principal": {"Service": "logs.eu-west-2.amazonaws.com"},
+      "Action": ["kms:Encrypt*", "kms:Decrypt*", "kms:ReEncrypt*", "kms:GenerateDataKey*", "kms:Describe*"],
+      "Resource": "*",
+      "Condition": {
+        "ArnLike": {"kms:EncryptionContext:aws:logs:arn": [
+          "arn:aws:logs:eu-west-2:992617582533:log-group:/aws/lambda/CareLoopDocumentProcessor",
+          "arn:aws:logs:eu-west-2:992617582533:log-group:/aws/lambda/AfterwardReminderChecker"
+        ]}
+      }
+    }
+  ]
+}

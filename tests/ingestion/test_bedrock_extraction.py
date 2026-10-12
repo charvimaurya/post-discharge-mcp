@@ -38,8 +38,8 @@ def test_truncation_never_returns_even_valid_tool_input(client, capsys):
     with pytest.raises(RuntimeError, match="extraction was truncated"):
         bedrock.invoke_extraction_model("Synthetic text")
     log = capsys.readouterr().out
-    assert "BEDROCK_STOP_REASON: max_tokens" in log
-    assert "BEDROCK_USAGE:" in log
+    assert '"event":"extraction_model"' in log and '"reason":"max_tokens"' in log
+    assert '"tokens_out":100' in log
 
 
 def test_truncation_checked_before_accessing_output(client):
@@ -69,8 +69,11 @@ def test_medication_clock_times_rejected_not_removed(client):
     client.converse.return_value = response(extracted)
     with pytest.raises(ValueError, match="does not match the discharge schema") as caught:
         bedrock.invoke_extraction_model("Synthetic text")
-    assert isinstance(caught.value.__cause__, ValidationError)
+    # The field and the rule are named; the extracted values are not (logs must not hold letter text),
+    # and the original error, which quotes the values, is not chained on.
     assert "clock_times" in str(caught.value)
+    assert "08:00" not in str(caught.value) and "Example" not in str(caught.value)
+    assert caught.value.__cause__ is None and caught.value.__suppress_context__
     assert extracted == before
 
 

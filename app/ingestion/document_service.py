@@ -21,8 +21,10 @@ save RecoveryState
 index original pages for RAG
 """
 
+from app.ingestion.document_validation import WrongDocumentError
+
 import json
-import time
+from datetime import datetime
 
 from urllib.parse import (
     unquote_plus,
@@ -44,6 +46,32 @@ from app.aws.s3_service import (
     download_document,
     parse_document_key,
 )
+from app.clock import system_now_utc
+from app.observability.log import Timer, service_log
+
+
+log = service_log("document_lambda")
+
+
+def _ms_since_upload(s3_record: dict) -> int | None:
+    """ms from the S3 upload event to now, or None if the event has no usable time."""
+
+    try:
+        uploaded = datetime.fromisoformat(str(s3_record["eventTime"]).replace("Z", "+00:00"))
+    except (KeyError, ValueError):
+        return None
+
+    return max(0, int((system_now_utc() - uploaded).total_seconds() * 1000))
+
+
+def _counts(state) -> tuple[int, int]:
+    """(items in the plan, items that need confirmation). Counts only."""
+
+    groups = ("medications", "tasks", "appointments", "restrictions", "monitoring", "warning_signs", "diet_advice")
+    items = [item for name in groups for item in getattr(state, name, None) or []]
+
+    return len(items), sum(1 for item in items if getattr(item, "needs_confirmation", False))
+
 
 def _extract_s3_records(
     sqs_record: dict,
@@ -85,7 +113,7 @@ def _extract_s3_records(
 
     # AWS sends this when validating an S3 notification, not for an upload.
     if body.get("Event") == "s3:TestEvent":
-        print("Ignoring S3 test event")
+        log("s3_test_event_ignored")
         return []
 
     records = body.get(
@@ -108,9 +136,7 @@ def _process_s3_record(
     Process one S3 ObjectCreated event.
     """
 
-    started_at = (
-        time.perf_counter()
-    )
+    timer = Timer()
 
 
     # -----------------------------------------------------
@@ -166,11 +192,8 @@ def _process_s3_record(
     )
 
 
-    print(
-        f"Processing "
-        f"patient={patient_id} "
-        f"document={document_id}"
-    )
+    log("ingest_stage", stage="received", patient_id=patient_id, document_id=document_id,
+        ms=_ms_since_upload(s3_record))
 
 
     # -----------------------------------------------------
@@ -201,10 +224,7 @@ def _process_s3_record(
         ) == "ready"
     ):
 
-        print(
-            f"Skipping duplicate "
-            f"document={document_id}"
-        )
+        log("ingest_skipped", document_id=document_id, reason="duplicate")
 
         return
 
@@ -226,10 +246,7 @@ def _process_s3_record(
         )
 
 
-    print(
-        f"Downloaded "
-        f"{len(file_bytes)} bytes"
-    )
+    log("ingest_stage", stage="downloaded", document_id=document_id, ms=timer.ms)
 
 
     # -----------------------------------------------------
@@ -245,15 +262,21 @@ def _process_s3_record(
     # PNG?
     #
     # process_document_with_pages() decides.
-    state, pages = process_document_with_pages(
-        file_bytes=file_bytes,
+    try:
+        state, pages = process_document_with_pages(
+            file_bytes=file_bytes,
 
-        filename=filename,
+            filename=filename,
 
-        patient_id=patient_id,
+            patient_id=patient_id,
 
-        document_id=document_id,
-    )
+            document_id=document_id,
+        )
+    except WrongDocumentError:
+        # Permanent rejection: acknowledge SQS, preserve the current plan,
+        # and do not index unrelated content into the patient's RAG store.
+        log("ingest_skipped", level="warning", document_id=document_id, reason="wrong_document")
+        return
 
 
     # -----------------------------------------------------
@@ -273,6 +296,10 @@ def _process_s3_record(
         state
     )
 
+    item_count, needs_confirmation_count = _counts(state)
+    log("ingest_stage", stage="saved", document_id=document_id, ms=timer.ms,
+        item_count=item_count, needs_confirmation_count=needs_confirmation_count)
+
     # -----------------------------------------------------
     # 8. INDEX ORIGINAL DOCUMENT FOR RAG
     # -----------------------------------------------------
@@ -282,7 +309,7 @@ def _process_s3_record(
         document_id=document_id,
         pages=pages,
     )
-    print(f"Indexed {vector_count} RAG chunks document={document_id}")
+    log("ingest_stage", stage="indexed", document_id=document_id, ms=timer.ms, item_count=vector_count)
 
     # Only skip future deliveries once both persistence and indexing succeeded.
     # If indexing or this final save fails, SQS retries the full document flow.
@@ -293,21 +320,11 @@ def _process_s3_record(
     # 9. LOG PROCESSING TIME
     # -----------------------------------------------------
 
-    duration_ms = (
-        (
-            time.perf_counter()
-            - started_at
-        )
-        * 1000
-    )
+    # ms: this Lambda's own work. upload_to_ready_ms: from the S3 upload to a ready plan.
+    log("ingest_ready", stage="ready", document_id=document_id, ms=timer.ms,
+        item_count=item_count, needs_confirmation_count=needs_confirmation_count,
+        upload_to_ready_ms=_ms_since_upload(s3_record))
 
-
-    print(
-        f"Processing completed "
-        f"document={document_id} "
-        f"duration_ms="
-        f"{duration_ms:.2f}"
-    )
 
 def process_sqs_record(
     sqs_record: dict,

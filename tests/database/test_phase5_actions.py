@@ -187,9 +187,7 @@ def test_current_list_readers(service, method, field, present):
         if method == "get_today_tasks":
             assert _base_fields(reader(PATIENT_ID), items) == (items if present else [])
         elif present:
-            # Medication occurrences need an explicit date.
-            with pytest.raises(ValueError, match="date is required"):
-                reader(PATIENT_ID)
+            assert _base_fields(reader(PATIENT_ID), items) == items
     with patch.object(service, "get_recovery_state", return_value={"patient_id": PATIENT_ID}), \
             patch.object(service, "get_events", return_value=[]):
         assert reader(PATIENT_ID, date="2026-09-30") == []

@@ -34,7 +34,7 @@ def test_canonical_examples_through_local_pipeline(category, snippet, fields):
             "output": {"message": {"content": [{"toolUse": {"name": "record_recovery_extraction", "input": extracted}}]}},
             "stopReason": "tool_use", "usage": {"outputTokens": 100},
         }
-        state = pipeline.process_text(f"[Page 1]\n{snippet}", "patient", "request-document")
+        state = pipeline.process_text(f"[Page 1]\nHospital discharge letter\nRecovery instructions\n{snippet}", "patient", "request-document")
         client.converse.assert_called_once()
         request = client.converse.call_args.kwargs
         assert request["toolConfig"]["tools"][0]["toolSpec"]["inputSchema"]["json"] == bedrock.load_extraction_schema()

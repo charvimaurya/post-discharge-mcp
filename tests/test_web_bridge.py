@@ -13,10 +13,26 @@ TASKS = [
     {
         "occurrence_id": "task_abc#2026-10-23#1",
         "title": "Short walk",
+        "description": "Short walk",
         "clock_time": "07:30",
         "status": "pending",
     }
 ]
+
+MEDICATIONS = [
+    {
+        "occurrence_id": "med_para#2026-10-23#1",
+        "name": "Paracetamol",
+        "dose": "2 tablets",
+        "time_of_day_label": "morning",
+        "status": "pending",
+    }
+]
+
+TOOL_DATA = {
+    "get_today_tasks": {"date": "2026-10-23", "tasks": TASKS},
+    "get_medications": {"date": "2026-10-23", "medications": MEDICATIONS},
+}
 
 CHECKIN = {
     "checkin_id": "2026-10-23#task_abc#2026-10-23#1",
@@ -31,12 +47,12 @@ def bridge(monkeypatch):
     """Fake MCP and state reads; record what was asked for."""
 
     calls = {"tools": [], "patients": []}
-    state = {"timezone": "Europe/London"}
+    state = {"timezone": "Europe/London", "discharge_date": "2026-10-16"}
 
     async def fake_call_mcp_tool(name, arguments):
         calls["tools"].append((name, arguments))
         return SimpleNamespace(
-            structured_content={"ok": True, "data": {"date": "2026-10-23", "tasks": TASKS}}
+            structured_content={"ok": True, "data": TOOL_DATA[name]}
         )
 
     def fake_get_recovery_state(patient_id):
@@ -71,15 +87,31 @@ def test_no_pending_checkin_is_null(bridge):
     assert response.json()["pending_checkin"] is None
 
 
-def test_tasks_and_clock_pass_through_unchanged(bridge):
+TOOLS_CALLED = [("get_today_tasks", {}), ("get_medications", {})]
+
+
+def test_tasks_medications_and_clock_pass_through_unchanged(bridge):
     body = bridge.client.get("/today").json()
 
+    # Each item gains its place in the day; nothing else changes.
     assert body == {
         "clock_label": "Friday 23 October, 07:00",
-        "tasks": TASKS,
+        # 07:00: the 07:30 walk is inside its reminder window, so the greeting names it (same as the reminder).
+        "opening_greeting": "Good morning. I hope you slept well. Next is your morning walk at half past seven. You can start getting ready.",
+        "date": "2026-10-23",
+        "discharge_date": "2026-10-16",
+        "tasks": [dict(TASKS[0], timing="due now")],
+        "medications": [dict(MEDICATIONS[0], timing="due now")],
         "pending_checkin": None,
     }
-    assert bridge.calls["tools"] == [("get_today_tasks", {})]
+    assert bridge.calls["tools"] == TOOLS_CALLED
+
+
+def test_today_includes_a_medications_list(bridge):
+    body = bridge.client.get("/today").json()
+
+    assert isinstance(body["medications"], list)
+    assert body["medications"][0]["occurrence_id"] == "med_para#2026-10-23#1"
 
 
 def test_caller_cannot_choose_patient_date_or_time(bridge):
@@ -89,7 +121,7 @@ def test_caller_cannot_choose_patient_date_or_time(bridge):
     )
 
     assert bridge.calls["patients"] == ["demo_patient_001"]
-    assert bridge.calls["tools"] == [("get_today_tasks", {})]
+    assert bridge.calls["tools"] == TOOLS_CALLED
 
 
 def test_failed_tool_call_returns_clear_error(bridge, monkeypatch):
@@ -114,3 +146,31 @@ def test_tool_error_result_is_not_shown_as_an_empty_day(bridge, monkeypatch):
 
     assert response.status_code == 502
     assert "tasks" not in response.json()
+
+
+def test_failed_medications_call_returns_clear_error(bridge, monkeypatch):
+    async def medications_fail(name, arguments):
+        if name == "get_medications":
+            raise ConnectionError("MCP unreachable")
+        return SimpleNamespace(structured_content={"ok": True, "data": TOOL_DATA[name]})
+
+    monkeypatch.setattr(web_bridge, "call_mcp_tool", medications_fail)
+
+    response = bridge.client.get("/today")
+
+    assert response.status_code == 502
+    assert response.json() == {"error": web_bridge.TODAY_ERROR}
+
+
+def test_medications_error_result_is_not_shown_as_no_medicines(bridge, monkeypatch):
+    async def medications_error(name, arguments):
+        if name == "get_medications":
+            return SimpleNamespace(structured_content={"ok": False, "error": {"code": "X"}})
+        return SimpleNamespace(structured_content={"ok": True, "data": TOOL_DATA[name]})
+
+    monkeypatch.setattr(web_bridge, "call_mcp_tool", medications_error)
+
+    response = bridge.client.get("/today")
+
+    assert response.status_code == 502
+    assert "medications" not in response.json()

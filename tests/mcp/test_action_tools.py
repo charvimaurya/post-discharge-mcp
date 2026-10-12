@@ -111,3 +111,9 @@ def test_medication_report_requires_occurrence_id():
     result = report_medication_taken_for_context(get_demo_patient_context(), "")
     assert result["ok"] is False
     assert result["error"]["code"] == "INVALID_OCCURRENCE_ID"
+
+
+@pytest.fixture(autouse=True)
+def fake_patient_timezone(monkeypatch):
+    from app.mcp.tools import actions
+    monkeypatch.setattr(actions, "get_recovery_state", lambda patient_id: {"timezone": "Europe/London"})

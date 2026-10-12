@@ -5,8 +5,10 @@ from app.clock import (
 )
 
 from app.database.recovery_state import (
+    get_recovery_state,
     mark_medication_taken,
     mark_task_completed,
+    undo_completion,
 )
 
 from app.mcp.results import (
@@ -45,7 +47,7 @@ def report_task_completed_for_context(
         result = mark_task_completed(
             patient_context.patient_id,
             occurrence_id.strip(),
-            get_current_date(),
+            get_current_date((get_recovery_state(patient_context.patient_id) or {}).get("timezone") or "Europe/London"),
         )
 
     except ValueError as exc:
@@ -108,7 +110,7 @@ def report_medication_taken_for_context(
         result = mark_medication_taken(
             patient_id,
             occurrence_id.strip(),
-            get_current_date(),
+            get_current_date((get_recovery_state(patient_context.patient_id) or {}).get("timezone") or "Europe/London"),
         )
 
     except ValueError as exc:
@@ -130,3 +132,43 @@ def report_medication_taken_for_context(
         data=result,
         message=message,
     )
+
+
+def undo_report_for_context(
+    patient_context,
+    occurrence_id: str,
+) -> dict:
+    """
+    Change one of today's saved reports (a dose or a task) back to
+    not done, when the patient says it was wrong. History is kept.
+    """
+
+    if not occurrence_id or not occurrence_id.strip():
+        return error_result(
+            code="INVALID_OCCURRENCE_ID",
+            message="An occurrence is required.",
+            next_step="Use the occurrence_id of the dose or task that was saved by mistake.",
+        )
+
+    zone = (get_recovery_state(patient_context.patient_id) or {}).get("timezone") or "Europe/London"
+
+    try:
+        result = undo_completion(
+            patient_context.patient_id,
+            occurrence_id.strip(),
+            get_current_date(zone),
+        )
+    except ValueError as exc:
+        return error_result(
+            code="NOTHING_TO_UNDO",
+            message=str(exc),
+            next_step="Check today's tasks and medicines for the item to change back.",
+        )
+
+    message = (
+        "That report has been changed back to not done."
+        if result["undone"]
+        else "That item was not marked as done, so nothing changed."
+    )
+
+    return success_result(data=result, message=message)

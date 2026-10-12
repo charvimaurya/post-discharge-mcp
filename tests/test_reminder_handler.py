@@ -27,7 +27,7 @@ def saved(monkeypatch):
 
     store: dict[str, dict] = {}
 
-    def fake_save(patient_id, pending_checkin, checkin_key):
+    def fake_save(patient_id, pending_checkin, checkin_key, **rules):
         if store.get(patient_id, {}).get("last_checkin_key") == checkin_key:
             return False
         store[patient_id] = {
