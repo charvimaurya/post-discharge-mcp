@@ -130,7 +130,9 @@ def test_completion_report_uses_write_tool_then_clears(bridge):
         "get_today_tasks", "get_medications", "get_today_tasks", "report_task_completed",
     ]
     assert body["session_id"] == "s-walk"
-    assert set(body) == {"response", "tool_trace", "source", "session_id", "request_id"}
+    assert set(body) == {"response", "tool_trace", "source", "help", "session_id", "request_id"}
+    # "help" is the Get help card for a symptom reply; a completion report has none.
+    assert body["help"] is None
     assert "pending_checkin" not in bridge.state
     assert bridge.state["last_checkin_key"] == CHECKIN_KEY
 

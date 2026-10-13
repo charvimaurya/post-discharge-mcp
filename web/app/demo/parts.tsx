@@ -1,8 +1,8 @@
 // The building blocks of the demo screen. Each one copies a part of the mock-ups
 // (docs/ui_mockups/source/screens.py) and uses the same CSS class names.
-import type { FormEvent, ReactNode } from 'react';
+import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import { Icon, Logo } from './icons';
-import { letterBlocks, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
+import { letterBlocks, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
 
 // ---------- Frame: top bar and footer ----------
 
@@ -159,10 +159,26 @@ function dueText(item: PlanItem, clock: string): string | null {
   return mins > 0 ? `Due in ${mins} minutes` : 'Due now';
 }
 
+// ---------- "Get help" card: shown on top of Today after she says she feels unwell ----------
+// The 999 and NHS 111 lines are the same fixed wording AfterWard speaks (app/agent/symptoms.py).
+// "Your letter says" lines are the letter's own actions, never invented.
+export function HelpCard({ actions, onDismiss }: { actions: HelpAction[]; onDismiss: () => void }) {
+  return <section className="helpcard" role="alert" aria-label="Getting help">
+    <div className="help-head"><span className="help-ico"><Icon name="alert" size={22} stroke={2.2} /></span>
+      <div><div className="help-eyebrow">If you feel unwell</div><h3>Getting help</h3></div></div>
+    <a className="help-row urgent" href="tel:999"><b>Severe or sudden?</b><span>Call 999</span></a>
+    <a className="help-row" href="tel:111"><b>Not urgent?</b><span>Call NHS 111 or your care team</span></a>
+    {actions.length > 0 && <div className="help-letter"><small>Your letter says</small>
+      <ul>{actions.map(a => <li key={a.action} className={a.urgency === 'emergency' ? 'emergency' : ''}>{a.action}</li>)}</ul></div>}
+    <button type="button" className="help-dismiss" onClick={onDismiss}>I&apos;m feeling better</button>
+  </section>;
+}
+
 export function TodayPanel(props: {
   items: PlanItem[]; justDone: PlanItem | null; reminderItemId: string | null; clock: string;
   dayAtHome: number | null; compact?: boolean; busy?: boolean; onDone?: (i: PlanItem) => void;
   empty?: boolean; onStart?: () => void;
+  help?: HelpAction[] | null; onDismissHelp?: () => void;
 }) {
   const { items, justDone } = props;
   const pending = items.filter(i => !i.done);
@@ -178,6 +194,7 @@ export function TodayPanel(props: {
     </div>
     {/* Everything under the heading scrolls inside the panel instead of running off the screen */}
     <div className="tbody" tabIndex={0} role="region" aria-label="Today's plan">
+    {props.help && <HelpCard actions={props.help} onDismiss={props.onDismissHelp || (() => {})} />}
     {/* What is already done comes first, then what is next and the rest of the day. */}
     {done.length > 0 && <div className="slotgrp donefirst">
       <div className="slot-h done">Done</div>
@@ -258,10 +275,16 @@ export function LetterPanel({ source, onBack }: { source: NonNullable<Source>; o
         {source.highlight && <span className="letter-key"><i />Relevant wording</span>}
       </div>
       <div className="letter-scroll" tabIndex={0} role="region" aria-label="Original letter passage">
-        <div className="in letterbody"><LetterBody blocks={blocks} flag={source.note?.flag} />
-          {/* The appointment the passage points at, in the letter's own words, when the plan has it. */}
-          {(source.related || []).map((r, i) => <p key={i} className="txt related">
-            <mark>{r.text}</mark>{r.page && r.page !== source.page && <span className="related-page">Page {r.page}</span>}</p>)}
+        <div className="in letterbody">
+          {/* One card for what the letter says, and one for each appointment it points at. */}
+          <div className="quotecard">
+            <div className="quotehead"><span>Your letter says</span>{source.page && <b>Page {source.page}</b>}</div>
+            <LetterBody blocks={blocks} flag={source.note?.flag} />
+          </div>
+          {(source.related || []).map((r, i) => <div key={i} className="quotecard linked">
+            <div className="quotehead"><span>Linked appointment</span>{r.page && <b>Page {r.page}</b>}</div>
+            <p className="txt">{r.text}</p>
+          </div>)}
         </div>
       </div>
       <div className="letter-paper-bottom"><Icon name="doc" size={15} />Original wording · Synthetic demo document</div>
@@ -328,21 +351,35 @@ export function VoicePanel(props: {
 
 // ---------- Developer view (mock-up 09) ----------
 
+// Keeps a scrolling list on its newest entry: when `count` grows, the list scrolls to the end.
+// Everything earlier stays in the list, a scroll away.
+function useFollowNewest(count: number) {
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (list.current) list.current.scrollTop = list.current.scrollHeight;
+  }, [count]);
+  return list;
+}
+
 export function ConversationLog({ turns }: { turns: Turn[] }) {
+  const list = useFollowNewest(turns.length);
   return <div className="panel" style={{ width: 384, flex: 'none', padding: '20px 20px' }}>
     <div className="eyebrow" style={{ marginBottom: 12 }}>Conversation</div>
     <div className="legend">Margaret on the right, AfterWard on the left</div>
-    <div className="msgs">{turns.slice(-8).map((t, i) =>
+    <div className="msgs" ref={list} tabIndex={0} role="log" aria-label="The whole conversation">{turns.map((t, i) =>
       <div key={i} className={`msg ${t.who === 'you' ? 'me' : 'aw'}`}>{t.text}</div>)}</div>
   </div>;
 }
 
 export function ToolPanel({ calls, requestId }: { calls: ToolCall[]; requestId: string | null }) {
+  // Every call of the session, oldest first, so an earlier write (a walk recorded
+  // three turns ago) can still be scrolled back to.
+  const list = useFollowNewest(calls.length);
   return <div className="panel tools" style={{ width: 376, flex: 'none', padding: '20px 22px' }}>
     <div className="vhead" style={{ marginBottom: 8 }}><Icon name="code" size={17} stroke={2} />MCP tool calls · spec 2025-11-25</div>
-    <div className="calls">
+    <div className="calls" ref={list} tabIndex={0} role="log" aria-label="Every tool call this session">
       {calls.length === 0 && <p className="call"><span className="arg">No tool calls yet. Ask AfterWard something.</span></p>}
-      {calls.slice(-5).map((c, i) => <div key={i} className="call">
+      {calls.map((c, i) => <div key={i} className="call">
         <b>{c.name}<i className={c.kind}>{c.kind}</i></b>
         <span className="arg">{c.args}</span><br /><span className="res">{c.result}</span>
       </div>)}

@@ -138,6 +138,7 @@ from app.agent.symptoms import (
     no_match_reply,
     sign_source,
     warning_sign_reply,
+    help_actions,
 )
 from app.mcp.client import (
     call_mcp_tool,
@@ -1137,7 +1138,7 @@ async def _symptom_turn(
     message: str,
     first_name: str | None,
     tool_trace: list[dict],
-) -> tuple[str, dict | None]:
+) -> tuple[str, dict | None, list[dict]]:
     """
     "My head is hurting": only the letter's own warning sign, or the fixed sentence.
 
@@ -1158,11 +1159,12 @@ async def _symptom_turn(
 
     warning_signs = ((plan or {}).get("data") or {}).get("warning_signs") or [] if ok else []
     sign = match_warning_sign(symptom, warning_signs)
+    help_lines = help_actions(warning_signs)
 
     if sign is not None:
         sign_id = str(sign.get("id") or "unknown")
         log("symptom", reason=sign_id, kind="warning_sign")
-        return warning_sign_reply(sign, first_name), sign_source(sign)
+        return warning_sign_reply(sign, first_name), sign_source(sign), help_lines
 
     # Not among the warning signs: look in the rest of the letter for the same symptom.
     arguments = {"query": message}
@@ -1180,11 +1182,11 @@ async def _symptom_turn(
         sentence = match_letter_sentence(symptom, items)
         if sentence:
             log("symptom", reason="letter_passage", kind="letter")
-            return letter_sentence_reply(sentence, first_name), evidence_source(match, sentence)
+            return letter_sentence_reply(sentence, first_name), evidence_source(match, sentence), help_lines
 
     log("symptom", reason="none", kind="template")
 
-    return no_match_reply(symptom, first_name), None
+    return no_match_reply(symptom, first_name), None, help_lines
 
 
 async def _food_turn(
@@ -1665,7 +1667,7 @@ async def _chat_turn(
 
     if intent is Intent.SYMPTOM:
         # A symptom always wins: no pending question, no next step, no write.
-        symptom_reply, symptom_source = await _symptom_turn(cleaned_message, first_name, tool_trace)
+        symptom_reply, symptom_source, help_lines = await _symptom_turn(cleaned_message, first_name, tool_trace)
         set_last_prompt(session_id, None)
         add_message(session_id, "user", cleaned_message)
         add_message(session_id, "assistant", symptom_reply)
@@ -1675,6 +1677,8 @@ async def _chat_turn(
             "tool_trace": tool_trace,
             "source": symptom_source,
             "completed": True,
+            # Shown as the "Get help" card on the Today screen.
+            "help": {"actions": help_lines},
         }
 
     # A waiting question lasts one turn, and only an answer uses it.

@@ -14,13 +14,16 @@ APPOINTMENTS = [
     {"title": "Consultant review", "source": {"page": Decimal(2), "snippet": CONSULTANT_LINE}},
 ]
 
+# What the panel's "linked appointment" card shows.
+CONSULTANT = {"text": CONSULTANT_LINE, "page": 2}
+
 
 def source(highlight, text=None):
     return {"page": 1, "section": "Restrictions", "text": text or highlight, "highlight": highlight}
 
 
 def test_driving_restriction_brings_the_consultant_review_line():
-    assert related_appointment_lines(source(DRIVING), APPOINTMENTS) == [{"text": CONSULTANT_LINE, "page": 2}]
+    assert related_appointment_lines(source(DRIVING), APPOINTMENTS) == [CONSULTANT]
 
 
 def test_page_is_a_plain_number_so_the_reply_can_be_sent_as_json():
@@ -57,4 +60,12 @@ def test_no_source_or_no_appointments_brings_nothing():
 
 def test_older_source_fields_are_read_too():
     older = {"page": 1, "passage": f"What you must not do\n{DRIVING}", "highlighted_line": DRIVING}
-    assert related_appointment_lines(older, APPOINTMENTS) == [{"text": CONSULTANT_LINE, "page": 2}]
+    assert related_appointment_lines(older, APPOINTMENTS) == [CONSULTANT]
+
+
+def test_a_line_only_in_the_raw_chunk_is_still_shown():
+    # The retrieved chunk can run on into the appointments section, but the panel shows
+    # only the excerpt, so the appointment line must still be added.
+    raw_chunk = "\n".join(["RESTRICTIONS", DRIVING, "FOLLOW-UP APPOINTMENTS", CONSULTANT_LINE])
+    with_raw_chunk = dict(source(DRIVING), passage=raw_chunk)
+    assert related_appointment_lines(with_raw_chunk, APPOINTMENTS) == [CONSULTANT]

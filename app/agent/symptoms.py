@@ -246,3 +246,26 @@ def sign_source(sign: dict[str, Any]) -> dict[str, Any] | None:
         "passage": snippet,
         "highlighted_line": snippet,
     }
+
+
+def help_actions(warning_signs: list[dict[str, Any]]) -> list[dict[str, str]]:
+    """
+    Who to call, in the letter's own words, for the "Get help" card.
+
+    One line per distinct action ("Call the ward on ...", "Call emergency
+    services straight away"), emergencies first. Nothing is invented: an
+    action not written in the letter is never shown.
+    """
+
+    seen: set[str] = set()
+    out: list[dict[str, str]] = []
+
+    for sign in sorted(warning_signs, key=lambda s: s.get("urgency") != "emergency"):
+        action = " ".join(str(sign.get("action") or "").split())
+        key = action.lower().rstrip(".")
+        if not action or key in seen:
+            continue
+        seen.add(key)
+        out.append({"urgency": str(sign.get("urgency") or "contact_care_team"), "action": action})
+
+    return out

@@ -816,7 +816,7 @@ def related_appointment_lines(source: dict | None, appointments: list[dict] | No
 
     Nothing is guessed: an appointment is included only when every main word
     of its title appears in the answering sentence, the plan kept the letter's
-    wording for it, and that wording is not already in the passage.
+    wording for it, and that wording is not already in the excerpt on screen.
     """
 
     if not source or not appointments:
@@ -828,7 +828,9 @@ def related_appointment_lines(source: dict | None, appointments: list[dict] | No
         return []
 
     sentence_stems = {word[:_STEM_LENGTH] for word in re.findall(r"[a-z]+", sentence.lower())}
-    already_shown = _normalise(" ".join(str(source.get(key) or "") for key in ("text", "highlight", "passage")))
+    # Only what the panel displays counts. The raw chunk ("passage") can hold the appointment
+    # line further down without it ever being shown.
+    already_shown = _normalise(" ".join(str(source.get(key) or "") for key in ("text", "highlight")))
     lines: list[dict] = []
 
     for appointment in appointments:

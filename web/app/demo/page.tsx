@@ -19,7 +19,7 @@ import './afterward.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
 import { daysAtHome, isObj, localTime, readChat, readPlan, readToday, splitClock, str,
-  type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
+  type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
 import { canListen, listenOnce, speak } from '../../lib/voice';
 import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
@@ -76,6 +76,8 @@ export default function DemoPage() {
   const [calls, setCalls] = useState<ToolCall[]>([]);
   const [requestId, setRequestId] = useState<string | null>(null);  // the last chat turn's ID in the server logs
   const [source, setSource] = useState<Source>(null);
+  // The "Get help" card: set by a symptom reply, cleared only when she taps "I'm feeling better".
+  const [help, setHelp] = useState<HelpAction[] | null>(null);
   const [justDone, setJustDone] = useState<PlanItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -220,6 +222,7 @@ export default function DemoPage() {
       setCalls(c => [...c, ...reply.tools]);
       setRequestId(reply.requestId);
       setSource(reply.source);
+      if (reply.help) setHelp(reply.help);
       const after = await loadToday();
       // Only claim a save when a report_* tool really succeeded in this reply.
       const newlyDone = reply.saved ? after?.items.find(i => i.done && !before.has(i.id)) || null : null;
@@ -288,7 +291,8 @@ export default function DemoPage() {
     ? <LetterPanel source={source} onBack={() => setSource(null)} />
     : <TodayPanel items={today.items} justDone={justDone} reminderItemId={reminderItemId} clock={today.clockLabel}
         dayAtHome={dayAtHome} compact={dev} busy={busy} onDone={tapDone}
-        empty={todayLoaded && today.items.length === 0} onStart={backToStart} />;
+        empty={todayLoaded && today.items.length === 0} onStart={backToStart}
+        help={help} onDismissHelp={() => setHelp(null)} />;
 
   let screen;
   if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;

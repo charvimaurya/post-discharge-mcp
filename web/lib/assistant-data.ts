@@ -39,7 +39,9 @@ export type SourceNote = { flag: string; text: string };
 export type Source = { text: string; highlight: string | null; page: number | null; section: string | null; related?: RelatedLine[]; note?: SourceNote | null } | null;
 // saved: a report_* tool ran and succeeded, so something really was written to the plan.
 // requestId: the ID this turn has in every server log line (shown small in Developer view).
-export type ChatReply = { text: string; tools: ToolCall[]; source: Source; completed: boolean; saved: boolean; requestId: string | null };
+// "Get help" card: who to call, in the letter's own words. Only set on a symptom reply.
+export type HelpAction = { urgency: string; action: string };
+export type ChatReply = { text: string; tools: ToolCall[]; source: Source; completed: boolean; saved: boolean; requestId: string | null; help: HelpAction[] | null };
 
 type Obj = Record<string, unknown>;
 export const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -231,6 +233,9 @@ export function readChat(json: unknown): ChatReply {
     completed: o.completed !== false,
     saved: tools.some(t => t.kind === 'write' && t.ok),
     requestId: str(o.request_id) || null,
+    help: isObj(o.help) && Array.isArray(o.help.actions)
+      ? o.help.actions.filter(isObj).map(a => ({ urgency: str(a.urgency), action: str(a.action) })).filter(a => a.action)
+      : null,
   };
 }
 

@@ -174,6 +174,8 @@ async def chat_message(request: Request) -> JSONResponse:
             "response": result["response"],
             "tool_trace": result["tool_trace"],
             "source": source,
+            # Only on a symptom reply: who to call, from her letter.
+            "help": result.get("help"),
             "session_id": session_id,
             # Shown small in Developer view, to find this turn in the logs.
             "request_id": get_request_id(),
