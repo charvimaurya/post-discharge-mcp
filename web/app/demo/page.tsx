@@ -82,6 +82,8 @@ export default function DemoPage() {
   const [helpCompact, setHelpCompact] = useState(false);
   // The plan items the last answer named: highlighted on the Today screen.
   const [focus, setFocus] = useState<string[]>([]);
+  // When an answer names nothing in the plan: the next item, shown softly as "Next in your plan".
+  const [nextHint, setNextHint] = useState<string | null>(null);
   const [justDone, setJustDone] = useState<PlanItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -228,7 +230,11 @@ export default function DemoPage() {
       setSource(reply.source);
       if (reply.help) { setHelp(reply.help); setHelpCompact(false); } else setHelpCompact(true);
       const after = await loadToday();
-      setFocus(after ? itemsMentioned(reply.text, after.items) : []);
+      const named = after ? itemsMentioned(reply.text, after.items) : [];
+      setFocus(named);
+      // Only for an answer that names no item, quotes no letter and is not about a symptom.
+      setNextHint(after && !named.length && !reply.source && !reply.help && !reply.saved
+        ? after.items.find(i => !i.done)?.id || null : null);
       // Only claim a save when a report_* tool really succeeded in this reply.
       const newlyDone = reply.saved ? after?.items.find(i => i.done && !before.has(i.id)) || null : null;
       setJustDone(newlyDone);
@@ -297,7 +303,7 @@ export default function DemoPage() {
     : <TodayPanel items={today.items} justDone={justDone} reminderItemId={reminderItemId} clock={today.clockLabel}
         dayAtHome={dayAtHome} compact={dev} busy={busy} onDone={tapDone}
         empty={todayLoaded && today.items.length === 0} onStart={backToStart}
-        help={help} helpCompact={helpCompact} onDismissHelp={() => setHelp(null)} focus={focus} />;
+        help={help} helpCompact={helpCompact} onDismissHelp={() => setHelp(null)} focus={focus} hint={nextHint} />;
 
   let screen;
   if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;

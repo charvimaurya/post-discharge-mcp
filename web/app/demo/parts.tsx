@@ -130,10 +130,11 @@ function Ring({ done, total }: { done: number; total: number }) {
 
 const repeatText = (i: PlanItem) => (i.repeat ? `, ${i.repeat.index} of ${i.repeat.total}` : '');
 
-function Card({ item, due, onDone, busy, focus }: { item: PlanItem; due: string | null; onDone?: (i: PlanItem) => void; busy?: boolean; focus?: boolean }) {
+function Card({ item, due, onDone, busy, focus, hint }: { item: PlanItem; due: string | null; onDone?: (i: PlanItem) => void; busy?: boolean; focus?: boolean; hint?: boolean }) {
   const state = item.done ? ' ok' : due ? ' due' : '';
-  return <div className={`item${state}${focus ? ' focus' : ''}`}>
+  return <div className={`item${state}${focus ? ' focus' : hint ? ' hint' : ''}`}>
     {focus && <span className="focus-tag">AfterWard is talking about this</span>}
+    {!focus && hint && <span className="focus-tag hint">Next in your plan</span>}
     <span className="ico">{item.done ? <Icon name="check" size={26} stroke={2.4} /> : <Icon name={item.kind === 'medicine' ? 'pill' : /walk/i.test(item.name) ? 'walk' : 'exercise'} size={27} />}</span>
     <div className="t">
       <b>{item.title}{repeatText(item)}
@@ -187,15 +188,15 @@ export function TodayPanel(props: {
   dayAtHome: number | null; compact?: boolean; busy?: boolean; onDone?: (i: PlanItem) => void;
   empty?: boolean; onStart?: () => void;
   help?: HelpAction[] | null; helpCompact?: boolean; onDismissHelp?: () => void;
-  focus?: string[];
+  focus?: string[]; hint?: string | null;
 }) {
   const { items, justDone } = props;
   const focus = new Set(props.focus || []);
-  const focusKey = (props.focus || []).join(',');
+  const focusKey = `${(props.focus || []).join(',')}|${props.hint || ''}`;
   const body = useRef<HTMLDivElement>(null);
   // Bring the first card AfterWard named into view, inside the panel's own scroll area.
   useEffect(() => {
-    const card = body.current?.querySelector<HTMLElement>('.item.focus');
+    const card = body.current?.querySelector<HTMLElement>('.item.focus, .item.hint');
     if (card && body.current) body.current.scrollTo({ top: card.offsetTop - body.current.offsetTop - 12, behavior: 'smooth' });
   }, [focusKey]);
   const pending = items.filter(i => !i.done);
@@ -215,13 +216,13 @@ export function TodayPanel(props: {
     {/* What is already done comes first, then what is next and the rest of the day. */}
     {done.length > 0 && <div className="slotgrp donefirst">
       <div className="slot-h done">Done</div>
-      <div className="items">{done.map(i => <Card key={i.id} item={i} due={null} focus={focus.has(i.id)} />)}</div>
+      <div className="items">{done.map(i => <Card key={i.id} item={i} due={null} focus={focus.has(i.id)} hint={props.hint === i.id} />)}</div>
     </div>}
     <div className="lbl">{justDone ? 'Just done, then next up' : 'Next up'}</div>
     <div className="items">
-      {justDone && <Card item={justDone} due={null} focus={focus.has(justDone.id)} />}
+      {justDone && <Card item={justDone} due={null} focus={focus.has(justDone.id)} hint={props.hint === justDone.id} />}
       {shown.map(i => <Card key={i.id} item={i} due={i.id === props.reminderItemId ? dueText(i, props.clock) : null}
-        onDone={props.onDone} busy={props.busy} focus={focus.has(i.id)} />)}
+        onDone={props.onDone} busy={props.busy} focus={focus.has(i.id)} hint={props.hint === i.id} />)}
     </div>
     {/* The rest of the day, as cards, by time of day. Every pending card has a "Mark as done" button;
         the report names the card's time of day, so a later card records its own occurrence. */}
@@ -229,7 +230,7 @@ export function TodayPanel(props: {
     {slots.map(s => <div key={s} className="slotgrp">
       <div className="slot-h">{s}</div>
       <div className="items">{rest.filter(i => i.slot === s).map(i => <Card key={i.id} item={i} due={null}
-        onDone={props.onDone} busy={props.busy} focus={focus.has(i.id)} />)}</div>
+        onDone={props.onDone} busy={props.busy} focus={focus.has(i.id)} hint={props.hint === i.id} />)}</div>
     </div>)}
     {props.empty && <>
       <p className="note">No plan for today yet. Upload a discharge letter first.</p>

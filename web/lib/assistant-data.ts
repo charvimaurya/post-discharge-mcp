@@ -119,6 +119,16 @@ export function shortTaskLabel(description: string): string {
   return head ? head[0].toUpperCase() + head.slice(1) : description;
 }
 
+// A medicine's instruction is shown on a dose only when it fits that dose's time of day.
+// "Take the morning dose after breakfast." belongs on the morning dose, not the midday one.
+// An instruction that names no time of day, or names this one, is shown as it is.
+function extraForSlot(extra: string, slot: string): string {
+  if (!extra) return '';
+  const said = ` ${words(extra)} `;
+  const named = Object.entries(SLOT_WORDS).filter(([, ws]) => ws.some(w => said.includes(` ${w}`))).map(([s]) => s);
+  return named.length === 0 || named.includes(slot.toLowerCase()) ? extra : '';
+}
+
 // Medicines carry "name"; tasks carry "description".
 function toItem(o: Obj, kind: PlanItem['kind']): PlanItem {
   const source = isObj(o.source) ? o.source : {};
@@ -134,7 +144,7 @@ function toItem(o: Obj, kind: PlanItem['kind']): PlanItem {
     kind,
     name,
     title: kind === 'task' ? shortTaskLabel(name) : dose ? `${name}, ${dose}` : name,
-    detail: [clockTime ? prettyTime(clockTime) : slot, extra].filter(Boolean).join(', '),
+    detail: [clockTime ? prettyTime(clockTime) : slot, kind === 'medicine' ? extraForSlot(extra, slot) : extra].filter(Boolean).join(', '),
     slot,
     clockTime,
     done: status === 'completed',
