@@ -296,3 +296,36 @@ def meal_medicines_reminder(meal: str, doses: list[dict[str, Any]]) -> str:
     comma = "," if doses[-1].get("dose") else ""
 
     return f"Remember, {listed}{comma} {verb} taken {wording}."
+
+
+def diet_source(reply: str, diet_advice: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """
+    The letter panel's source for a food answer: the letter's eating and
+    drinking lines, with the ones the reply quoted marked. None when the reply
+    quoted no line (for example "your letter doesn't mention food").
+    """
+
+    def clean(text: Any) -> str:
+        return " ".join(str(text or "").split())
+
+    spoken = clean(reply).lower()
+    lines = [a for a in diet_advice if clean(a.get("text"))]
+    quoted = [a for a in lines if clean(a.get("text")).rstrip(".").lower() in spoken]
+
+    if not quoted:
+        return None
+
+    first = quoted[0].get("source") or {}
+    text = "\n".join(f"- {clean(a.get('text'))}" for a in lines)
+    highlight = " ".join(clean(a.get("text")) for a in quoted)
+
+    return {
+        "document_id": first.get("document_id"),
+        "page": first.get("page"),
+        "chunk_id": None,
+        "section": "Eating and drinking",
+        "text": text,
+        "highlight": highlight,
+        "passage": text,
+        "highlighted_line": highlight,
+    }

@@ -18,7 +18,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './afterward.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
-import { daysAtHome, isObj, localTime, readChat, readPlan, readToday, splitClock, str,
+import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, splitClock, str,
   type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
 import { canListen, listenOnce, speak } from '../../lib/voice';
@@ -78,6 +78,10 @@ export default function DemoPage() {
   const [source, setSource] = useState<Source>(null);
   // The "Get help" card: set by a symptom reply, cleared only when she taps "I'm feeling better".
   const [help, setHelp] = useState<HelpAction[] | null>(null);
+  // After a reply about something else, the card shrinks to a one-line strip.
+  const [helpCompact, setHelpCompact] = useState(false);
+  // The plan items the last answer named: highlighted on the Today screen.
+  const [focus, setFocus] = useState<string[]>([]);
   const [justDone, setJustDone] = useState<PlanItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -222,8 +226,9 @@ export default function DemoPage() {
       setCalls(c => [...c, ...reply.tools]);
       setRequestId(reply.requestId);
       setSource(reply.source);
-      if (reply.help) setHelp(reply.help);
+      if (reply.help) { setHelp(reply.help); setHelpCompact(false); } else setHelpCompact(true);
       const after = await loadToday();
+      setFocus(after ? itemsMentioned(reply.text, after.items) : []);
       // Only claim a save when a report_* tool really succeeded in this reply.
       const newlyDone = reply.saved ? after?.items.find(i => i.done && !before.has(i.id)) || null : null;
       setJustDone(newlyDone);
@@ -288,11 +293,11 @@ export default function DemoPage() {
 
   const reminderItemId = today.pendingCheckin?.itemId || null;
   const leftPanel = source
-    ? <LetterPanel source={source} onBack={() => setSource(null)} />
+    ? <LetterPanel source={source} onBack={() => setSource(null)} help={help} onDismissHelp={() => setHelp(null)} />
     : <TodayPanel items={today.items} justDone={justDone} reminderItemId={reminderItemId} clock={today.clockLabel}
         dayAtHome={dayAtHome} compact={dev} busy={busy} onDone={tapDone}
         empty={todayLoaded && today.items.length === 0} onStart={backToStart}
-        help={help} onDismissHelp={() => setHelp(null)} />;
+        help={help} helpCompact={helpCompact} onDismissHelp={() => setHelp(null)} focus={focus} />;
 
   let screen;
   if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;

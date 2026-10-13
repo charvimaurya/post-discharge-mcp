@@ -64,6 +64,7 @@ from app.agent.food import (
     PLAN,
     classify_food_message,
     diet_reply,
+    diet_source,
     food_question_reply,
     foods_named,
     is_food_message,
@@ -1211,6 +1212,8 @@ async def _food_turn(
     tool_trace.append({"tool": "get_recovery_plan", "arguments": {}, "ok": ok})
 
     diet_advice = ((plan or {}).get("data") or {}).get("diet_advice") or [] if ok else []
+    # Kept for the letter panel: the reply's quoted diet lines become its source.
+    _TURN.get()["diet_advice"] = diet_advice
     kind = classify_food_message(message)
 
     if kind in (PLAN, NOT_YET):
@@ -1753,6 +1756,8 @@ async def _chat_turn(
     ):
         # "I ate pizza for breakfast": never judged except by the letter.
         resolved_reply = await _food_turn(cleaned_message, today, first_name, session_id, tool_trace)
+        # Open the letter at its eating and drinking lines, as for any letter answer.
+        resolved_source = diet_source(resolved_reply, _TURN.get().get("diet_advice") or [])
 
     elif (
         pending_checkin

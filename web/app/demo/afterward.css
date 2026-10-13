@@ -551,3 +551,15 @@
 /* Developer view: the conversation and the tool calls keep the whole session and scroll. */
 .awapp .msgs > .msg,.awapp .tools .calls > .call{flex:none}
 .awapp .msgs{margin-right:-8px;padding-right:8px}
+
+/* The "Get help" card, shrunk to one line once she asks about something else */
+.awapp .helpstrip{display:flex;align-items:center;gap:12px;background:#FFF5F7;border:1.5px solid #E7B3C2;border-left:5px solid var(--accent);border-radius:12px;padding:8px 12px;margin-bottom:12px;font-size:15px;color:#1B2430;flex:none}
+.awapp .help-ico.sm{width:26px;height:26px;border-radius:8px}
+.awapp .help-strip-text{flex:1;min-width:0}
+.awapp .help-strip-text b{color:var(--accent)}
+.awapp .help-strip-call{background:var(--accent);color:#fff;border-radius:8px;padding:5px 12px;font-weight:600;text-decoration:none;white-space:nowrap}
+.awapp .help-strip-close{background:#fff;border:1px solid #E7B3C2;border-radius:8px;padding:5px 12px;font-weight:600;color:#1B2430;cursor:pointer}
+
+/* The plan item AfterWard just talked about */
+.awapp .item.focus{position:relative;outline:2.5px solid var(--accent);outline-offset:2px;box-shadow:0 6px 18px rgba(167,35,74,.14)}
+.awapp .item .focus-tag{position:absolute;top:-11px;left:18px;background:var(--accent);color:#fff;font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;border-radius:999px;padding:3px 10px;z-index:1}

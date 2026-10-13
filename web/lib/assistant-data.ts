@@ -245,6 +245,56 @@ export type LetterBlock = { kind: 'para' | 'item' | 'bullet'; number: string | n
 
 const words = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
+// ---------- Which plan items an answer is about ----------
+// Same everyday name AfterWard says aloud (app/agent/occurrence_resolver.py: _EVERYDAY_NAMES).
+const BLOOD_THINNERS = ['apixaban', 'rivaroxaban', 'edoxaban', 'dabigatran', 'warfarin', 'enoxaparin', 'dalteparin', 'heparin'];
+const SLOT_WORDS: Record<string, string[]> = {
+  morning: ['morning', 'breakfast'], midday: ['midday', 'lunch'], afternoon: ['afternoon'],
+  evening: ['evening', 'dinner', 'supper'], bedtime: ['bedtime', 'bed time', 'night'],
+};
+
+// The words AfterWard could use for this item: "paracetamol", "blood thinner", "walk", "knee exercises".
+function spokenNames(item: PlanItem): string[] {
+  const name = words(item.name);
+  if (item.kind === 'medicine') {
+    const out = [name.split(' ')[0]];
+    if (BLOOD_THINNERS.some(b => name.includes(b))) out.push('blood thinner');
+    return out.filter(Boolean);
+  }
+  if (name.includes('walk')) return ['walk'];
+  if (name.includes('exercise')) return ['exercise'];
+  return [words(item.title).split(' ')[0]].filter(Boolean);
+}
+
+/**
+ * The ids of the plan items an answer names, so the Today screen can point at them.
+ * Nothing is guessed: an item is picked only when its name is in the reply. For each
+ * name, the next item not yet done is chosen, in the part of the day the reply names
+ * ("after breakfast" is morning) when it names one.
+ */
+export function itemsMentioned(reply: string, items: PlanItem[]): string[] {
+  const said = ` ${words(reply)} `;
+  const slots = Object.entries(SLOT_WORDS).filter(([, ws]) => ws.some(w => said.includes(` ${w}`))).map(([s]) => s);
+  const byName = new Map<string, PlanItem[]>();
+  for (const item of items) {
+    for (const n of spokenNames(item)) {
+      if (!said.includes(` ${n}`)) continue;
+      byName.set(n, [...(byName.get(n) || []), item]);
+      break;
+    }
+  }
+  const ids: string[] = [];
+  for (const group of byName.values()) {
+    // The named part of the day first ("your morning walk done" is the morning one, even
+    // though it is done), then the next one not yet done, then any.
+    const inSlot = group.filter(i => slots.includes(i.slot.toLowerCase()));
+    const pending = (list: PlanItem[]) => list.filter(i => !i.done);
+    const pick = [pending(inSlot), inSlot, pending(group), group].find(l => l.length)?.[0];
+    if (pick && !ids.includes(pick.id)) ids.push(pick.id);
+  }
+  return ids;
+}
+
 function markHighlight(text: string, highlight: string | null): LetterSegment[] {
   if (!highlight) return [{ text, mark: false }];
   const at = text.indexOf(highlight);
