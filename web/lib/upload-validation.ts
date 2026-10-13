@@ -25,3 +25,20 @@ export async function validateUpload(
     return { accepted: false, status: 502, error: 'Could not check the document. Please try again.' };
   }
 }
+
+// After the letter is stored: ask the bridge to delete what was recorded against the previous
+// letter, so nothing from the old plan shows as done on the new one. True when it was cleared.
+export async function clearPreviousHistory(
+  bridgeUrl: string,
+  request: typeof fetch = fetch,
+  requestId?: string,
+): Promise<boolean> {
+  try {
+    const response = await request(`${bridgeUrl}/documents/uploaded`, {
+      method: 'POST', headers: requestId ? { 'X-Request-ID': requestId } : {}, cache: 'no-store',
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}

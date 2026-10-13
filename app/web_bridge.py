@@ -8,6 +8,7 @@ caller sends can choose the patient, date or time.
 
 import asyncio
 import os
+import re
 import uuid
 from contextlib import asynccontextmanager, suppress
 
@@ -17,13 +18,16 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+from app.agent.evidence import related_appointment_lines
 from app.agent.service import chat, get_structured_tool_result
 from app.agent.next_up import build_opening_message, timing
 from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime, system_now_utc
+from app.database.event_history import delete_events
 from app.database.recovery_state import (
     add_scheduled_checkin,
     clear_pending_checkin,
     get_recovery_state,
+    plan_end_date,
     record_chat_activity,
 )
 from app.ingestion.document_validation import (
@@ -42,6 +46,48 @@ log = service_log("bridge")
 
 TODAY_ERROR = "Could not load today's plan. Please try again."
 CHAT_ERROR = "Sorry, I couldn't reach the assistant. Please try again."
+
+
+# A question about how long a medicine goes on for: "how long", "when do I stop", "end date".
+_ASKS_HOW_LONG = re.compile(
+    r"\b(how long|end date|until when|stop taking|when (do|can|should|will) i stop|how many (days|weeks|months))\b",
+    re.IGNORECASE,
+)
+
+NO_END_DATE_FLAG = "Needs confirmation: the letter gives no end date"
+NO_END_DATE_TEXT = "Today's doses stay in the plan. Only the end date is unanswered."
+
+
+def open_ended_medicine_note(source: dict | None, conversation: str, state: dict) -> dict | None:
+    """
+    The note shown under a medicine whose letter line gives no end date.
+
+    Only when the turn is about how long to take it, the marked line is one
+    regular medicine in the plan, and neither an end date nor a length
+    ("for 14 days") can be read from the letter. Nothing is said about a
+    medicine that has an end, or one taken only if needed.
+    """
+
+    if not source or not _ASKS_HOW_LONG.search(conversation or ""):
+        return None
+
+    marked = str(source.get("highlight") or "").lower()
+    medicines = [
+        medicine for medicine in state.get("medications") or []
+        if isinstance(medicine, dict)
+        and str(medicine.get("name") or "").strip()
+        and str(medicine["name"]).lower().split()[0] in re.findall(r"[a-z]+", marked)
+    ]
+
+    if len(medicines) != 1:
+        return None
+
+    (medicine,) = medicines
+
+    if medicine.get("as_needed") or plan_end_date(medicine, state) is not None:
+        return None
+
+    return {"flag": NO_END_DATE_FLAG, "text": NO_END_DATE_TEXT}
 
 
 async def chat_message(request: Request) -> JSONResponse:
@@ -110,11 +156,24 @@ async def chat_message(request: Request) -> JSONResponse:
             # The reply is already real; the reminder just stays visible.
             log("clear_checkin_failed", level="error", error=exc)
 
+    # A passage that points at an appointment ("until your consultant has reviewed
+    # you") is shown with that appointment's own line from the letter, if the plan has it.
+    source = result["source"]
+    related = related_appointment_lines(source, state.get("appointments"))
+
+    if related:
+        source = dict(source, related=related)
+
+    note = open_ended_medicine_note(source, f"{message} {result['response']}", state)
+
+    if note:
+        source = dict(source, note=note)
+
     return JSONResponse(
         {
             "response": result["response"],
             "tool_trace": result["tool_trace"],
-            "source": result["source"],
+            "source": source,
             "session_id": session_id,
             # Shown small in Developer view, to find this turn in the logs.
             "request_id": get_request_id(),
@@ -195,6 +254,32 @@ async def validate_document(request: Request) -> JSONResponse:
             status_code=422,
         )
     return JSONResponse({"accepted": True}, headers={"Cache-Control": "no-store"})
+
+
+HISTORY_ERROR = "Could not clear the previous plan's history."
+
+
+async def document_uploaded(request: Request) -> JSONResponse:
+    """
+    A new discharge letter is in S3: delete what was recorded against the old one.
+
+    The upload route calls this after the letter is accepted and stored. The
+    new letter replaces the plan, so completions saved for the previous plan
+    must not show as done on the new one. The request body is ignored, so the
+    caller cannot choose the patient.
+    """
+
+    patient = get_demo_patient_context()
+
+    try:
+        deleted = await asyncio.to_thread(delete_events, patient.patient_id)
+    except Exception as exc:
+        log("history_clear_failed", level="error", error=exc, route="/documents/uploaded")
+        return JSONResponse({"error": HISTORY_ERROR}, status_code=502)
+
+    log("history_cleared", item_count=deleted)
+
+    return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
 
 
 # Local stand-in for the EventBridge schedule: with LOCAL_REMINDER_LOOP=1
@@ -340,6 +425,7 @@ class RequestLogMiddleware:
 app = Starlette(
     routes=[
         Route("/documents/validate", validate_document, methods=["POST"]),
+        Route("/documents/uploaded", document_uploaded, methods=["POST"]),
         Route("/chat", chat_message, methods=["POST"]),
         Route("/today", today, methods=["GET"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),

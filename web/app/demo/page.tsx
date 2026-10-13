@@ -27,6 +27,8 @@ import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPa
 
 type View = 'start' | 'build' | 'today';
 const POLL_MS = 5000;
+// The parts of the day the agent matches a report to (app/agent/occurrence_resolver.py).
+const DAY_PARTS = ['morning', 'midday', 'afternoon', 'evening', 'bedtime'];
 
 // Keep the mock-up's readable scale while extending the frame to every window edge.
 function useFitFrame() {
@@ -252,9 +254,14 @@ export default function DemoPage() {
     }
   }
 
-  // Tapping Done goes through AfterWard too, so the tick is a real report tool call.
-  const tapDone = (item: PlanItem) =>
-    send(item.kind === 'medicine' ? `I've taken my ${item.name.split(',')[0].toLowerCase()}.` : `I've done my ${item.name.toLowerCase()}.`);
+  // Tapping "Mark as done" goes through AfterWard too, so the tick is a real report tool call.
+  // An item that repeats in the day names its time of day ("my evening knee exercises"), so the
+  // card that was tapped is the occurrence recorded, not just the next one due.
+  const tapDone = (item: PlanItem) => {
+    const slot = item.slot.toLowerCase();
+    const part = item.repeat && DAY_PARTS.includes(slot) ? `${slot} ` : '';
+    send(item.kind === 'medicine' ? `I've taken my ${part}${item.name.split(',')[0].toLowerCase()}.` : `I've done my ${part}${item.name.toLowerCase()}.`);
+  };
 
   function openToday() {
     // Her click opens Today afresh, so the waiting reminder or greeting is spoken, even if this

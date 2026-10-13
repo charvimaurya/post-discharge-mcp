@@ -146,7 +146,7 @@ function Card({ item, due, onDone, busy }: { item: PlanItem; due: string | null;
     {item.done
       ? <span className="done-at"><Icon name="check" size={22} stroke={2.4} />Done{item.doneAt ? ` at ${localTime(item.doneAt)}` : ''}</span>
       : onDone && <button type="button" className="btn-done" disabled={busy} onClick={() => onDone(item)}>
-          <Icon name="check" size={20} stroke={2.2} />Done</button>}
+          <Icon name="ring" size={20} stroke={2.2} />Mark as done</button>}
   </div>;
 }
 
@@ -178,23 +178,25 @@ export function TodayPanel(props: {
     </div>
     {/* Everything under the heading scrolls inside the panel instead of running off the screen */}
     <div className="tbody" tabIndex={0} role="region" aria-label="Today's plan">
+    {/* What is already done comes first, then what is next and the rest of the day. */}
+    {done.length > 0 && <div className="slotgrp donefirst">
+      <div className="slot-h done">Done</div>
+      <div className="items">{done.map(i => <Card key={i.id} item={i} due={null} />)}</div>
+    </div>}
     <div className="lbl">{justDone ? 'Just done, then next up' : 'Next up'}</div>
     <div className="items">
       {justDone && <Card item={justDone} due={null} />}
       {shown.map(i => <Card key={i.id} item={i} due={i.id === props.reminderItemId ? dueText(i, props.clock) : null}
         onDone={props.onDone} busy={props.busy} />)}
     </div>
-    {/* The rest of the day, as cards, by time of day. Only the "Next up" cards have a Done button:
-        a tap reports the next occurrence, so it must not sit on a later one. */}
+    {/* The rest of the day, as cards, by time of day. Every pending card has a "Mark as done" button;
+        the report names the card's time of day, so a later card records its own occurrence. */}
     {rest.length > 0 && <div className="more">+ {rest.length} more today <span>&nbsp;by time of day</span></div>}
     {slots.map(s => <div key={s} className="slotgrp">
       <div className="slot-h">{s}</div>
-      <div className="items">{rest.filter(i => i.slot === s).map(i => <Card key={i.id} item={i} due={null} />)}</div>
+      <div className="items">{rest.filter(i => i.slot === s).map(i => <Card key={i.id} item={i} due={null}
+        onDone={props.onDone} busy={props.busy} />)}</div>
     </div>)}
-    {done.length > 0 && <div className="slotgrp">
-      <div className="slot-h done">Done</div>
-      <div className="items">{done.map(i => <Card key={i.id} item={i} due={null} />)}</div>
-    </div>}
     {props.empty && <>
       <p className="note">No plan for today yet. Upload a discharge letter first.</p>
       {props.onStart && <button type="button" className="back" onClick={props.onStart}>Back to start</button>}
@@ -210,12 +212,16 @@ function Segments({ segments }: { segments: LetterBlock['segments'] }) {
 }
 
 // Paragraphs stay paragraphs; runs of numbered items or bullets become one list.
-function LetterBody({ blocks }: { blocks: LetterBlock[] }) {
+function LetterBody({ blocks, flag }: { blocks: LetterBlock[]; flag?: string | null }) {
   const out: ReactNode[] = [];
+  // The flag ("Needs confirmation: ...") sits directly under the first marked line.
+  const flagged = flag ? blocks.find(b => b.segments.some(s => s.mark)) : undefined;
+  const flagFor = (b: LetterBlock) => b === flagged &&
+    <span className="chip amber letterflag"><Icon name="alert" size={15} stroke={2} />{flag}</span>;
   for (let i = 0; i < blocks.length;) {
     const kind = blocks[i].kind;
     if (kind === 'para') {
-      out.push(<p key={i} className="txt"><Segments segments={blocks[i].segments} /></p>);
+      out.push(<p key={i} className="txt"><Segments segments={blocks[i].segments} />{flagFor(blocks[i])}</p>);
       i += 1;
       continue;
     }
@@ -224,15 +230,18 @@ function LetterBody({ blocks }: { blocks: LetterBlock[] }) {
     const run = blocks.slice(i, j);
     out.push(kind === 'item'
       ? <ol key={i} className="letterlist2" start={Number(run[0].number) || 1}>
-          {run.map((b, k) => <li key={k} className="txt"><Segments segments={b.segments} /></li>)}</ol>
+          {run.map((b, k) => <li key={k} className="txt"><Segments segments={b.segments} />{flagFor(b)}</li>)}</ol>
       : <ul key={i} className="letterlist2">
-          {run.map((b, k) => <li key={k} className="txt"><Segments segments={b.segments} /></li>)}</ul>);
+          {run.map((b, k) => <li key={k} className="txt"><Segments segments={b.segments} />{flagFor(b)}</li>)}</ul>);
     i = j;
   }
   return <>{out}</>;
 }
 
 export function LetterPanel({ source, onBack }: { source: NonNullable<Source>; onBack: () => void }) {
+  const blocks = letterBlocks(source);
+  // A list of several rows (the medicines) is set smaller, so every row and the marked one fit without scrolling.
+  const list = blocks.length >= 3;
   return <section className="panel grow letter-panel" aria-label="Passage from your discharge letter">
     <header className="letter-heading">
       <div className="letter-heading-icon"><Icon name="doc" size={25} /></div>
@@ -243,16 +252,21 @@ export function LetterPanel({ source, onBack }: { source: NonNullable<Source>; o
       {source.page && <span className="letter-page">Page {source.page}</span>}
     </header>
     <p className="letter-intro">The passage behind AfterWard’s answer.</p>
-    <div className="paper letter-excerpt">
+    <div className={`paper letter-excerpt${list ? ' is-list' : ''}`}>
       <div className="letter-paper-top">
         <span>Letter excerpt</span>
         {source.highlight && <span className="letter-key"><i />Relevant wording</span>}
       </div>
       <div className="letter-scroll" tabIndex={0} role="region" aria-label="Original letter passage">
-        <div className="in letterbody"><LetterBody blocks={letterBlocks(source)} /></div>
+        <div className="in letterbody"><LetterBody blocks={blocks} flag={source.note?.flag} />
+          {/* The appointment the passage points at, in the letter's own words, when the plan has it. */}
+          {(source.related || []).map((r, i) => <p key={i} className="txt related">
+            <mark>{r.text}</mark>{r.page && r.page !== source.page && <span className="related-page">Page {r.page}</span>}</p>)}
+        </div>
       </div>
       <div className="letter-paper-bottom"><Icon name="doc" size={15} />Original wording · Synthetic demo document</div>
     </div>
+    {source.note?.text && <p className="letter-note">{source.note.text}</p>}
     <footer className="letter-actions">
       <button type="button" className="letter-back" onClick={onBack}>
         <span className="letter-back-arrow"><Icon name="arrow" size={19} /></span>Back to today
@@ -287,7 +301,7 @@ export function VoicePanel(props: {
   const state = props.busy ? ['Thinking', 'AfterWard is checking her plan.']
     : props.listening ? ['Listening', 'Speak now.']
     : props.speaking ? ['Speaking', 'The same words are on screen.']
-    : ['Listening', props.canListen ? 'Tap the microphone, tap Done, or type.' : 'Type below. This browser cannot listen.'];
+    : ['Listening', props.canListen ? 'Tap the microphone, tap Mark as done, or type.' : 'Type below. This browser cannot listen.'];
   return <div className={`panel voice${props.speaking ? ' speaking' : ''}`} aria-live="polite">
     {RINGS}
     <div className="vhead"><Logo size={26} /><span>{props.head}</span></div>

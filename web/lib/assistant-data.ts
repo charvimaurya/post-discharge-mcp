@@ -32,7 +32,11 @@ export type ToolCall = { name: string; kind: 'read' | 'write'; args: string; res
 // text: the letter passage; highlight: the one line the reply relied on.
 // text: the clean excerpt (or, from an older bridge, the raw passage); highlight: the sentence that answers;
 // section: the letter heading above it, e.g. "Medicines".
-export type Source = { text: string; highlight: string | null; page: number | null; section: string | null } | null;
+// related: the letter's own line for an appointment the passage refers to ("Consultant review: ...").
+export type RelatedLine = { text: string; page: number | null };
+// note: shown under the marked line when the letter leaves something open ("no end date").
+export type SourceNote = { flag: string; text: string };
+export type Source = { text: string; highlight: string | null; page: number | null; section: string | null; related?: RelatedLine[]; note?: SourceNote | null } | null;
 // saved: a report_* tool ran and succeeded, so something really was written to the plan.
 // requestId: the ID this turn has in every server log line (shown small in Developer view).
 export type ChatReply = { text: string; tools: ToolCall[]; source: Source; completed: boolean; saved: boolean; requestId: string | null };
@@ -215,11 +219,14 @@ export function readChat(json: unknown): ChatReply {
   const s = isObj(o.source) ? o.source : null;
   const text = s ? str(s.text) || str(s.passage) : '';
   const highlight = s ? str(s.highlight) || str(s.highlighted_line) : '';
+  const related: RelatedLine[] = (s && Array.isArray(s.related) ? s.related : []).filter(isObj)
+    .map(r => ({ text: str(r.text), page: Number(r.page) || null })).filter(r => r.text);
+  const note: SourceNote | null = s && isObj(s.note) && str(s.note.flag) ? { flag: str(s.note.flag), text: str(s.note.text) } : null;
   return {
     text: str(o.response),
     tools,
     source: text || highlight
-      ? { text: text || highlight, highlight: highlight || null, page: Number(s?.page) || null, section: s ? str(s.section) || null : null }
+      ? { text: text || highlight, highlight: highlight || null, page: Number(s?.page) || null, section: s ? str(s.section) || null : null, related, note }
       : null,
     completed: o.completed !== false,
     saved: tools.some(t => t.kind === 'write' && t.ok),

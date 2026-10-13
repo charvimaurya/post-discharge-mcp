@@ -60,7 +60,7 @@
 .awapp .chip.amber{color:var(--amber);background:var(--amber-pale)}
 .awapp .chip.blue{color:var(--blue);background:var(--blue-pale)}
 .awapp .chip.grey{color:var(--soft);background:var(--alt)}
-.awapp .btn-done{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);border-radius:999px;padding:11px 20px 11px 16px;font-size:18px;font-weight:600;flex:none}
+.awapp .btn-done{display:flex;align-items:center;gap:8px;border:1.5px solid var(--ink);border-radius:999px;padding:11px 20px 11px 16px;font-size:18px;font-weight:600;flex:none;white-space:nowrap}
 .awapp .done-at{display:flex;align-items:center;gap:8px;color:var(--blue);font-size:17px;font-weight:600;flex:none}
 .awapp .more{font-size:18px;font-weight:600;color:var(--ink);margin:12px 0 4px}
 .awapp .more span{color:var(--muted);font-weight:400}
@@ -497,3 +497,21 @@
 .awapp .joinslot .join{left:-23px;top:-23px}
 .awapp .planfoot{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;flex:none}
 .awapp .planfoot .openplan{margin:0 0 0 auto;align-self:center;padding:11px 24px;font-size:17px}
+/* Today: the Done group sits at the top, above "Next up". */
+.awapp .slotgrp.donefirst{margin:0 0 14px}
+.awapp .slotgrp.donefirst .slot-h{margin-top:0}
+/* Letter panel: the appointment a passage refers to, shown under it in the same pink marking. */
+.awapp .letter-excerpt .txt.related{margin-top:6px;padding-top:16px;border-top:1px dashed #eadfd3}
+.awapp .letter-excerpt .related-page{display:inline-block;margin-left:10px;font-family:var(--sans);font-size:12px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+/* Her own words: a cream bubble on the right, so they are never mistaken for AfterWard's reply. */
+.awapp .turn.you{align-self:flex-end;max-width:90%;display:flex;flex-direction:column;align-items:flex-end;margin-bottom:18px}
+.awapp .turn.you small{text-transform:none;letter-spacing:.6px;font-size:14px;color:#E6ECF1!important;margin-bottom:7px}
+.awapp .turn.you p{background:#F4EFE6;color:#17222B;font-size:19px;font-weight:600;line-height:1.38;border-radius:16px 16px 4px 16px;padding:12px 18px;margin-bottom:0;text-align:left}
+/* Letter panel: a flag under the marked line, and a plain note under the excerpt. */
+.awapp .letter-excerpt .letterflag{display:flex;width:fit-content;margin-top:10px;font-size:14px}
+.awapp .letter-note{font-size:16px;line-height:1.45;color:var(--soft);margin-top:12px;flex:none}
+.awapp .letter-note + .letter-actions{margin-top:12px}
+.awapp .letter-excerpt.is-list .in{padding:18px 24px 20px}
+.awapp .letter-excerpt.is-list .txt{font-size:17px;line-height:1.5}
+.awapp .letter-excerpt.is-list .letterbody,.awapp .letter-excerpt.is-list .letterlist2{gap:9px}
+.awapp .letter-excerpt.is-list .letterflag{margin-top:8px;font-size:13.5px}

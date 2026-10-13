@@ -624,6 +624,73 @@ def _expanded_words(text: str) -> set[str]:
     return words
 
 
+# Most rows of a list shown in one excerpt.
+MAX_LIST_ROWS = 8
+
+# Most words in a table's column headings ("Medicine  How to take it  Status") or in
+# one short cell after a row's last sentence ("New").
+_MAX_HEADING_WORDS = 8
+_MAX_CELL_WORDS = 2
+_AFTER_LAST_SENTENCE = re.compile(r"^(.*[.!?])\s+([^.!?]+)$", re.DOTALL)
+
+
+def _without_table_cells(blocks: list[dict]) -> list[dict]:
+    """
+    Remove what a table leaves behind when a PDF is read as plain text.
+
+    A medicines table arrives as its column headings on one line, then
+    numbered rows that each end with a short status cell ("New"). Neither
+    is a sentence of the letter, and shown raw they read as nonsense
+    ("Medicine How to take it Status"). The headings line is dropped, and
+    so is the short cell after each row's last sentence. A chunk without
+    such a headings line is returned unchanged.
+    """
+
+    cleaned: list[dict] = []
+    cells: list[str] = []
+    in_table = False
+
+    for index, block in enumerate(blocks):
+        following = blocks[index + 1] if index + 1 < len(blocks) else None
+
+        if (
+            block["kind"] == "para"
+            and following is not None
+            and following["kind"] == "item"
+            and not re.search(r"[.!?:]", block["text"])
+            and len(block["text"].split()) <= _MAX_HEADING_WORDS
+        ):
+            in_table = True
+            continue
+
+        if block["kind"] != "item":
+            in_table = False
+        elif in_table:
+            cell = _AFTER_LAST_SENTENCE.match(block["text"])
+
+            if cell and len(cell.group(2).split()) <= _MAX_CELL_WORDS:
+                cells.append(cell.group(2).strip())
+                block = dict(block, text=cell.group(1).strip(), table_row=True)
+            else:
+                block = dict(block, table_row=True)
+
+        cleaned.append(block)
+
+    # The last row of a table also swallows the paragraph printed after the table
+    # ("... if constipated. New Usual medicines before admission: none."). Its status
+    # cell is the one the other rows ended with, so the row is cut there too.
+    for cell_text in set(cells):
+        ends_row = re.compile(rf"([.!?])\s+{re.escape(cell_text)}\s+\S")
+
+        for index, block in enumerate(cleaned):
+            found = ends_row.search(block["text"]) if block.get("table_row") else None
+
+            if found:
+                cleaned[index] = dict(block, text=block["text"][:found.end(1)].strip())
+
+    return cleaned
+
+
 def _block_text(block: dict) -> str:
     if block["kind"] == "item":
         return f"{block['number']}. {block['text']}"
@@ -654,7 +721,7 @@ def clean_passage(
     glyphs and trimming change; the letter's words never do.
     """
 
-    blocks = _trim_partial_edges(_blocks(chunk_text))
+    blocks = _without_table_cells(_trim_partial_edges(_blocks(chunk_text)))
 
     if not blocks:
         return None
@@ -677,6 +744,24 @@ def clean_passage(
 
     if item:
         wanted = _normalise(item)
+
+        # A medicines table reaches here as one long item holding every row. Show the
+        # rows as the letter's list and mark the one row the answer is about.
+        rows = [
+            block for block in blocks
+            if block["kind"] == "item" and _normalise(block["text"]) and _normalise(block["text"]) in wanted
+        ][:MAX_LIST_ROWS]
+
+        if len(rows) >= 2:
+            row = max(rows, key=lambda block: score(block["text"]))
+            section = row.get("section")
+
+            return {
+                "section": section.title() if section else None,
+                "text": "\n".join(_block_text(block) for block in rows),
+                "highlight": row["text"],
+            }
+
         for block in blocks:
             have = _normalise(block["text"])
             if wanted and (wanted in have or have in wanted):
@@ -709,3 +794,59 @@ def clean_passage(
         "text": _block_text(chosen),
         "highlight": sentences[best],
     }
+
+
+# ---------- The appointment a passage refers to ----------
+
+# "consultant has reviewed you at your 6-week appointment": the passage points at an appointment.
+_REFERS_TO_APPOINTMENT = re.compile(r"\b(?:appointment|review\w*|follow[- ]?up|clinic|consultant)s?\b", re.IGNORECASE)
+
+# How much of a word must match, so "review" in a title finds "reviewed" in the passage.
+_STEM_LENGTH = 6
+
+
+def related_appointment_lines(source: dict | None, appointments: list[dict] | None) -> list[dict]:
+    """
+    The letter's own lines for the appointment a passage refers to.
+
+    "Do not drive until your consultant has reviewed you" answers the question
+    but not "when is that?". When the passage refers to an appointment and the
+    plan holds one whose title it names ("Consultant review"), that
+    appointment's line from the letter is returned to show under the passage.
+
+    Nothing is guessed: an appointment is included only when every main word
+    of its title appears in the answering sentence, the plan kept the letter's
+    wording for it, and that wording is not already in the passage.
+    """
+
+    if not source or not appointments:
+        return []
+
+    sentence = str(source.get("highlight") or source.get("highlighted_line") or source.get("text") or "")
+
+    if not _REFERS_TO_APPOINTMENT.search(sentence):
+        return []
+
+    sentence_stems = {word[:_STEM_LENGTH] for word in re.findall(r"[a-z]+", sentence.lower())}
+    already_shown = _normalise(" ".join(str(source.get(key) or "") for key in ("text", "highlight", "passage")))
+    lines: list[dict] = []
+
+    for appointment in appointments:
+        if not isinstance(appointment, dict):
+            continue
+
+        title_words = [word for word in re.findall(r"[a-z]+", str(appointment.get("title") or "").lower()) if len(word) > 3]
+
+        if not title_words or any(word[:_STEM_LENGTH] not in sentence_stems for word in title_words):
+            continue
+
+        letter = appointment.get("source") if isinstance(appointment.get("source"), dict) else {}
+        snippet = str(letter.get("snippet") or "").strip()
+
+        if not snippet or _normalise(snippet) in already_shown:
+            continue
+
+        page = letter.get("page")
+        lines.append({"text": snippet, "page": int(page) if page is not None else None})
+
+    return lines

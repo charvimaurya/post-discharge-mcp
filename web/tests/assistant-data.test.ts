@@ -181,3 +181,20 @@ test('reads the server opening greeting on an empty day', () => {
   assert.deepEqual(t.items, []);
   assert.equal(readToday({}).openingGreeting, '');
 });
+
+test('a source carries the related appointment line, and has none when the server sends none', () => {
+  const line = 'Consultant review: Monday 23 November 2026, 9:15 am, Orthopaedic Clinic.';
+  const withRelated = readChat({ response: 'x', tool_trace: [],
+    source: { page: 1, text: 'Do not drive.', highlight: 'Do not drive.', related: [{ text: line, page: 2 }, { text: '' }, 'junk'] } });
+  assert.deepEqual(withRelated.source?.related, [{ text: line, page: 2 }]);
+  const without = readChat({ response: 'x', tool_trace: [], source: { page: 1, text: 'Do not drive.', highlight: 'Do not drive.' } });
+  assert.deepEqual(without.source?.related, []);
+});
+
+test('a source carries the note for an open question in the letter, or none', () => {
+  const note = { flag: 'Needs confirmation: the letter gives no end date', text: 'Only the end date is unanswered.' };
+  const base = { page: 1, text: '3. Apixaban 2.5 mg tablets.', highlight: 'Apixaban 2.5 mg tablets.' };
+  assert.deepEqual(readChat({ response: 'x', tool_trace: [], source: { ...base, note } }).source?.note, note);
+  assert.equal(readChat({ response: 'x', tool_trace: [], source: base }).source?.note, null);
+  assert.equal(readChat({ response: 'x', tool_trace: [], source: { ...base, note: { text: 'no flag' } } }).source?.note, null);
+});

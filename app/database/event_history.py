@@ -100,3 +100,51 @@ def append_event(
                 "event": None,
             }
         raise
+
+
+def delete_events(
+    patient_id: str,
+) -> int:
+    """Delete every Event History row for one patient and return how many.
+
+    Event History is otherwise append-only. This is the one exception: a
+    newly uploaded discharge letter starts the plan again, so what was
+    recorded against the previous letter must not carry over. Pages
+    through the query so more than one page (1 MB) is fully deleted.
+    """
+
+    if not patient_id or not patient_id.strip():
+        raise ValueError("patient_id must not be empty")
+
+    deleted = 0
+
+    query_kwargs = {
+        "KeyConditionExpression": Key("patient_id").eq(patient_id),
+        # Only the key attributes are needed to delete.
+        # "timestamp" is a DynamoDB reserved word.
+        "ProjectionExpression": "patient_id, #ts",
+        "ExpressionAttributeNames": {"#ts": "timestamp"},
+    }
+
+    with event_table.batch_writer() as batch:
+
+        while True:
+            response = event_table.query(**query_kwargs)
+
+            for item in response.get("Items", []):
+                batch.delete_item(
+                    Key={
+                        "patient_id": item["patient_id"],
+                        "timestamp": item["timestamp"],
+                    }
+                )
+                deleted += 1
+
+            last_key = response.get("LastEvaluatedKey")
+
+            if not last_key:
+                break
+
+            query_kwargs["ExclusiveStartKey"] = last_key
+
+    return deleted
