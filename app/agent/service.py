@@ -120,17 +120,20 @@ from app.reminders.engine import recheck_text
 from app.reminders.text import short_task_name, time_to_words
 from app.agent.session import (
     add_message,
+    get_crisis,
     get_history,
     get_last_prompt,
     get_step_pointer,
     pop_last_saved,
     pop_offer,
+    set_crisis,
     set_last_prompt,
     set_last_saved,
     set_offer,
     set_step_pointer,
 )
-from app.agent.intent import Intent, classify_intent
+from app.agent.crisis import asks_about_doses, check_in_reply, crisis_reply, is_crisis
+from app.agent.intent import Intent, classify_intent, is_plan_question
 from app.agent.symptoms import (
     find_symptom,
     letter_sentence_reply,
@@ -1073,6 +1076,37 @@ async def _answer_recheck_offer(
     return f"Okay{_who(first_name)}. I'll check with you again in {time_words_minutes(checkin_config.RECHECK_MINUTES)}."
 
 
+def _crisis_turn(message: str, session_id: str, first_name: str | None) -> str | None:
+    """
+    The fixed reply if this turn is a crisis turn, else None.
+
+    A crisis message gets the crisis reply. After one, for the rest of the
+    conversation, a question about doses or tablet counts gets it again; and
+    on the very next turn a question about her plan is met with "how are you
+    feeling now?" and where to get help, instead of the plan.
+    Logs a "crisis" event with a kind only: never her words.
+    """
+
+    earlier = get_crisis(session_id)
+
+    if is_crisis(message):
+        kind = "message"
+    elif earlier and asks_about_doses(message):
+        kind = "dose_question"
+    elif earlier and earlier.get("check_in") and is_plan_question(message, []):
+        kind = "check_in"
+    else:
+        if earlier and earlier.get("check_in"):
+            set_crisis(session_id, check_in=False)
+        return None
+
+    log("crisis", level="warning", kind=kind, session_id_hash=hash_session(session_id))
+    # Ask how she is on the turn after a crisis reply, once.
+    set_crisis(session_id, check_in=kind != "check_in")
+
+    return check_in_reply() if kind == "check_in" else crisis_reply(first_name)
+
+
 def _saved_this_turn(tool_trace: list[dict]) -> bool:
     """Whether a report was really written this turn."""
 
@@ -1605,6 +1639,13 @@ async def _chat_turn(
     """
 
     cleaned_message = remove_wake_word(message)
+
+    # Crisis first, before any other check: fixed words, no MCP tool, no model,
+    # nothing saved, and her message is not kept in the conversation history.
+    crisis_text = _crisis_turn(cleaned_message, session_id, first_name)
+
+    if crisis_text is not None:
+        return {"response": crisis_text, "tool_trace": [], "source": None, "completed": True, "crisis": True}
 
     tool_trace: list[dict] = []
     source: dict | None = None

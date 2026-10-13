@@ -96,11 +96,25 @@ def clear_session(session_id: str) -> None:
     _saved.pop(session_id, None)
     _last_prompts.pop(session_id, None)
     _step_pointers.pop(session_id, None)
+    _crisis.pop(session_id, None)
 
 # What AfterWard has just offered in a session ("Shall I remind you
 # again in 30 minutes?"), so a "yes" on the next turn can act on it.
 # Kept for one turn only; DynamoDB stays the source of truth.
 _offers: dict[str, dict] = {}
+
+# A crisis reply was given in this session (app.agent.crisis). It stays for the
+# whole conversation, so dose questions are not answered; "check_in" is True
+# only until the next turn, which asks how she is feeling.
+_crisis: dict[str, dict] = {}
+
+
+def set_crisis(session_id: str, check_in: bool) -> None:
+    _crisis[session_id] = {"check_in": check_in}
+
+
+def get_crisis(session_id: str) -> dict | None:
+    return _crisis.get(session_id)
 
 
 def set_offer(session_id: str, offer: dict) -> None:

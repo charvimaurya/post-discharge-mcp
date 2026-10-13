@@ -196,12 +196,15 @@ def sign_wording(sign: dict[str, Any]) -> str:
     """The letter's own words for this sign and what to do: its source sentence."""
 
     snippet = (sign.get("source") or {}).get("snippet")
+    action = str(sign.get("action") or "").strip()
 
-    if snippet:
+    # The source sentence, when it also says what to do ("Call the ward ... if you have: ...").
+    if snippet and (not action or " ".join(action.lower().split()) in " ".join(snippet.lower().split())):
         return _quote(snippet)
 
-    # No source sentence kept: the two extracted parts, in the letter's order.
-    return _quote(f"{sign.get('action')} if you have: {sign.get('text')}")
+    # Otherwise the sign alone would be quoted with no one to call: join the
+    # letter's two parts, in the letter's order.
+    return _quote(f"{action} if you have: {snippet or sign.get('text')}")
 
 
 def warning_sign_reply(sign: dict[str, Any], first_name: str | None) -> str:

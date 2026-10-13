@@ -147,7 +147,8 @@ async def chat_message(request: Request) -> JSONResponse:
         log("chat_failed", level="error", error=exc, route="/chat")
         return JSONResponse({"error": CHAT_ERROR}, status_code=502)
 
-    if had_checkin and result.get("completed"):
+    # A crisis reply is not an answer to the reminder, so the reminder stays.
+    if had_checkin and result.get("completed") and not result.get("crisis"):
         try:
             await asyncio.to_thread(
                 clear_pending_checkin, patient.patient_id
