@@ -27,6 +27,8 @@ import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPa
 
 type View = 'start' | 'build' | 'today';
 const POLL_MS = 5000;
+// How long the caption under a reminder stays on screen.
+const REMINDER_NOTE_MS = 12000;
 // The parts of the day the agent matches a report to (app/agent/occurrence_resolver.py).
 const DAY_PARTS = ['morning', 'midday', 'afternoon', 'evening', 'bedtime'];
 
@@ -84,6 +86,8 @@ export default function DemoPage() {
   const [focus, setFocus] = useState<string[]>([]);
   // When an answer names nothing in the plan: the next item, shown softly as "Next in your plan".
   const [nextHint, setNextHint] = useState<string | null>(null);
+  // Shown when AfterWard speaks first: "Nobody set this reminder. It came from her letter."
+  const [reminderNote, setReminderNote] = useState(false);
   const [justDone, setJustDone] = useState<PlanItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -175,6 +179,7 @@ export default function DemoPage() {
     shownCheckin.current = checkin.id;
     const time = splitClock(today.clockLabel).time;
     setHead(`AfterWard speaks first${time ? ` · ${time}` : ''}`);
+    setReminderNote(true);
     setTurns(t => [...t, { who: 'aw', text: checkin.text, reminder: true }]);
     setChips([]); setJustDone(null); setSource(null);
     // Survives a page reload, so a reminder still waiting is shown again but not spoken twice.
@@ -183,6 +188,13 @@ export default function DemoPage() {
       say(checkin.text);
     }
   }, [today.pendingCheckin, today.openingGreeting, today.clockLabel, todayLoaded, openingCheckComplete, view, say]);
+
+  // The caption under a reminder stays for a while, then clears so the plan is not covered.
+  useEffect(() => {
+    if (!reminderNote) return;
+    const timer = setTimeout(() => setReminderNote(false), REMINDER_NOTE_MS);
+    return () => clearTimeout(timer);
+  }, [reminderNote]);
 
   // ---------- Upload ----------
   async function upload(file: File) {
@@ -214,7 +226,7 @@ export default function DemoPage() {
   async function send(message: string) {
     if (busy || !message.trim()) return;
     window.speechSynthesis?.cancel();
-    setBusy(true); setError(''); setChips([]); setJustDone(null);
+    setBusy(true); setError(''); setChips([]); setJustDone(null); setReminderNote(false);
     setTurns(t => [...t, { who: 'you', text: message }]);
     const before = new Set(todayRef.current.items.filter(i => i.done).map(i => i.id));
     try {
@@ -317,6 +329,8 @@ export default function DemoPage() {
         : <VoicePanel head={head} turns={turns} chips={chips} speaking={speaking} listening={listening} busy={busy}
             canListen={micOk} typing={typing} onMic={mic} onSend={send} onToggleTyping={() => setTyping(t => !t)} />}
     </div>
+    {reminderNote && !dev && !source &&
+      <div className="caption"><span>Nobody set this reminder. It came from her letter.</span></div>}
   </Screen>;
 
   return <div className="awapp"><div className="aw-viewport">

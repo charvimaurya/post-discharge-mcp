@@ -567,3 +567,6 @@
 /* "Next in your plan": a softer pointer when the answer named nothing in the plan */
 .awapp .item.hint{position:relative;outline:2px dashed #7FA3BF;outline-offset:2px}
 .awapp .item .focus-tag.hint{background:#E8F0F6;color:#20608D;border:1px solid #B9CDE0}
+/* Today screen: the caption sits over the plan panel, clear of the microphone on the right. */
+.awapp #app .caption{left:24px;right:478px;padding:0 16px}
+.awapp #app .caption span{font-size:23px;text-align:center}
