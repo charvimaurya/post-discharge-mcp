@@ -17,13 +17,21 @@ export function TopBar({ clock, dev, onDev }: { clock?: string; dev?: boolean; o
   </header>;
 }
 
+// Shown on the start screen only; the other screens use the full height for their panels.
+export function Footer() {
+  return <footer className="footbar">
+    <span>AfterWard · A living recovery plan for Alexa+</span>
+    <span>Synthetic patient data · Simulated Alexa+</span>
+  </footer>;
+}
+
 export function Screen({ id, dark, children }: { id: string; dark?: boolean; children: ReactNode }) {
   return <section className={`screen${dark ? ' dark' : ''}`} id={id}>{children}</section>;
 }
 
 // ---------- Start screen (mock-up 00_start) ----------
 
-export function StartScreen({ onUpload, busy }: { onUpload: (file: File) => void; busy: boolean }) {
+export function StartScreen({ onUpload, onOpen, busy }: { onUpload: (file: File) => void; onOpen: () => void; busy: boolean }) {
   return <Screen id="s00" dark>
     <div className="glow" /><div className="sun" />
     <TopBar />
@@ -32,60 +40,80 @@ export function StartScreen({ onUpload, busy }: { onUpload: (file: File) => void
       <h2 style={{ fontSize: 58, lineHeight: 1.08, maxWidth: 960 }}>Discharge is one moment.<br />Recovery happens every day.</h2>
       <p className="vision">No one should have to remember their recovery alone.</p>
       <p className="lead" style={{ fontSize: 18, maxWidth: 640, lineHeight: 1.45 }}>
-        Upload your discharge letter to build today&apos;s plan.</p>
+        Signed in as Margaret Ellis, a synthetic demo patient. Upload a discharge letter to build today&apos;s plan.</p>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginTop: 8 }}>
         <label className="btn primary" style={{ cursor: busy ? 'default' : 'pointer' }}>
           <Icon name="upload" size={22} stroke={2.2} />{busy ? 'Uploading…' : 'Upload a discharge letter'}
           <input type="file" accept=".pdf,application/pdf" hidden disabled={busy}
             onChange={e => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = ''; }} />
         </label>
+        <button type="button" className="textlink" onClick={onOpen}>
+          Already uploaded your letter? <b>Open today&apos;s plan</b><Icon name="arrow" size={18} stroke={2} /></button>
       </div>
       <div className="how"><div><b>1</b>Upload the letter once</div><div><b>2</b>AfterWard checks every line</div>
         <div><b>3</b>A plan, reminders and answers each day</div></div>
     </div>
+    <Footer />
   </Screen>;
 }
 
 // ---------- Building the plan (mock-ups 03 and 01) ----------
 
 export function BuildScreen({ step, plan, onOpen }: { step: 1 | 2 | 3; plan: PlanSummary | null; onOpen: () => void }) {
-  const cls = (n: number) => (step > n || step === 3 ? 'is-done' : step === n ? 'is-now' : '');
+  const cls = (n: number) => (step > n ? 'is-done' : step === n ? 'is-now' : '');
   const sections = ['Medicines', 'Each day', 'Appointments'] as const;
   const icons = { Medicines: 'pill', 'Each day': 'walk', Appointments: 'calendar' };
-  return <Screen id="app">
+  // "Each day" lists the tasks with a set time or count, so the appointments stay in view.
+  const rowsFor = (section: string) => {
+    const all = (plan?.rows || []).filter(r => r.section === section);
+    const timed = all.filter(r => r.when);
+    return (section === 'Each day' && timed.length ? timed : all).slice(0, 4);
+  };
+  const lines = [100, 84, 92, 100, 76, 90, 96, 70].map((w, i) => <div key={i} className="ln" style={{ width: `${w}%` }} />);
+  return <Screen id="s01">
     <TopBar />
     <div className="stage">
-      <div className="panel" style={{ width: 500, flex: 'none' }}>
-        <div className="eyebrow" style={{ marginBottom: 10 }}>Your discharge letter · uploaded once</div>
+      <div className="panel letterside">
+        <div className="eyebrow" style={{ marginBottom: 10 }}>Her discharge letter</div>
         <div className="paper sm"><div className="banner">Synthetic document · Not a real patient</div>
           <div className="in letterlist">
-            <h5 style={{ marginTop: 0 }}>Your medicines, as written</h5>
-            {plan ? plan.quotes.slice(0, 5).map((q, i) => <div key={i} className={q.flagged ? 'hl' : 'txt'}>{q.text}</div>)
-              : [100, 84, 92, 100, 76, 90, 96, 70].map((w, i) => <div key={i} className="ln" style={{ width: `${w}%` }} />)}
+            <h4>Discharge letter and recovery instructions</h4>
+            <h5>Your medicines</h5>
+            {plan ? plan.quotes.slice(0, 4).map((q, i) => <div key={i} className={q.flagged ? 'hl' : 'txt'}>{q.text}</div>) : lines}
+            {plan && plan.taskQuotes.length > 0 && <>
+              <h5>Each day at home</h5>
+              {plan.taskQuotes.slice(0, 2).map((q, i) => <div key={i} className="txt">{q}</div>)}
+            </>}
           </div></div>
-        <div className="steps">
+        {/* Progress while the letter is read; the finished screen shows the caption instead. */}
+        {step < 3 && <div className="steps">
           <b className={cls(1)}>{step > 1 && <Icon name="check" size={16} stroke={2.6} />}Read the letter</b><i />
-          <b className={cls(2)}>{step > 2 && <Icon name="check" size={16} stroke={2.6} />}Check every line</b><i />
-          <b className={cls(3)}>{step === 3 && <Icon name="check" size={16} stroke={2.6} />}Plan ready</b>
-        </div>
+          <b className={cls(2)}>Check every line</b><i />
+          <b className={cls(3)}>Plan ready</b>
+        </div>}
       </div>
+      <div className="joinslot"><span className="join"><Icon name="arrow" size={22} stroke={2.2} /></span></div>
       <div className="panel grow">
-        <div className="eyebrow rose">Your plan, built from the letter</div>
+        <div className="eyebrow rose">The plan AfterWard built</div>
         <div className="planrows">
           {sections.map(s => <div key={s}>
             <div className="sec"><Icon name={icons[s]} size={18} stroke={2} />{s}</div>
-            {plan ? plan.rows.filter(r => r.section === s).slice(0, 4).map((r, i) =>
+            {plan ? rowsFor(s).map((r, i) =>
               <div key={i} className="row"><span>{r.text}{r.flag && <> <span className="chip amber">{r.flag}</span></>}</span>
                 <span className="when">{r.when}</span></div>)
               : <><div className="skeleton" style={{ width: '64%' }} /><div className="skeleton" style={{ width: '50%' }} /></>}
           </div>)}
         </div>
-        {plan && <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        {plan && <div className="planfoot">
           <span className="chip grey"><Icon name="stop" size={15} stroke={2} />{plan.mustNot} things you must not do</span>
-          <span className="chip grey"><Icon name="alert" size={15} stroke={2} />{plan.warnings} warning signs</span></div>}
-        {step === 3 && <button type="button" className="btn primary openplan" onClick={onOpen}>Open today&apos;s plan<Icon name="arrow" size={20} stroke={2.2} /></button>}
+          <span className="chip grey"><Icon name="alert" size={15} stroke={2} />{plan.warnings} warning signs</span>
+          {plan.careNotes > 0 && <span className="chip grey">{plan.careNotes} care notes</span>}
+          {step === 3 && <button type="button" className="btn primary openplan" onClick={onOpen}>Open today&apos;s plan<Icon name="arrow" size={18} stroke={2.2} /></button>}
+        </div>}
       </div>
     </div>
+    {step === 3 && <div className="caption"><span>Built from her discharge letter. Nobody typed this in.</span></div>}
+    <Footer />
   </Screen>;
 }
 

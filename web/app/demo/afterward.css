@@ -484,3 +484,19 @@
 .awapp .caption{bottom:20px}
 .awapp .sped{bottom:22px}
 .awapp .errline{bottom:12px}
+/* The start screen has a footer bar, so its error line sits above it. */
+.awapp #s00 ~ .errline{bottom:42px}
+
+/* Build screen (upload -> plan): letter on the left, plan on the right, joined by an arrow,
+   with the caption and the footer bar underneath, as in the mock-up. */
+.awapp #s01 .stage{height:calc(100% - 90px);padding-bottom:46px}
+.awapp #s01 .letterside{flex:0 0 45%}
+.awapp #s01 .paper.sm h4{font-size:21px;margin:0 0 10px}
+.awapp #s01 .paper.sm .txt,.awapp #s01 .paper.sm .hl{font-size:15.5px;line-height:1.45}
+.awapp #s01 .paper.sm .in{overflow-y:auto;max-height:100%;scrollbar-width:thin}
+.awapp #s01 .paper{display:flex;flex-direction:column;min-height:0} .awapp #s01 .paper .in{flex:1;min-height:0}
+.awapp .joinslot{width:0;margin:0 -9px;position:relative;align-self:center;flex:none}
+.awapp .joinslot .join{left:-23px;top:-23px}
+.awapp .planfoot{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;flex:none}
+.awapp .planfoot .openplan{margin:0 0 0 auto;align-self:center;padding:11px 24px;font-size:17px}
+.awapp #s01 .caption{bottom:42px}

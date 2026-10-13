@@ -266,31 +266,48 @@ export function letterBlocks(source: NonNullable<Source>): LetterBlock[] {
 // ---------- The whole plan, for the screen shown right after upload ----------
 
 export type PlanRow = { section: 'Medicines' | 'Each day' | 'Appointments'; text: string; when: string; flag: string | null };
-export type PlanSummary = { rows: PlanRow[]; quotes: { text: string; flagged: boolean }[]; mustNot: number; warnings: number };
+export type PlanSummary = {
+  rows: PlanRow[]; quotes: { text: string; flagged: boolean }[]; taskQuotes: string[];
+  mustNot: number; warnings: number; careNotes: number;
+};
+
+// "2026-10-22" -> "Thu 22 Oct". Anything else is shown as written.
+function shortDate(date: string): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
+}
 
 export function readPlan(state: Obj): PlanSummary {
   const list = (k: string) => (Array.isArray(state[k]) ? (state[k] as unknown[]).filter(isObj) : []);
   const rows: PlanRow[] = [];
   const quotes: PlanSummary['quotes'] = [];
+  const taskQuotes: string[] = [];
   for (const m of list('medications')) {
     const name = str(pick(m, 'name')) || 'Medicine';
     const dose = str(pick(m, 'dose'));
     const times = Number(pick(m, 'times_per_day')) || 0;
     const when = m.as_needed === true ? 'only if needed' : times === 1 ? 'once a day' : times === 2 ? 'twice a day' : times ? `${times} times a day` : str(pick(m, 'time_of_day'));
-    rows.push({ section: 'Medicines', text: dose ? `${name}, ${dose}` : name, when, flag: m.needs_confirmation === true ? 'Needs confirmation' : null });
+    // "Paracetamol 500 mg tablets" -> "Paracetamol" in the plan; the letter side keeps the full name.
+    const shortName = name.replace(/\s+\d.*$/, '') || name;
+    rows.push({ section: 'Medicines', text: dose ? `${shortName}, ${dose}` : shortName, when, flag: m.needs_confirmation === true ? 'Needs confirmation' : null });
     const snippet = isObj(m.source) ? str(m.source.snippet) : '';
-    if (snippet) quotes.push({ text: snippet, flagged: m.needs_confirmation === true });
+    if (snippet) quotes.push({ text: snippet.toLowerCase().startsWith(name.toLowerCase()) ? snippet : `${name}. ${snippet}`, flagged: m.needs_confirmation === true });
   }
   for (const t of list('tasks')) {
     const name = str(pick(t, 'name', 'title', 'description')) || 'Task';
     const clock = Array.isArray(t.clock_times) ? (t.clock_times as unknown[]).map(c => prettyTime(str(c))).join(' and ') : '';
     const times = Number(pick(t, 'times_per_day')) || 0;
-    rows.push({ section: 'Each day', text: name, when: clock || (times ? `${times} times a day` : str(pick(t, 'time_of_day'))), flag: t.needs_confirmation === true ? 'Needs confirmation' : null });
+    const taskSnippet = isObj(t.source) ? str(t.source.snippet) : '';
+    if (taskSnippet) taskQuotes.push(taskSnippet);
+    rows.push({ section: 'Each day', text: shortTaskLabel(name), when: clock || (times ? `${times} times a day` : str(pick(t, 'time_of_day'))), flag: t.needs_confirmation === true ? 'Needs confirmation' : null });
   }
   for (const a of list('appointments')) {
     const name = str(pick(a, 'title', 'name', 'description', 'what')) || 'Appointment';
-    const when = [str(pick(a, 'date')), prettyTime(str(pick(a, 'time')) || null)].filter(Boolean).join(', ');
+    const when = [shortDate(str(pick(a, 'date'))), prettyTime(str(pick(a, 'time')) || null)].filter(Boolean).join(', ');
     rows.push({ section: 'Appointments', text: name, when, flag: a.needs_confirmation === true ? 'Needs confirmation' : null });
   }
-  return { rows, quotes, mustNot: list('restrictions').length, warnings: list('warning_signs').length };
+  return {
+    rows, quotes, taskQuotes, mustNot: list('restrictions').length, warnings: list('warning_signs').length,
+    careNotes: list('diet_advice').length + list('monitoring').length,
+  };
 }

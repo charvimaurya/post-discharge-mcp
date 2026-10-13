@@ -280,7 +280,7 @@ export default function DemoPage() {
         empty={todayLoaded && today.items.length === 0} onStart={backToStart} />;
 
   let screen;
-  if (view === 'start') screen = <StartScreen onUpload={upload} busy={uploading} />;
+  if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;
   else if (view === 'build') screen = <BuildScreen step={buildStep} plan={plan} onOpen={openToday} />;
   else screen = <Screen id="app">
     <TopBar clock={today.clockLabel} dev={dev} onDev={() => setDev(d => !d)} />
