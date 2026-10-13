@@ -1,4 +1,4 @@
-# Local CareLoop test UI
+# Local AfterWard test UI
 
 From the repository root:
 

@@ -1,0 +1,21 @@
+{
+  "QueueConfigurations": [
+    {
+      "Id": "AfterWardDocumentUploaded",
+      "QueueArn": "arn:aws:sqs:eu-west-2:992617582533:AfterWardDocumentProcessing",
+      "Events": [
+        "s3:ObjectCreated:*"
+      ],
+      "Filter": {
+        "Key": {
+          "FilterRules": [
+            {
+              "Name": "prefix",
+              "Value": "patients/"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

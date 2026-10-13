@@ -26,7 +26,7 @@ def process_text(
 ):
     """
     Convert document text into the structured
-    RecoveryState used by CareLoop.
+    RecoveryState used by AfterWard.
 
     Flow:
 
@@ -282,7 +282,7 @@ def process_document(
     IMPORTANT:
 
     This still returns ONLY RecoveryState so none of the
-    existing CareLoop code has to change.
+    existing AfterWard code has to change.
 
     RAG-aware callers should instead use:
 

@@ -48,7 +48,7 @@ export default function Page() {
 
   return <main>
     <header className="page-header">
-      <p className="eyebrow">CareLoop · Local testing</p>
+      <p className="eyebrow">AfterWard · Local testing</p>
       <h1>Your discharge document,<br />clearly organised.</h1>
       <p className="intro">Upload a PDF to see its medications, care instructions and follow-up plan.</p>
     </header>

@@ -174,7 +174,7 @@ def parse_s3_events_from_message(
 
             # Example:
             #
-            # careloop-documents-992617582533-london
+            # afterward-documents-992617582533-london
             bucket_name = (
                 record["s3"]
                 ["bucket"]

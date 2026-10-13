@@ -1,0 +1,16 @@
+{
+  "dataType": "float32",
+  "dimension": 512,
+  "distanceMetric": "cosine",
+  "metadataConfiguration": {
+    "nonFilterableMetadataKeys": [
+      "text",
+      "section"
+    ]
+  },
+  "encryptionConfiguration": {
+    "sseType": "AES256"
+  },
+  "vectorBucketName": "afterward-vectors-992617582533-london",
+  "indexName": "afterward-discharge-index"
+}

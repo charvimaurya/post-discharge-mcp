@@ -19,7 +19,7 @@ PROCESSING_QUEUE_URL = os.getenv(
 DOCUMENT_QUEUE_URL = PROCESSING_QUEUE_URL
 DOCUMENT_BUCKET = os.getenv(
     "DOCUMENT_BUCKET",
-    os.getenv("AFTERWARD_BUCKET", os.getenv("CARELOOP_BUCKET", "")),
+    os.getenv("AFTERWARD_BUCKET", ""),
 )
 RECOVERY_STATE_TABLE = os.environ.get(
     "RECOVERY_STATE_TABLE",
@@ -37,11 +37,11 @@ AGENT_MODEL_ID = os.environ.get("AGENT_MODEL_ID", "")
 # ---------------------------------------------------------
 S3_VECTOR_BUCKET = os.getenv(
     "S3_VECTOR_BUCKET",
-    "careloop-vectors-992617582533-london",
+    "afterward-vectors-992617582533-london",
 )
 S3_VECTOR_INDEX = os.getenv(
     "S3_VECTOR_INDEX",
-    "careloop-discharge-index",
+    "afterward-discharge-index",
 )
 EMBEDDING_MODEL_ID = os.getenv(
     "EMBEDDING_MODEL_ID",

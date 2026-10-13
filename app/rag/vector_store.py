@@ -1,7 +1,7 @@
 """
 Low-level Amazon S3 Vectors access.
 
-Higher-level CareLoop retrieval logic should live in
+Higher-level AfterWard retrieval logic should live in
 service.py, not here.
 """
 
@@ -25,7 +25,7 @@ def put_chunks(
 ) -> None:
     """
     Write document chunks and their embeddings into the
-    CareLoop S3 Vectors index.
+    AfterWard S3 Vectors index.
     """
 
     if len(chunks) != len(

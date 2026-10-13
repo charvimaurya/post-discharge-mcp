@@ -1,8 +1,8 @@
 # Lambda deployment
 
 Run commands from the project root with the virtual environment active.
-Configuration files are now in this directory. AWS resource names remain
-unchanged; the local archive uses the Afterward project name.
+Configuration files are in this directory. The document processor now uses
+AfterWard resource names; see [the migration record](../docs/aws-name-migration.md).
 
 ## Build
 
@@ -20,19 +20,19 @@ The builder packages current source from `app/` (including `app/models/` and `ap
 files. It produces `build/afterward_document_processor.zip` without deploying.
 The pinned boto3/botocore versions include the S3 Vectors client used by RAG.
 Build artifacts are excluded from Git. The previous ZIP is retained locally as
-`build/careloop_document_processor.previous.zip`.
+`build/afterward_document_processor.previous.zip`.
 
 ## Deploy when ready
 
 ```bash
-aws lambda update-function-code --function-name CareLoopDocumentProcessor --zip-file fileb://build/afterward_document_processor.zip --region eu-west-2
-aws lambda wait function-updated --function-name CareLoopDocumentProcessor --region eu-west-2
+aws lambda update-function-code --function-name AfterWardDocumentProcessor --zip-file fileb://build/afterward_document_processor.zip --region eu-west-2
+aws lambda wait function-updated --function-name AfterWardDocumentProcessor --region eu-west-2
 ```
 
 To apply environment settings separately:
 
 ```bash
-aws lambda update-function-configuration --function-name CareLoopDocumentProcessor --environment file://deployment/lambda-env.json --region eu-west-2
+aws lambda update-function-configuration --function-name AfterWardDocumentProcessor --environment file://deployment/lambda-env.json --region eu-west-2
 ```
 
 That command replaces the function's environment-variable map. Include all
@@ -56,14 +56,14 @@ Files:
   lets EventBridge Scheduler invoke only this function.
 - `reminder-schedule-target.json`: schedule target with input `{}`.
 
-Create once (not yet run):
+Commands for recreating the existing reminder deployment:
 
 ```bash
 aws iam create-role --role-name AfterwardReminderRole --assume-role-policy-document file://deployment/lambda-trust-policy.json
 aws iam attach-role-policy --role-name AfterwardReminderRole --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
 aws iam put-role-policy --role-name AfterwardReminderRole --policy-name AfterwardReminderTables --policy-document file://deployment/reminder-policy.json
 
-aws lambda create-function --function-name AfterwardReminderChecker --runtime python3.11 --architectures x86_64 --handler lambdas.reminder_checker.handler.handler --role arn:aws:iam::992617582533:role/AfterwardReminderRole --timeout 30 --zip-file fileb://build/afterward_document_processor.zip --environment file://deployment/reminder-env.json --region eu-west-2
+aws lambda create-function --function-name AfterwardReminderChecker --runtime python3.11 --architectures x86_64 --handler lambdas.reminder_checker.handler.handler --role arn:aws:iam::<ACCOUNT_ID>:role/AfterwardReminderRole --timeout 30 --zip-file fileb://build/afterward_document_processor.zip --environment file://deployment/reminder-env.json --region eu-west-2
 
 aws iam create-role --role-name AfterwardReminderSchedulerRole --assume-role-policy-document file://deployment/scheduler-trust-policy.json
 aws iam put-role-policy --role-name AfterwardReminderSchedulerRole --policy-name InvokeReminderChecker --policy-document file://deployment/scheduler-invoke-policy.json

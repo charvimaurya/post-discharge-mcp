@@ -5,13 +5,13 @@
       "Sid": "ReadUploadedLetters",
       "Effect": "Allow",
       "Action": ["s3:GetObject"],
-      "Resource": "arn:aws:s3:::careloop-documents-992617582533-london/patients/*"
+      "Resource": "arn:aws:s3:::afterward-documents-992617582533-london/patients/*"
     },
     {
       "Sid": "ConsumeDocumentQueue",
       "Effect": "Allow",
       "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
-      "Resource": "arn:aws:sqs:eu-west-2:992617582533:CareLoopDocumentProcessing"
+      "Resource": "arn:aws:sqs:eu-west-2:992617582533:AfterWardDocumentProcessing"
     },
     {
       "Sid": "UseRecoveryStateTable",
@@ -29,7 +29,7 @@
       "Sid": "IndexLetterForSearch",
       "Effect": "Allow",
       "Action": ["s3vectors:PutVectors", "s3vectors:GetVectors", "s3vectors:QueryVectors"],
-      "Resource": "arn:aws:s3vectors:eu-west-2:992617582533:bucket/careloop-vectors-992617582533-london/index/careloop-discharge-index"
+      "Resource": "arn:aws:s3vectors:eu-west-2:992617582533:bucket/afterward-vectors-992617582533-london/index/afterward-discharge-index"
     },
     {
       "Sid": "ExtractAndEmbedWithTheNamedModelsOnly",

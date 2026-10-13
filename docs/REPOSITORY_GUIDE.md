@@ -7,8 +7,8 @@ Afterward reads discharge paperwork and turns it into:
 2. **Searchable source text:** passages from the original document that can help
    answer questions such as “What did my paperwork say about driving?”
 
-The project was previously called CareLoop. GitHub uses **Afterward**, but the
-existing AWS resources still have **CareLoop** names.
+Active AWS storage, queues, and processing use **AfterWard** names.
+See [AWS integrations](aws-integrations.md) and the [migration record](aws-name-migration.md).
 
 ## Start here
 
@@ -75,12 +75,12 @@ TEST_MODEL_ID=eu.anthropic.claude-haiku-4-5-20251001-v1:0
 FINAL_EXTRACTION_MODEL_ID=
 FINAL_AGENT_MODEL_ID=
 IMAGE_MODEL_ID=
-DOCUMENT_BUCKET=careloop-documents-992617582533-london
-PROCESSING_QUEUE_URL=https://sqs.eu-west-2.amazonaws.com/992617582533/CareLoopDocumentProcessing
+DOCUMENT_BUCKET=afterward-documents-<ACCOUNT_ID>-london
+PROCESSING_QUEUE_URL=https://sqs.eu-west-2.amazonaws.com/<ACCOUNT_ID>/AfterWardDocumentProcessing
 RECOVERY_STATE_TABLE=PostDischargeRecoveryState
 EVENT_HISTORY_TABLE=PostDischargeEventHistory
-S3_VECTOR_BUCKET=careloop-vectors-992617582533-london
-S3_VECTOR_INDEX=careloop-discharge-index
+S3_VECTOR_BUCKET=afterward-vectors-<ACCOUNT_ID>-london
+S3_VECTOR_INDEX=afterward-discharge-index
 EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
 EMBEDDING_DIMENSIONS=512
 ```
@@ -221,7 +221,7 @@ DynamoDB, Bedrock, S3 Vectors, and permissions. A timeout means you should inspe
 Lambda logs and queue state; it does not necessarily mean processing has stopped.
 
 ```bash
-aws logs tail /aws/lambda/CareLoopDocumentProcessor --since 10m --region eu-west-2
+aws logs tail /aws/lambda/AfterWardDocumentProcessor --since 10m --region eu-west-2
 ```
 
 Follow with the RAG search check to inspect retrieved evidence. A ready state
@@ -449,7 +449,7 @@ Afterward/
 ├── build/                             # Generated local files; excluded from Git
 │   ├── lambda_package/                # Staged runtime dependencies
 │   ├── afterward_document_processor.zip # Current build output
-│   └── careloop_document_processor.previous.zip # Previous ZIP, when present
+│   └── afterward_document_processor.previous.zip # Previous ZIP, when present
 ├── docs/                              # Developer documentation
 │   ├── REPOSITORY_GUIDE.md             # This setup, workflow, and file guide
 │   ├── architecture.md                 # Concise design and component relationships
@@ -563,7 +563,7 @@ or upload a matching object before running them.
 | `deployment/README.md` | Build and deployment commands |
 | `build/lambda_package/` | Local staged dependencies; ignored by Git |
 | `build/afterward_document_processor.zip` | Current generated deployment ZIP |
-| `build/careloop_document_processor.previous.zip` | Locally preserved old ZIP, when present |
+| `build/afterward_document_processor.previous.zip` | Locally preserved old ZIP, when present |
 | `README.md` | Project overview and documentation links |
 | `docs/architecture.md` | Concise architecture and limitations |
 | `docs/testing.md` | Short testing command reference |

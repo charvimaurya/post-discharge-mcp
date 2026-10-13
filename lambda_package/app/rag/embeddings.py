@@ -1,7 +1,7 @@
 """
 Amazon Titan Text Embeddings V2 integration.
 
-CareLoop uses 512-dimensional normalized embeddings.
+AfterWard uses 512-dimensional normalized embeddings.
 """
 
 import json

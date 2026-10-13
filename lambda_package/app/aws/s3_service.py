@@ -16,7 +16,7 @@ from app import config
 # same bucket and region. Fail at import time if no bucket has been configured.
 if not config.DOCUMENT_BUCKET:
     raise RuntimeError(
-        "DOCUMENT_BUCKET (or AFTERWARD_BUCKET / legacy CARELOOP_BUCKET) environment variable is not set."
+        "DOCUMENT_BUCKET (or AFTERWARD_BUCKET) environment variable is not set."
     )
 
 # Reuse one client across calls. Boto3 obtains credentials from its normal

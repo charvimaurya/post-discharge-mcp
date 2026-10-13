@@ -1,0 +1,31 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CreateAfterWardLettersBucket",
+      "Effect": "Allow",
+      "Action": "s3:CreateBucket",
+      "Resource": "arn:aws:s3:::afterward-documents-992617582533-london",
+      "Condition": {
+        "StringEquals": {
+          "s3:LocationConstraint": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "InventoryEcsServices",
+      "Effect": "Allow",
+      "Action": "ecs:ListServices",
+      "Resource": "*"
+    },
+    {
+      "Sid": "InventorySourceQueueTags",
+      "Effect": "Allow",
+      "Action": "sqs:ListQueueTags",
+      "Resource": [
+        "arn:aws:sqs:eu-west-2:992617582533:CareLoopDocumentProcessing",
+        "arn:aws:sqs:eu-west-2:992617582533:CareLoopDocumentProcessingDLQ"
+      ]
+    }
+  ]
+}

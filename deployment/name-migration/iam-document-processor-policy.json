@@ -1,0 +1,47 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadUploadedLetters",
+      "Effect": "Allow",
+      "Action": ["s3:GetObject"],
+      "Resource": "arn:aws:s3:::afterward-documents-992617582533-london/patients/*"
+    },
+    {
+      "Sid": "ConsumeDocumentQueue",
+      "Effect": "Allow",
+      "Action": ["sqs:ReceiveMessage", "sqs:DeleteMessage", "sqs:GetQueueAttributes"],
+      "Resource": "arn:aws:sqs:eu-west-2:992617582533:AfterWardDocumentProcessing"
+    },
+    {
+      "Sid": "UseRecoveryStateTable",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:ConditionCheckItem"],
+      "Resource": "arn:aws:dynamodb:eu-west-2:992617582533:table/PostDischargeRecoveryState"
+    },
+    {
+      "Sid": "UseEventHistoryTable",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:Query", "dynamodb:ConditionCheckItem"],
+      "Resource": "arn:aws:dynamodb:eu-west-2:992617582533:table/PostDischargeEventHistory"
+    },
+    {
+      "Sid": "IndexLetterForSearch",
+      "Effect": "Allow",
+      "Action": ["s3vectors:PutVectors", "s3vectors:GetVectors", "s3vectors:QueryVectors"],
+      "Resource": "arn:aws:s3vectors:eu-west-2:992617582533:bucket/afterward-vectors-992617582533-london/index/afterward-discharge-index"
+    },
+    {
+      "Sid": "ExtractAndEmbedWithTheNamedModelsOnly",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": [
+        "arn:aws:bedrock:eu-west-2:992617582533:inference-profile/eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:eu-west-2:992617582533:inference-profile/eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+        "arn:aws:bedrock:*::foundation-model/anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v2:0"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "region": "eu-west-2",
+  "account": "992617582533",
+  "replacements": {
+    "careloop-documents-992617582533-london": "afterward-documents-992617582533-london",
+    "careloop-vectors-992617582533-london": "afterward-vectors-992617582533-london",
+    "careloop-discharge-index": "afterward-discharge-index",
+    "CareLoopDocumentProcessingDLQ": "AfterWardDocumentProcessingDLQ",
+    "CareLoopDocumentProcessing": "AfterWardDocumentProcessing",
+    "CareLoopDocumentProcessorRole": "AfterWardDocumentProcessorRole",
+    "CareLoopDocumentProcessor": "AfterWardDocumentProcessor",
+    "CareLoopDocumentUploaded": "AfterWardDocumentUploaded"
+  },
+  "identity": {
+    "source_name": "CareLoop",
+    "target_name": "AfterWard"
+  }
+}

@@ -11,7 +11,7 @@ Parameters:
     Description: Alarm when MCP tool errors in 5 minutes are more than this.
   DeadLetterQueueName:
     Type: String
-    Default: CareLoopDocumentProcessingDLQ
+    Default: AfterWardDocumentProcessingDLQ
     Description: The document queue's dead-letter queue.
   AlarmEmail:
     Type: String
@@ -19,7 +19,7 @@ Parameters:
     Description: Optional. An address to email when an alarm fires.
   QueryLogGroups:
     Type: CommaDelimitedList
-    Default: /aws/lambda/CareLoopDocumentProcessor,/aws/lambda/AfterwardReminderChecker
+    Default: /aws/lambda/AfterWardDocumentProcessor,/aws/lambda/AfterwardReminderChecker
     Description: >
       Existing log groups the saved queries search. Add the MCP server's ECS log group
       here; the bridge log group below is added automatically.

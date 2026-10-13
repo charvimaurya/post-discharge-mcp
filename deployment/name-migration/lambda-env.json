@@ -1,0 +1,13 @@
+{
+  "Variables": {
+    "MODEL_MODE": "test",
+    "TEST_MODEL_ID": "eu.anthropic.claude-haiku-4-5-20251001-v1:0",
+    "DOCUMENT_BUCKET": "afterward-documents-992617582533-london",
+    "RECOVERY_STATE_TABLE": "PostDischargeRecoveryState",
+    "EVENT_HISTORY_TABLE": "PostDischargeEventHistory",
+    "S3_VECTOR_BUCKET": "afterward-vectors-992617582533-london",
+    "S3_VECTOR_INDEX": "afterward-discharge-index",
+    "EMBEDDING_MODEL_ID": "amazon.titan-embed-text-v2:0",
+    "EMBEDDING_DIMENSIONS": "512"
+  }
+}

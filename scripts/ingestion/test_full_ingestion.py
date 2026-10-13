@@ -182,7 +182,7 @@ def main():
             print(
                 "aws logs tail "
                 "/aws/lambda/"
-                "CareLoopDocumentProcessor "
+                "AfterWardDocumentProcessor "
                 "--since 10m "
                 "--region eu-west-2"
             )

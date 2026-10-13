@@ -7,20 +7,20 @@ update AWS. Never put AWS credentials in committed configuration files.
 Existing resource identifiers (not renamed during repository cleanup):
 
 - Region: eu-west-2
-- Document bucket: careloop-documents-992617582533-london
-- Processing queue: CareLoopDocumentProcessing
-- Dead-letter queue: CareLoopDocumentProcessingDLQ
-- Lambda: CareLoopDocumentProcessor
+- Document bucket: afterward-documents-<ACCOUNT_ID>-london
+- Processing queue: AfterWardDocumentProcessing
+- Dead-letter queue: AfterWardDocumentProcessingDLQ
+- Lambda: AfterWardDocumentProcessor
 - Recovery table: PostDischargeRecoveryState (patient_id partition key)
 - History table: PostDischargeEventHistory (patient_id partition key, timestamp sort key)
-- Vector bucket: careloop-vectors-992617582533-london
-- Vector index: careloop-discharge-index
+- Vector bucket: afterward-vectors-<ACCOUNT_ID>-london
+- Vector index: afterward-discharge-index
 
 MODEL_MODE selects test or final model settings. Image transcription uses
 IMAGE_MODEL_ID. Titan embedding settings use EMBEDDING_MODEL_ID and
 EMBEDDING_DIMENSIONS (512 in the current configuration).
 
-DOCUMENT_BUCKET is preferred; AFTERWARD_BUCKET and legacy CARELOOP_BUCKET are
+DOCUMENT_BUCKET is preferred; AFTERWARD_BUCKET is also
 fallbacks. PROCESSING_QUEUE_URL is the queue setting, with legacy aliases in config.
 
 ## Deployment

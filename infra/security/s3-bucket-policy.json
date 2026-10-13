@@ -7,8 +7,8 @@
       "Principal": "*",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::careloop-documents-992617582533-london",
-        "arn:aws:s3:::careloop-documents-992617582533-london/*"
+        "arn:aws:s3:::afterward-documents-992617582533-london",
+        "arn:aws:s3:::afterward-documents-992617582533-london/*"
       ],
       "Condition": {
         "Bool": {
@@ -22,8 +22,8 @@
       "Principal": "*",
       "Action": "s3:*",
       "Resource": [
-        "arn:aws:s3:::careloop-documents-992617582533-london",
-        "arn:aws:s3:::careloop-documents-992617582533-london/*"
+        "arn:aws:s3:::afterward-documents-992617582533-london",
+        "arn:aws:s3:::afterward-documents-992617582533-london/*"
       ],
       "Condition": {
         "NumericLessThan": {

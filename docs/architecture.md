@@ -1,7 +1,7 @@
 # Architecture
 
-Afterward is a post-discharge companion prototype. Existing AWS infrastructure
-still uses CareLoop names; the GitHub repository is Afterward.
+Afterward is a post-discharge companion prototype. Active document storage, queues, and processing use AfterWard resource names.
+The original CareLoop resources are retained for rollback.
 
 ## Document ingestion
 

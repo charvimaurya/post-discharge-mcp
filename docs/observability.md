@@ -83,7 +83,7 @@ Format. CloudWatch turns it into a metric in the `AfterWard` namespace, with one
 `infra/observability/template.yaml` is a CloudFormation template. **It is not deployed.** It defines:
 
 - `afterward-tool-errors`: more than 3 tool errors in 5 minutes (the threshold is a parameter).
-- `afterward-document-dlq-not-empty`: any message in `CareLoopDocumentProcessingDLQ`.
+- `afterward-document-dlq-not-empty`: any message in `AfterWardDocumentProcessingDLQ`.
 - An SNS topic for both alarms, with an optional email subscription.
 - A new log group, `/afterward/bridge`, with 30-day retention.
 - The three saved queries below.

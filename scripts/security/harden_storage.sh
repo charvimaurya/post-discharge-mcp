@@ -25,14 +25,14 @@ set -euo pipefail
 ACCOUNT=992617582533
 REGION=eu-west-2
 ALIAS=alias/afterward-patient-data
-BUCKET=careloop-documents-992617582533-london
+BUCKET=afterward-documents-992617582533-london
 QUEUE_URLS=(
-  https://sqs.eu-west-2.amazonaws.com/${ACCOUNT}/CareLoopDocumentProcessing
-  https://sqs.eu-west-2.amazonaws.com/${ACCOUNT}/CareLoopDocumentProcessingDLQ
+  https://sqs.eu-west-2.amazonaws.com/${ACCOUNT}/AfterWardDocumentProcessing
+  https://sqs.eu-west-2.amazonaws.com/${ACCOUNT}/AfterWardDocumentProcessingDLQ
 )
 TABLES=(PostDischargeRecoveryState PostDischargeEventHistory)
-LOG_GROUPS=(/aws/lambda/CareLoopDocumentProcessor /aws/lambda/AfterwardReminderChecker)
-DOC_ROLE=CareLoopDocumentProcessorRole
+LOG_GROUPS=(/aws/lambda/AfterWardDocumentProcessor /aws/lambda/AfterwardReminderChecker)
+DOC_ROLE=AfterWardDocumentProcessorRole
 REMINDER_ROLE=AfterwardReminderRole
 ECS_TASK_ROLE=AfterWardEcsTaskRole
 HERE="$(cd "$(dirname "$0")/../.." && pwd)/infra/security"
@@ -186,8 +186,8 @@ fi
 if [[ "$ROUND" == 3 ]]; then
   section "Round 3a. Document Lambda: one scoped policy (no Resource \"*\")"
   run "aws iam put-role-policy --role-name $DOC_ROLE --policy-name AfterwardDocumentProcessor --policy-document file://$HERE/iam-document-processor-policy.json"
-  run "aws iam delete-role-policy --role-name $DOC_ROLE --policy-name CareLoopDocumentProcessorRole"
-  run "aws iam delete-role-policy --role-name $DOC_ROLE --policy-name CareLoopDocumentProcessorRolePolicy"
+  run "aws iam delete-role-policy --role-name $DOC_ROLE --policy-name AfterWardDocumentProcessorRole"
+  run "aws iam delete-role-policy --role-name $DOC_ROLE --policy-name AfterWardDocumentProcessorRolePolicy"
 
   section "Round 3b. Reminder Lambda: drop the redundant logging policy"
   run "aws iam delete-role-policy --role-name $REMINDER_ROLE --policy-name AfterwardReminderLogging"

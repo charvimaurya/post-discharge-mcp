@@ -58,11 +58,11 @@
         },
         {
           "name": "S3_VECTOR_BUCKET",
-          "value": "careloop-vectors-992617582533-london"
+          "value": "afterward-vectors-992617582533-london"
         },
         {
           "name": "S3_VECTOR_INDEX",
-          "value": "careloop-discharge-index"
+          "value": "afterward-discharge-index"
         },
         {
           "name": "EMBEDDING_MODEL_ID",

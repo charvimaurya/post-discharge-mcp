@@ -1,0 +1,21 @@
+{
+  "TransitionDefaultMinimumObjectSize": "all_storage_classes_128K",
+  "Rules": [
+    {
+      "Expiration": {
+        "Days": 30
+      },
+      "ID": "delete-uploaded-letters-after-30-days",
+      "Filter": {
+        "Prefix": "patients/"
+      },
+      "Status": "Enabled",
+      "NoncurrentVersionExpiration": {
+        "NoncurrentDays": 1
+      },
+      "AbortIncompleteMultipartUpload": {
+        "DaysAfterInitiation": 1
+      }
+    }
+  ]
+}

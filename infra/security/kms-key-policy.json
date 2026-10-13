@@ -17,10 +17,10 @@
       "Sid": "AppRolesUseTheKeyOnlyThroughS3DynamoDBAndSQS",
       "Effect": "Allow",
       "Principal": {"AWS": [
-        "arn:aws:iam::992617582533:role/CareLoopDocumentProcessorRole",
+        "arn:aws:iam::992617582533:role/AfterWardDocumentProcessorRole",
         "arn:aws:iam::992617582533:role/AfterwardReminderRole",
         "arn:aws:iam::992617582533:role/AfterWardEcsTaskRole",
-        "arn:aws:iam::992617582533:user/CareLoop"
+        "arn:aws:iam::992617582533:user/AfterWard"
       ]},
       "Action": ["kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*", "kms:ReEncrypt*", "kms:DescribeKey"],
       "Resource": "*",
@@ -37,8 +37,8 @@
       "Sid": "DynamoDBCreatesGrantsForTheTables",
       "Effect": "Allow",
       "Principal": {"AWS": [
-        "arn:aws:iam::992617582533:user/CareLoop",
-        "arn:aws:iam::992617582533:role/CareLoopDocumentProcessorRole",
+        "arn:aws:iam::992617582533:user/AfterWard",
+        "arn:aws:iam::992617582533:role/AfterWardDocumentProcessorRole",
         "arn:aws:iam::992617582533:role/AfterwardReminderRole",
         "arn:aws:iam::992617582533:role/AfterWardEcsTaskRole"
       ]},
@@ -57,7 +57,7 @@
       "Resource": "*",
       "Condition": {
         "StringEquals": {"aws:SourceAccount": "992617582533"},
-        "ArnLike": {"aws:SourceArn": "arn:aws:s3:::careloop-documents-992617582533-london"}
+        "ArnLike": {"aws:SourceArn": "arn:aws:s3:::afterward-documents-992617582533-london"}
       }
     },
     {
@@ -68,7 +68,7 @@
       "Resource": "*",
       "Condition": {
         "ArnLike": {"kms:EncryptionContext:aws:logs:arn": [
-          "arn:aws:logs:eu-west-2:992617582533:log-group:/aws/lambda/CareLoopDocumentProcessor",
+          "arn:aws:logs:eu-west-2:992617582533:log-group:/aws/lambda/AfterWardDocumentProcessor",
           "arn:aws:logs:eu-west-2:992617582533:log-group:/aws/lambda/AfterwardReminderChecker"
         ]}
       }

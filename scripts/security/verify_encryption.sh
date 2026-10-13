@@ -13,12 +13,12 @@ set -uo pipefail
 ACCOUNT=992617582533
 REGION=eu-west-2
 ALIAS=alias/afterward-patient-data
-BUCKET=careloop-documents-992617582533-london
-QUEUES=(CareLoopDocumentProcessing CareLoopDocumentProcessingDLQ)
+BUCKET=afterward-documents-992617582533-london
+QUEUES=(AfterWardDocumentProcessing AfterWardDocumentProcessingDLQ)
 TABLES=(PostDischargeRecoveryState PostDischargeEventHistory)
-LOG_GROUPS=(/aws/lambda/CareLoopDocumentProcessor /aws/lambda/AfterwardReminderChecker)
+LOG_GROUPS=(/aws/lambda/AfterWardDocumentProcessor /aws/lambda/AfterwardReminderChecker)
 # Who may decrypt with the key (the principals named in kms-key-policy.json).
-ALLOWED="CareLoopDocumentProcessorRole AfterwardReminderRole AfterWardEcsTaskRole CareLoop"
+ALLOWED="AfterWardDocumentProcessorRole AfterwardReminderRole AfterWardEcsTaskRole AfterWard"
 
 FAILS=0
 pass() { printf 'PASS  %s\n' "$*"; }
