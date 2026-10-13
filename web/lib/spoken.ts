@@ -36,3 +36,11 @@ export function shouldSpeakOpening(store: Store | undefined, text: string): bool
   } catch { /* storage blocked: speak it */ }
   return true;
 }
+
+// Opening Today from the start screen is a fresh start: whatever is waiting is spoken once more.
+// Reloads that stay on Today never happen (a reload returns to the start screen), so this only
+// runs on her own click.
+export function forgetSpoken(store: Store | undefined): void {
+  clearSpoken(store);
+  try { store?.removeItem(OPENING_KEY); } catch { /* storage blocked: nothing to clear */ }
+}

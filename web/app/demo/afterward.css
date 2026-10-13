@@ -478,18 +478,16 @@
 .awapp .screen{width:100%;height:100%}
 .awapp .stage{height:calc(100% - 90px)}
 
-/* No footer bar: the panels use the full height under the top bar. */
-.awapp .stage{height:660px}
-.awapp .centre{height:660px}
-.awapp .caption{bottom:20px}
-.awapp .sped{bottom:22px}
-.awapp .errline{bottom:12px}
-/* The start screen has a footer bar, so its error line sits above it. */
-.awapp #s00 ~ .errline{bottom:42px}
+/* Footer bar on every screen: the panels fill the space between the top bar and the footer. */
+.awapp .stage{height:calc(100% - 90px)}
+.awapp .centre{height:630px}
+.awapp .caption{bottom:42px}
+.awapp .sped{bottom:44px}
+.awapp .errline{bottom:42px}
 
 /* Build screen (upload -> plan): letter on the left, plan on the right, joined by an arrow,
    with the caption and the footer bar underneath, as in the mock-up. */
-.awapp #s01 .stage{height:calc(100% - 90px);padding-bottom:46px}
+.awapp #s01 .stage{padding-bottom:46px}
 .awapp #s01 .letterside{flex:0 0 45%}
 .awapp #s01 .paper.sm h4{font-size:21px;margin:0 0 10px}
 .awapp #s01 .paper.sm .txt,.awapp #s01 .paper.sm .hl{font-size:15.5px;line-height:1.45}
@@ -499,4 +497,3 @@
 .awapp .joinslot .join{left:-23px;top:-23px}
 .awapp .planfoot{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:12px;flex:none}
 .awapp .planfoot .openplan{margin:0 0 0 auto;align-self:center;padding:11px 24px;font-size:17px}
-.awapp #s01 .caption{bottom:42px}

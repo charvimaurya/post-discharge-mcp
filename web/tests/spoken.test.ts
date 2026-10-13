@@ -1,7 +1,7 @@
 // A reload shows a waiting reminder again but never speaks it twice. No browser needed.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { alreadySpoken, clearSpoken, markSpoken, shouldSpeakOpening } from '../lib/spoken.ts';
+import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../lib/spoken.ts';
 
 function fakeStore() {
   const data = new Map<string, string>();
@@ -58,4 +58,14 @@ test('blocked or broken storage never throws; it just speaks', () => {
   clearSpoken(broken);
   assert.equal(shouldSpeakOpening(broken, 'Good morning.'), true);
   assert.equal(alreadySpoken(undefined, WALK), false);
+});
+
+test('opening Today again forgets both, so the reminder and the greeting are spoken again', () => {
+  const store = fakeStore();
+  markSpoken(store, WALK);
+  assert.equal(shouldSpeakOpening(store, 'Good morning, Margaret.'), true);
+  assert.equal(shouldSpeakOpening(store, 'Good morning, Margaret.'), false);
+  forgetSpoken(store);
+  assert.equal(alreadySpoken(store, WALK), false);
+  assert.equal(shouldSpeakOpening(store, 'Good morning, Margaret.'), true);
 });

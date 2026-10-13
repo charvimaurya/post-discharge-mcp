@@ -22,7 +22,7 @@ import { daysAtHome, isObj, localTime, readChat, readPlan, readToday, splitClock
   type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
 import { canListen, listenOnce, speak } from '../../lib/voice';
-import { alreadySpoken, clearSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
+import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
 import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPanel, ToolPanel, TopBar, VoicePanel, type Turn } from './parts';
 
 type View = 'start' | 'build' | 'today';
@@ -257,6 +257,10 @@ export default function DemoPage() {
     send(item.kind === 'medicine' ? `I've taken my ${item.name.split(',')[0].toLowerCase()}.` : `I've done my ${item.name.toLowerCase()}.`);
 
   function openToday() {
+    // Her click opens Today afresh, so the waiting reminder or greeting is spoken, even if this
+    // tab has said it before.
+    forgetSpoken(tabStore());
+    shownCheckin.current = null;
     openingGreetingShown.current = false;
     setOpeningCheckComplete(false);
     setTodayLoaded(false);

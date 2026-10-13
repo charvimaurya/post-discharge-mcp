@@ -12,3 +12,6 @@ build/
 
 # Local snapshots of live AWS settings (for undo); not committed.
 infra/security/backup/
+
+# Local Claude Code settings (per-machine permissions); not committed.
+.claude/

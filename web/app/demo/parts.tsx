@@ -17,7 +17,6 @@ export function TopBar({ clock, dev, onDev }: { clock?: string; dev?: boolean; o
   </header>;
 }
 
-// Shown on the start screen only; the other screens use the full height for their panels.
 export function Footer() {
   return <footer className="footbar">
     <span>AfterWard · A living recovery plan for Alexa+</span>
@@ -26,7 +25,7 @@ export function Footer() {
 }
 
 export function Screen({ id, dark, children }: { id: string; dark?: boolean; children: ReactNode }) {
-  return <section className={`screen${dark ? ' dark' : ''}`} id={id}>{children}</section>;
+  return <section className={`screen${dark ? ' dark' : ''}`} id={id}>{children}<Footer /></section>;
 }
 
 // ---------- Start screen (mock-up 00_start) ----------
@@ -53,7 +52,6 @@ export function StartScreen({ onUpload, onOpen, busy }: { onUpload: (file: File)
       <div className="how"><div><b>1</b>Upload the letter once</div><div><b>2</b>AfterWard checks every line</div>
         <div><b>3</b>A plan, reminders and answers each day</div></div>
     </div>
-    <Footer />
   </Screen>;
 }
 
@@ -113,7 +111,6 @@ export function BuildScreen({ step, plan, onOpen }: { step: 1 | 2 | 3; plan: Pla
       </div>
     </div>
     {step === 3 && <div className="caption"><span>Built from her discharge letter. Nobody typed this in.</span></div>}
-    <Footer />
   </Screen>;
 }
 
