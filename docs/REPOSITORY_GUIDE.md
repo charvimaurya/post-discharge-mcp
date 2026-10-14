@@ -29,68 +29,65 @@ You do not need to run every file. Most files are supporting code used by other 
 Bedrock, S3, DynamoDB, or S3 Vectors contact real AWS services and may cost money
 or write data. Use the synthetic test documents.
 
-### What “no single app server command” means
+### Run the app and MCP server
 
-The document-processing and search components exist. They can run through local
-scripts or the deployed Lambda. There is not yet one complete user-facing app
-that connects document upload, questions, and medication/task completion.
+The MCP server and user-facing app are implemented. Local startup uses three
+processes: the authenticated MCP server, the Python bridge, and the Next.js web app.
 
-**MCP server: not implemented.** The folder contains preliminary reader helpers,
-but there is no complete running MCP server with registered application tools.
+Follow the [README local setup](../README.md#local-setup) for exact macOS and
+Windows commands, dependencies, and all settings. It also has the judge demo steps.
+
+From the repository root, with the Python virtual environment active, run each
+Python command in a separate terminal:
+
+```sh
+python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001
+python scripts/run_web_bridge.py --port 8002
+```
+
+In a third terminal, from the repository root:
+
+```sh
+cd web
+npm run dev -- --port 3000
+```
+
+Set `MCP_URL=http://127.0.0.1:8001/mcp` in the root `.env`. Open
+http://127.0.0.1:3000/demo. The web server calls the bridge at 8002 by default.
+The MCP app exposes `/mcp`; its port is chosen by uvicorn. Use 8001 consistently
+for this local setup. The old README used 8000, which was a different launch
+argument rather than a fixed server port.
+
+The upload flow uses live AWS services and needs the deployed document pipeline.
+Upload `test_data/doc_001.pdf`, wait for the new document to be ready, then open
+Today. To reset progress in an existing demo plan:
+
+```sh
+python scripts/reset_demo_patient.py --confirm
+```
+
+The reset script only touches `demo_patient_001`. It does not load a letter.
 
 ## 1. Set up your computer once
 
-Use Python 3.11, matching the current Lambda runtime.
+Use Python 3.11 and Node.js 22.18 or newer. Clone the current repository:
 
-```bash
-git clone https://github.com/charvimaurya/Afterward.git
-cd Afterward
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m pip install -r deployment/requirements-lambda.txt
-python -m pip install pytest
+```sh
+git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa.git
+cd AfterWard-A-Living-Recovery-Plan-for-Alexa
 ```
 
-If you already have the repository and `.venv`, start with:
-
-```bash
-source .venv/bin/activate
-```
-
-The second requirements file supplies the AWS SDK, including S3 Vectors support.
-The two requirements files currently specify different python-dotenv versions;
-installing in the order above uses the deployment version, 1.2.4. Pytest is
-installed separately because it is not yet listed in these files.
+Follow the [README](../README.md#local-setup) to create the virtual environment,
+install Python and web dependencies, and copy both environment examples.
+The root requirements include the AWS SDK. No second requirements file is
+needed for local startup. Install pytest separately as shown in the README.
 
 ### Add your settings
 
-Create a file named `.env` in the project root. The current `.env.example` is
-incomplete. This example points to the existing project resources:
-
-```dotenv
-AWS_REGION=eu-west-2
-MODEL_MODE=test
-TEST_MODEL_ID=eu.anthropic.claude-haiku-4-5-20251001-v1:0
-FINAL_EXTRACTION_MODEL_ID=
-FINAL_AGENT_MODEL_ID=
-IMAGE_MODEL_ID=
-DOCUMENT_BUCKET=afterward-documents-<ACCOUNT_ID>-london
-PROCESSING_QUEUE_URL=https://sqs.eu-west-2.amazonaws.com/<ACCOUNT_ID>/AfterWardDocumentProcessing
-RECOVERY_STATE_TABLE=PostDischargeRecoveryState
-EVENT_HISTORY_TABLE=PostDischargeEventHistory
-S3_VECTOR_BUCKET=afterward-vectors-<ACCOUNT_ID>-london
-S3_VECTOR_INDEX=afterward-discharge-index
-EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
-EMBEDDING_DIMENSIONS=512
-```
-
-- Use your own resource names if you are working in another AWS account.
-- Fill in `IMAGE_MODEL_ID` before running image tests.
-- Keep `MODEL_MODE=test` for the configured development model. Final mode needs
-  the relevant `FINAL_*` model IDs.
-- Do not commit `.env` or AWS credentials.
-- Settings already exported in your terminal take priority over `.env`.
+See the [setting-by-setting reference](../README.md#settings). Fill in the AWS
+resource names and Bedrock model IDs. Set `MCP_URL` for the bridge. Final model
+mode also needs `FINAL_AGENT_MODEL_ID`, which is absent from the example.
+Exported terminal settings take priority over the root `.env`.
 
 ### Check AWS access
 
@@ -111,14 +108,14 @@ that every model, bucket, or table is accessible.
 
 ## 2. Run tests in this order
 
-### Step A — Check the code without running the live pipeline
+### Step A : Check the code without running the live pipeline
 
 ```bash
 pytest -v
 ```
 
-At the last verified baseline: **93 passed, 7 deselected, 3 subtests passed**.
-“Deselected” means the live AWS tests were intentionally left out.
+Live AWS integration tests are excluded by default. Run `pytest -q` for the
+current Python result and `npm test` from `web/` for browser helper tests.
 
 If you have no AWS credentials configured, use dummy credentials for this
 mocked test run only:
@@ -130,7 +127,7 @@ AWS_ACCESS_KEY_ID=testing AWS_SECRET_ACCESS_KEY=testing AWS_EC2_METADATA_DISABLE
 You still need region and bucket settings in `.env` because some modules read
 configuration when imported. Never use dummy credentials for a live AWS test.
 
-### Step B — Check the PDF text
+### Step B : Check the PDF text
 
 ```bash
 python -m scripts.ingestion.test_extraction
@@ -140,7 +137,7 @@ Reads `test_data/doc_001.pdf` and prints its text. No AWS calls.
 The current sample has **2 pages**. You may see pypdf `startxref` warnings;
 the sample currently still extracts successfully.
 
-### Step C — Check Bedrock extraction
+### Step C : Check Bedrock extraction
 
 ```bash
 python verify_models.py
@@ -162,7 +159,7 @@ python run_ingestion.py
 This prints a `RecoveryState`, the Python object representing the patient's
 recovery plan. **These local commands do not save it to DynamoDB or index it.**
 
-### Step D — Check image extraction, if needed
+### Step D : Check image extraction, if needed
 
 ```bash
 python -m scripts.ingestion.test_image
@@ -173,7 +170,7 @@ The first transcribes `test_image1.jpeg`. The second also creates structured JSO
 Both need a working image model setting. Check handwritten numbers against the
 image, even when the model does not mark them uncertain.
 
-### Step E — Check document search
+### Step E : Check document search
 
 “RAG” here means finding relevant passages from the original paperwork.
 An “embedding” is the numerical representation used to search by meaning.
@@ -205,7 +202,7 @@ Search returns source text, page numbers, document IDs, and distances. It does
 not ask Claude to generate medical advice. The isolation script is a small
 check, not a complete security assessment.
 
-### Step F — Check the deployed pipeline
+### Step F : Check the deployed pipeline
 
 Do this after the earlier checks pass and the current Lambda is deployed:
 
@@ -227,7 +224,7 @@ aws logs tail /aws/lambda/AfterWardDocumentProcessor --since 10m --region eu-wes
 Follow with the RAG search check to inspect retrieved evidence. A ready state
 is not a substitute for checking the actual extracted content.
 
-### Optional — Run live database and queue tests
+### Optional : Run live database and queue tests
 
 ```bash
 pytest tests/database/test_phase5_actions.py -v -m integration
@@ -322,7 +319,9 @@ State saving and history writing are still separate operations, not one transact
 | `app/database/` | Save/read plans and record patient actions |
 | `app/models/` | Definitions of the data objects |
 | `lambdas/` | Code AWS calls when a queue message arrives |
-| `app/mcp/` | MCP server not implemented; preliminary helpers only |
+| `app/mcp/` | Authenticated MCP HTTP server, tool registration, and client |
+| `app/web_bridge.py` | HTTP bridge for chat, Today, reminders, and history reset |
+| `web/` | Next.js app, server API routes, and browser voice interface |
 | `scripts/` | Commands developers run manually |
 | `tests/` | Automated tests run by pytest |
 | `test_data/` | Synthetic PDFs and images |
@@ -344,15 +343,17 @@ Afterward/
 ├── app/                              # Main application code
 │   ├── __init__.py                    # Application package marker
 │   ├── config.py                      # Read environment settings and select models
-│   ├── mcp/                           # MCP scaffolding; server not implemented
+│   ├── mcp/                           # Working MCP server and tools
 │   │   ├── __init__.py                 # Package marker
-│   │   ├── context.py                  # Request-context placeholder
-│   │   ├── results.py                  # Result-helper placeholder
-│   │   ├── server.py                   # Recovery reader export; no transport yet
+│   │   ├── context.py                  # Server-side patient context
+│   │   ├── results.py                  # Structured tool result helpers
+│   │   ├── http_server.py              # Authenticated HTTP app at /mcp
+│   │   ├── client.py                   # Bridge client for MCP tools
+│   │   ├── server.py                   # Registered recovery, action, and search tools
 │   │   └── tools/
 │   │       ├── __init__.py             # Package marker
-│   │       ├── actions.py              # Action-tool placeholder
-│   │       ├── rag.py                  # Retrieval-tool placeholder
+│   │       ├── actions.py              # Record medication and task completions
+│   │       ├── rag.py                  # Search letter evidence
 │   │       └── recovery.py             # Read current RecoveryState
 │   ├── models/                        # Shared application data definitions
 │   │   ├── __init__.py                 # Package marker
@@ -478,6 +479,10 @@ All `__init__.py` files mark Python packages; they are not commands to run.
 
 | File | Responsibility |
 |---|---|
+| `app/mcp/http_server.py` | MCP HTTP transport and authentication middleware |
+| `app/mcp/server.py` | Registered tools for recovery, evidence, and progress |
+| `app/web_bridge.py` | Agent chat, Today, reminder checks, and history reset routes |
+| `web/app/demo/page.tsx` | Upload, Today, evidence, voice/text, and Developer view |
 | `app/config.py` | Environment configuration, model selection, table/bucket/queue/vector settings |
 | `app/aws/s3_service.py` | Upload/download bytes, supported upload extensions, document-key creation/parsing |
 | `app/aws/sqs_service.py` | Receive/delete messages and parse S3 notifications |
