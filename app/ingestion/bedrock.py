@@ -2,8 +2,7 @@
 
 import boto3
 from app import config
-import json
-from pathlib import Path
+from discharge_letter_check.schema import load_schema
 from jsonschema import validate
 from jsonschema.exceptions import ValidationError
 
@@ -12,17 +11,9 @@ from app.observability.log import service_log
 
 log = service_log("document_lambda")
 
-SCHEMA_PATH = (
-    Path(__file__).parent
-    / "schemas"
-    / "discharge-extraction.schema.json"
-)
-
-
 def load_extraction_schema() -> dict:
-    """Load the canonical discharge extraction JSON schema for Bedrock."""
-    with SCHEMA_PATH.open("r", encoding="utf-8") as file:
-        return json.load(file)
+    """Load a fresh dictionary from the package's canonical extraction schema."""
+    return load_schema()
 
 
 EXTRACTION_SCHEMA = load_extraction_schema()

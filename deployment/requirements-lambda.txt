@@ -9,3 +9,4 @@ python-dotenv==1.2.4
 s3transfer==0.19.2
 six==1.17.0
 urllib3==2.8.0
+discharge-letter-check @ https://github.com/charvimaurya/discharge-letter-check/archive/refs/tags/v0.1.0.zip

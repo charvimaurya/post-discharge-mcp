@@ -12,7 +12,7 @@ PACKAGES = ("app", "lambdas")
 
 
 def build(staging: Path):
-    for dependency in ("pypdf", "dotenv", "boto3", "botocore", "jsonschema", "rpds"):
+    for dependency in ("pypdf", "dotenv", "boto3", "botocore", "jsonschema", "rpds", "discharge_letter_check"):
         if not (staging / dependency / "__init__.py").is_file():
             raise SystemExit(f"Missing staged dependency: {dependency} in {staging}")
 
@@ -30,7 +30,11 @@ def build(staging: Path):
 
     required = ("app/models/__init__.py", "app/models/recovery_model.py",
                 "lambdas/document_processor/handler.py", "app/ingestion/document_service.py",
-                "lambdas/reminder_checker/handler.py")
+                "lambdas/reminder_checker/handler.py",
+                "discharge_letter_check/models.py", "discharge_letter_check/validator.py",
+                "discharge_letter_check/document_validation.py",
+                "discharge_letter_check/schema.py",
+                "discharge_letter_check/schemas/discharge-extraction.schema.json")
     for name in required:
         if name not in entries or not entries[name].is_file():
             raise SystemExit(f"Missing required Lambda source: {name}")

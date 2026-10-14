@@ -1,0 +1,915 @@
+{
+  "additionalProperties": false,
+  "description": "Everything read from one discharge letter. The model returns this.",
+  "properties": {
+    "discharge_date": {
+      "anyOf": [
+        {
+          "format": "date",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Discharge Date"
+    },
+    "medications": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "Medicine name as written, for example 'Apixaban'.",
+            "title": "Name",
+            "type": "string"
+          },
+          "strength": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Strength as written, for example '2.5 mg' or '0.1%'. Null if the letter does not state it. Never guess.",
+            "title": "Strength"
+          },
+          "form": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Form as written: 'tablets', 'eye drops', ...",
+            "title": "Form"
+          },
+          "dose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Amount taken each time, for example '1 tablet' or '1 drop'. Null if the letter does not state it. Never guess.",
+            "title": "Dose"
+          },
+          "site": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Where it goes, if stated, for example 'right eye'.",
+            "title": "Site"
+          },
+          "times_per_day": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How many times a day, only if the letter states it.",
+            "title": "Times Per Day"
+          },
+          "time_of_day": {
+            "description": "Time-of-day words the letter uses. Empty if it uses none.",
+            "items": {
+              "description": "Time-of-day words a letter may use.",
+              "enum": [
+                "morning",
+                "midday",
+                "afternoon",
+                "evening",
+                "bedtime"
+              ],
+              "title": "TimeOfDay",
+              "type": "string"
+            },
+            "title": "Time Of Day",
+            "type": "array"
+          },
+          "as_needed": {
+            "default": false,
+            "description": "True if the letter says 'only if needed' or 'if ...'.",
+            "title": "As Needed",
+            "type": "boolean"
+          },
+          "as_needed_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For example 'for pain' or 'if constipated'.",
+            "title": "As Needed Reason"
+          },
+          "max_per_day": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For as-needed medicines: the stated 'up to N times a day'.",
+            "title": "Max Per Day"
+          },
+          "instructions": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Extra wording, copied exactly, such as 'with food' or 'Take the morning dose after breakfast.'",
+            "title": "Instructions"
+          },
+          "duration_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How long to take it, copied exactly: 'for 14 days', 'Continue as directed'. Never turn vague wording into a date.",
+            "title": "Duration Text"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "name",
+          "source"
+        ],
+        "title": "ExtractedMedication",
+        "type": "object"
+      },
+      "title": "Medications",
+      "type": "array"
+    },
+    "tasks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "description": {
+            "description": "What to do, in the letter's words.",
+            "title": "Description",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "walk",
+              "exercise",
+              "care",
+              "other"
+            ],
+            "title": "TaskKind",
+            "type": "string",
+            "default": "other"
+          },
+          "times_per_day": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How many times a day, only if the letter states a number.",
+            "title": "Times Per Day"
+          },
+          "time_of_day": {
+            "items": {
+              "description": "Time-of-day words a letter may use.",
+              "enum": [
+                "morning",
+                "midday",
+                "afternoon",
+                "evening",
+                "bedtime"
+              ],
+              "title": "TimeOfDay",
+              "type": "string"
+            },
+            "title": "Time Of Day",
+            "type": "array"
+          },
+          "clock_times": {
+            "description": "Clock times the letter states for this task, for example 07:30 and 15:00. Empty if the letter gives none. Never work a clock time out from a word like 'morning'.",
+            "items": {
+              "format": "time",
+              "type": "string"
+            },
+            "title": "Clock Times",
+            "type": "array"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For example '5 to 10 minutes, using your frame'.",
+            "title": "Details"
+          },
+          "duration_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For example 'for 1 week', copied exactly.",
+            "title": "Duration Text"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          },
+          "follow_on": {
+            "anyOf": [
+              {
+                "additionalProperties": false,
+                "description": "Set only when the letter says to do THIS task for a stated time straight after ANOTHER task, e.g. 'Ice pack on the knee for 20 minutes after each set of exercises.'",
+                "properties": {
+                  "after_task": {
+                    "description": "The letter's own words for the task this one follows, e.g. 'each set of exercises'.",
+                    "title": "After Task",
+                    "type": "string"
+                  },
+                  "duration_minutes": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Minutes, only if the letter states a number of minutes.",
+                    "title": "Duration Minutes"
+                  },
+                  "source": {
+                    "additionalProperties": false,
+                    "description": "Where in the letter an item came from.",
+                    "properties": {
+                      "snippet": {
+                        "description": "The sentence from the letter, copied word for word.",
+                        "title": "Snippet",
+                        "type": "string"
+                      },
+                      "page": {
+                        "anyOf": [
+                          {
+                            "type": "integer"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Page number in the letter, starting at 1.",
+                        "title": "Page"
+                      },
+                      "document_id": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ],
+                        "default": null,
+                        "description": "Set by the pipeline, not by the model.",
+                        "title": "Document Id"
+                      },
+                      "read_from_image": {
+                        "default": false,
+                        "description": "True if this text was read from a photo or scan.",
+                        "title": "Read From Image",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "snippet"
+                    ],
+                    "title": "SourceEvidence",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "after_task",
+                  "source"
+                ],
+                "title": "FollowOn",
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Follow On"
+          }
+        },
+        "required": [
+          "description",
+          "source"
+        ],
+        "title": "ExtractedTask",
+        "type": "object"
+      },
+      "title": "Tasks",
+      "type": "array"
+    },
+    "appointments": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "description": "For example 'Consultant review'.",
+            "title": "Title",
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Date of the appointment. Null if not stated.",
+            "title": "Date"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "format": "time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Time, if stated.",
+            "title": "Time"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          },
+          "conflicting_dates": {
+            "description": "Any OTHER date the letter gives for this same appointment. Report it here. Do not pick one and drop the other.",
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Conflicting Dates",
+            "type": "array"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "title",
+          "source"
+        ],
+        "title": "ExtractedAppointment",
+        "type": "object"
+      },
+      "title": "Appointments",
+      "type": "array"
+    },
+    "restrictions": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "The full restriction sentence, word for word.",
+            "title": "Text",
+            "type": "string"
+          },
+          "topic": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "One word, for example 'driving' or 'lifting'.",
+            "title": "Topic"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "text",
+          "source"
+        ],
+        "title": "ExtractedRestriction",
+        "type": "object"
+      },
+      "title": "Restrictions",
+      "type": "array"
+    },
+    "monitoring": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "what": {
+            "description": "What to measure, for example 'temperature'.",
+            "title": "What",
+            "type": "string"
+          },
+          "frequency_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Frequency Text"
+          },
+          "threshold_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Any threshold, copied exactly.",
+            "title": "Threshold Text"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "what",
+          "source"
+        ],
+        "title": "ExtractedMonitoring",
+        "type": "object"
+      },
+      "title": "Monitoring",
+      "type": "array"
+    },
+    "warning_signs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "The warning sign, word for word.",
+            "title": "Text",
+            "type": "string"
+          },
+          "action": {
+            "description": "What the letter says to do, word for word.",
+            "title": "Action",
+            "type": "string"
+          },
+          "urgency": {
+            "enum": [
+              "contact_care_team",
+              "emergency"
+            ],
+            "title": "Urgency",
+            "type": "string",
+            "default": "contact_care_team"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "text",
+          "action",
+          "source"
+        ],
+        "title": "ExtractedWarningSign",
+        "type": "object"
+      },
+      "title": "Warning Signs",
+      "type": "array"
+    },
+    "diet_advice": {
+      "description": "Each diet or food/drink line from the letter, one item per line, copied word for word.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "text": {
+            "description": "The diet line, word for word, as written in the letter.",
+            "title": "Text",
+            "type": "string"
+          },
+          "kind": {
+            "description": "'avoid' for a line telling the patient not to eat or drink something; 'advice' for any other diet line.",
+            "enum": [
+              "avoid",
+              "advice"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "source": {
+            "additionalProperties": false,
+            "description": "Where in the letter an item came from.",
+            "properties": {
+              "snippet": {
+                "description": "The sentence from the letter, copied word for word.",
+                "title": "Snippet",
+                "type": "string"
+              },
+              "page": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Page number in the letter, starting at 1.",
+                "title": "Page"
+              },
+              "document_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Set by the pipeline, not by the model.",
+                "title": "Document Id"
+              },
+              "read_from_image": {
+                "default": false,
+                "description": "True if this text was read from a photo or scan.",
+                "title": "Read From Image",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "snippet"
+            ],
+            "title": "SourceEvidence",
+            "type": "object"
+          }
+        },
+        "required": [
+          "text",
+          "kind",
+          "source"
+        ],
+        "title": "DietAdvice",
+        "type": "object"
+      },
+      "title": "Diet Advice",
+      "type": "array"
+    }
+  },
+  "title": "ExtractedDischarge",
+  "type": "object"
+}

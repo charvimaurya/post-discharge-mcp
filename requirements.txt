@@ -4,3 +4,4 @@ python-dotenv==1.2.3
 fastmcp==4.0.9
 jsonschema==4.26.0
 httpx==0.28.1
+discharge-letter-check @ https://github.com/charvimaurya/discharge-letter-check/archive/refs/tags/v0.1.0.zip
