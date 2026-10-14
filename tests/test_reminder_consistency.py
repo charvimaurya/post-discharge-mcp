@@ -104,7 +104,7 @@ def test_at_0735_the_medicines_reminder_may_appear():
     assert checkin.occurrence_ids == ["para#2026-10-23#1", "apix#2026-10-23#1"]
     assert checkin.text == (
         "Good morning, Margaret. I hope you slept well. "
-        "Next is your paracetamol and blood thinner, after breakfast."
+        "Next is 2 tablets of your paracetamol and 1 tablet of your blood thinner, after breakfast."
     )
 
 

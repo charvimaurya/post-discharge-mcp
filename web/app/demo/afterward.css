@@ -570,3 +570,10 @@
 /* Today screen: the caption sits over the plan panel, clear of the microphone on the right. */
 .awapp #app .caption{left:24px;right:478px;padding:0 16px}
 .awapp #app .caption span{font-size:23px;text-align:center}
+/* Her words while she is still speaking: the same bubble, a little lighter until she has finished. */
+.awapp .turn.you.live p{opacity:.78;border:1.5px dashed rgba(23,34,43,.25)}
+/* Whose plan this is, in the top bar of every screen once a letter has been read. */
+.awapp .top .patient{display:flex;align-items:center;gap:7px;margin-left:14px;padding-left:16px;border-left:1px solid rgba(255,255,255,.35);font-size:17px;font-weight:600;color:#FFFFFF}
+.awapp .top .patient b{font-weight:800;color:#FFE3EA}
+.awapp .top .patient svg{color:#FFE3EA}
+.awapp .top .clock .demo-time{margin-right:10px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.18);font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#FFFFFF;vertical-align:2px}

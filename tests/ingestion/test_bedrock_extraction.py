@@ -85,6 +85,15 @@ def test_task_clock_times_allowed(client):
     assert bedrock.invoke_extraction_model("Walk at 08:00") == extracted
 
 
+def test_unknown_task_kind_becomes_other(client):
+    # The asthma letter's "Gentle activity is fine" came back as kind "activity".
+    extracted = empty_extraction()
+    extracted["tasks"] = [{"description": "Gentle activity is fine.", "kind": "activity",
+                          "source": {"snippet": "Gentle activity is fine.", "page": 1}}]
+    client.converse.return_value = response(extracted)
+    assert bedrock.invoke_extraction_model("Gentle activity is fine.")["tasks"][0]["kind"] == "other"
+
+
 def test_missing_warning_action_rejected(client):
     extracted = empty_extraction()
     extracted["warning_signs"] = [{"text": "Chest pain", "source": {"snippet": "Chest pain"}}]

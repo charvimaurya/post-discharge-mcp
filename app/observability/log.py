@@ -13,8 +13,9 @@ What may be logged is decided HERE, not by the caller:
     (an id, a route, a reason code). A string with spaces or punctuation is
     dropped too, so a sentence cannot ride in on an allowed name.
 
-So no message text, reply, letter text, quote, medicine name, dose or
-patient name can reach a log line. Errors go in through safe_error(),
+So no message text, reply, letter text, quote, medicine name, dose,
+patient name or patient id can reach a log line (a patient is logged as
+patient_id_hash, see hash_patient). Errors go in through safe_error(),
 which gives the TYPE only (see app/safe_logging.py).
 
 request_id is kept in a contextvar, set once per request and carried from
@@ -40,7 +41,7 @@ from app.safe_logging import safe_error
 
 
 ALLOWED_FIELDS = frozenset({
-    "event", "request_id", "session_id_hash", "patient_id", "route", "status", "ms",
+    "event", "request_id", "session_id_hash", "patient_id_hash", "route", "status", "ms",
     "tool", "kind", "reason", "model", "tool_calls", "tokens_in", "tokens_out",
     "document_id", "stage", "item_count", "needs_confirmation_count", "checkin_type",
     "error_type", "error_code",
@@ -95,13 +96,28 @@ def get_request_id() -> str | None:
     return _request_id.get()
 
 
+def _short_hash(value: str | None) -> str | None:
+    if not value:
+        return None
+
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:12]
+
+
 def hash_session(session_id: str | None) -> str | None:
     """A short one-way hash, so one session's lines can be grouped without logging its id."""
 
-    if not session_id:
-        return None
+    return _short_hash(session_id)
 
-    return hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:12]
+
+def hash_patient(patient_id: str | None) -> str | None:
+    """
+    A short one-way hash of a patient id, logged as patient_id_hash.
+
+    The id itself is never a log field: one patient's lines can still be
+    grouped, and found by hashing a known id, without the id in the logs.
+    """
+
+    return _short_hash(patient_id)
 
 
 def dropped_fields_total() -> int:

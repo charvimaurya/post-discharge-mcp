@@ -7,6 +7,9 @@ This module coordinates:
 - retrieval
 """
 
+import threading
+from collections import OrderedDict
+
 from app.database.recovery_state import (
     get_recovery_state,
 )
@@ -65,6 +68,59 @@ def index_document_pages(
     return len(chunks)
 
 
+# ---------------------------------------------------------
+# Search caches
+# ---------------------------------------------------------
+#
+# The same questions come up again and again ("Can I drive?"), and the
+# answer for one letter never changes: a new upload is a new document_id.
+# So a query's embedding, and the matches for (patient, document, query),
+# are kept in memory. The current document_id is still read on every
+# search, so an old letter's matches are never returned for a new one.
+# Empty results are not kept: the letter may still be being indexed.
+
+MAX_CACHED_SEARCHES = 256
+
+_cache_lock = threading.Lock()
+_embedding_cache: "OrderedDict[str, list[float]]" = OrderedDict()
+_search_cache: "OrderedDict[tuple, list[dict]]" = OrderedDict()
+
+
+def _remember(cache: OrderedDict, key, value) -> None:
+    with _cache_lock:
+        cache[key] = value
+        cache.move_to_end(key)
+        while len(cache) > MAX_CACHED_SEARCHES:
+            cache.popitem(last=False)
+
+
+def _recall(cache: OrderedDict, key):
+    with _cache_lock:
+        if key not in cache:
+            return None
+        cache.move_to_end(key)
+        return cache[key]
+
+
+def _query_embedding(query: str) -> list[float]:
+    """The query's embedding, computed once per distinct question text."""
+
+    key = " ".join(query.split())
+    cached = _recall(_embedding_cache, key)
+
+    if cached is None:
+        cached = embed_text(key)
+        _remember(_embedding_cache, key, cached)
+
+    return cached
+
+
+def clear_search_caches() -> None:
+    with _cache_lock:
+        _embedding_cache.clear()
+        _search_cache.clear()
+
+
 def search_discharge_instructions(
     *,
     query: str,
@@ -109,7 +165,14 @@ def search_discharge_instructions(
     # -------------------------------------------------
     # 2. SEARCH ONLY THAT DOCUMENT
     # -------------------------------------------------
-    query_embedding = embed_text(query)
+    cache_key = (patient_id, document_id, " ".join(query.split()).lower(), top_k)
+    cached = _recall(_search_cache, cache_key)
+
+    if cached is not None:
+        # Copies, so a caller changing a result never changes the cache.
+        return [dict(result) for result in cached]
+
+    query_embedding = _query_embedding(query)
     matches = query_chunks(
         query_embedding=query_embedding,
         patient_id=patient_id,
@@ -130,4 +193,8 @@ def search_discharge_instructions(
                 "text": metadata.get("text"),
             }
         )
+
+    if results:
+        _remember(_search_cache, cache_key, [dict(result) for result in results])
+
     return results

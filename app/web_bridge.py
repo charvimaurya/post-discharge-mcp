@@ -34,7 +34,7 @@ from app.ingestion.document_validation import (
     WRONG_DOCUMENT_MESSAGE, WrongDocumentError, validate_discharge_document,
 )
 from app.ingestion.pdf_processor import extract_text as extract_pdf_text
-from app.mcp.client import call_mcp_tool
+from app.mcp.client import call_mcp_tool, mcp_turn
 from app.mcp.context import get_demo_patient_context
 from app.observability.log import (
     Timer, get_request_id, reset_request_id, service_log, set_request_id,
@@ -115,21 +115,23 @@ async def chat_message(request: Request) -> JSONResponse:
 
     patient = get_demo_patient_context()
 
-    # When she last spoke (real time), so no check-in interrupts a chat.
-    try:
-        await asyncio.to_thread(
-            record_chat_activity, patient.patient_id, system_now_utc().isoformat()
-        )
-    except Exception as exc:
-        log("chat_activity_failed", level="error", error=exc)
-
     def schedule(entry: dict) -> None:
         add_scheduled_checkin(patient.patient_id, entry)
 
+    # Recording when she last spoke (real time, so no check-in interrupts a chat) and
+    # reading her record are independent DynamoDB calls, so they run at the same time.
+    activity, state = await asyncio.gather(
+        asyncio.to_thread(record_chat_activity, patient.patient_id, system_now_utc().isoformat()),
+        asyncio.to_thread(get_recovery_state, patient.patient_id),
+        return_exceptions=True,
+    )
+
+    if isinstance(activity, Exception):
+        log("chat_activity_failed", level="error", error=activity)
+
     try:
-        state = await asyncio.to_thread(
-            get_recovery_state, patient.patient_id
-        )
+        if isinstance(state, BaseException):
+            raise state
         state = state or {}
         had_checkin = bool(state.get("pending_checkin"))
 
@@ -192,15 +194,15 @@ async def today(request: Request) -> JSONResponse:
 
     try:
         # Tasks and medicines come from the MCP tools, which own the plan rules.
-        tasks_result = get_structured_tool_result(
-            await call_mcp_tool("get_today_tasks", {})
-        )
-        medications_result = get_structured_tool_result(
-            await call_mcp_tool("get_medications", {})
-        )
-        state = await asyncio.to_thread(
-            get_recovery_state, patient.patient_id
-        )
+        # The two reads and the record read run at once, over one MCP connection.
+        async with mcp_turn():
+            raw_tasks, raw_medications, state = await asyncio.gather(
+                call_mcp_tool("get_today_tasks", {}),
+                call_mcp_tool("get_medications", {}),
+                asyncio.to_thread(get_recovery_state, patient.patient_id),
+            )
+        tasks_result = get_structured_tool_result(raw_tasks)
+        medications_result = get_structured_tool_result(raw_medications)
     except Exception as exc:
         log("today_failed", level="error", error=exc, route="/today")
         return JSONResponse({"error": TODAY_ERROR}, status_code=502)
@@ -220,11 +222,15 @@ async def today(request: Request) -> JSONResponse:
         dict(m, timing=timing(m, now)) for m in medications_result["data"]["medications"]
     ]
 
+    first_name = state.get("first_name") or str(state.get("patient_name") or "").split(" ")[0] or None
+
     return JSONResponse(
         {
             "clock_label": get_clock_label(zone, now),
+            # Shown above "Today", so whose plan this is is always on screen.
+            "first_name": first_name,
             "opening_greeting": build_opening_message(
-                state.get("first_name") or str(state.get("patient_name") or "").split(" ")[0] or None,
+                first_name,
                 tasks,
                 medications,
                 now,

@@ -198,3 +198,18 @@ test('a source carries the note for an open question in the letter, or none', ()
   assert.equal(readChat({ response: 'x', tool_trace: [], source: base }).source?.note, null);
   assert.equal(readChat({ response: 'x', tool_trace: [], source: { ...base, note: { text: 'no flag' } } }).source?.note, null);
 });
+
+test('the upload screen names the patient from the letter, or says "The discharge letter"', async () => {
+  const { readPlan, letterTitle } = await import('../lib/assistant-data.ts');
+  assert.equal(readPlan({ first_name: 'Leo' }).firstName, 'Leo');
+  assert.equal(readPlan({ first_name: '  ' }).firstName, null);
+  assert.equal(readPlan({}).firstName, null);
+  assert.equal(letterTitle('Margaret'), "Margaret's discharge letter");
+  assert.equal(letterTitle(null), 'The discharge letter');
+});
+
+test('the Today screen gets the first name of the patient whose plan it is', () => {
+  assert.equal(readToday({ first_name: 'Margaret' }).firstName, 'Margaret');
+  assert.equal(readToday({ first_name: null }).firstName, null);
+  assert.equal(readToday({}).firstName, null);
+});

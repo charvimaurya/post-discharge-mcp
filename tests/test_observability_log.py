@@ -89,6 +89,22 @@ def test_session_id_is_hashed():
     assert "session" not in hashed and obs.hash_session(None) is None
 
 
+def test_patient_id_is_hashed_and_never_logged_as_it_is(capsys):
+    hashed = obs.hash_patient("demo_patient_001")
+
+    assert hashed == obs.hash_patient("demo_patient_001") and len(hashed) == 12
+    assert "patient" not in hashed and obs.hash_patient(None) is None
+    # The same short hash as sessions use, so one rule covers both.
+    assert hashed == obs.hash_session("demo_patient_001")
+
+    obs.service_log("bridge")("probe", patient_id="demo_patient_001", patient_id_hash=hashed)
+    line = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+
+    assert "patient_id" not in line and line["patient_id_hash"] == hashed
+    assert line["dropped_fields"] == 1
+    assert "demo_patient_001" not in json.dumps(line)
+
+
 def test_metrics_use_the_embedded_metric_format(capsys):
     obs.service_log("mcp")("tool_call", tool="get_medications", ms=41, tool_ms=41, tool_errors=0)
 

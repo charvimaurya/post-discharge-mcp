@@ -17,6 +17,20 @@ def demo_clock_by_default(monkeypatch):
     monkeypatch.setenv("CLOCK_MODE", "demo")
 
 
+@pytest.fixture(autouse=True)
+def empty_caches():
+    """No test sees a letter search, embedding or tool list cached by another."""
+
+    from app.mcp import client
+    from app.rag import service as rag_service
+
+    rag_service.clear_search_caches()
+    client._tool_list_cache.clear()
+    yield
+    rag_service.clear_search_caches()
+    client._tool_list_cache.clear()
+
+
 def log_lines(text: str) -> list[dict]:
     """The structured log lines in captured stdout, oldest first."""
 

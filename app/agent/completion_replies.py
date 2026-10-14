@@ -8,6 +8,7 @@ a screen. Tone: a kind nurse, one or two short sentences.
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from app.agent.occurrence_resolver import everyday_name, item_name, part_of_day
@@ -49,9 +50,22 @@ def _noun(occurrence: dict[str, Any]) -> tuple[str, str]:
 
 
 def medicine_name(name: str) -> str:
-    """How a medicine is said aloud: 'paracetamol', 'blood thinner'."""
+    """
+    How a medicine is said aloud: 'paracetamol', 'blood thinner'.
 
-    return everyday_name(name) or (name or "medicine").lower()
+    The letter's full name ("Paracetamol 500 mg tablets") stays on the screen;
+    aloud, the strength and form are left out, so a dose reads naturally:
+    "2 tablets of your paracetamol", not "2 tablets of your paracetamol 500 mg tablets".
+    """
+
+    everyday = everyday_name(name)
+
+    if everyday:
+        return everyday
+
+    spoken = re.split(r"\s+\d", (name or "").strip(), maxsplit=1)[0].strip().lower()
+
+    return spoken or (name or "medicine").lower()
 
 
 def describe(occurrence: dict[str, Any]) -> str:
@@ -213,22 +227,28 @@ def _words_and(names: list[str]) -> str:
 
 def step_phrase(step: list[Any]) -> str:
     """
-    'your paracetamol and blood thinner, after breakfast'
+    '2 tablets of your paracetamol and 1 tablet of your blood thinner, after breakfast'
     'your knee exercises this morning'
     'your afternoon walk at three o'clock'
+
+    A medicine is said with its dose, as on its card, so she hears how many to take.
     """
 
     first = step[0]
 
     if first.is_medication:
-        names = []
+        names: list[str] = []
+        parts: list[str] = []
         for item in step:
             name = medicine_name(item_name(item.occurrence))
-            if name not in names:
-                names.append(name)
+            if name in names:
+                continue
+            names.append(name)
+            dose = str(item.occurrence.get("dose") or "").strip()
+            parts.append(f"{dose} of your {name}" if dose else f"your {name}")
         whens = {item.when for item in step}
         when = first.when if len(whens) == 1 else _SLOT_WORDS.get(first.slot or "", "")
-        return f"your {_words_and(names)}, {when}" if when else f"your {_words_and(names)}"
+        return f"{_words_and(parts)}, {when}" if when else _words_and(parts)
 
     return f"{first.spoken} {first.when}".strip() if first.when else first.spoken
 

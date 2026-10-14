@@ -93,6 +93,7 @@ from app.agent.occurrence_resolver import (
 )
 from app.agent.prompts import SYSTEM_PROMPT
 from app.agent.safety import (
+    sounds_like_both,
     asked_about_completion,
     asks_after_that,
     asks_whats_left_today,
@@ -147,6 +148,7 @@ from app.agent.symptoms import (
 from app.mcp.client import (
     call_mcp_tool,
     get_mcp_tools,
+    mcp_turn,
 )
 from app.observability.log import Timer, hash_session, service_log
 
@@ -388,9 +390,18 @@ async def _load_today(tool_trace: list[dict]) -> dict[str, list] | None:
 
     today: dict[str, list] = {}
 
-    for tool_name, field in _FACT_READS:
+    # Both reads at once: neither depends on the other, and each is a round trip
+    # to the MCP server and DynamoDB. They are still checked, and traced, in order.
+    raw_results = await asyncio.gather(
+        *(call_mcp_tool(tool_name, {}) for tool_name, _ in _FACT_READS),
+        return_exceptions=True,
+    )
+
+    for (tool_name, field), raw in zip(_FACT_READS, raw_results):
         try:
-            result = get_structured_tool_result(await call_mcp_tool(tool_name, {}))
+            if isinstance(raw, BaseException):
+                raise raw
+            result = get_structured_tool_result(raw)
         except Exception:
             tool_trace.append({"tool": tool_name, "arguments": {}, "ok": False})
             return None
@@ -1511,6 +1522,10 @@ def _reminder_ack(today: dict[str, list] | None, pending_checkin: dict) -> str:
     return reminder_ack_reply(reminded, same_item, is_medication)
 
 
+# "both", "all my tablets", "all of them": every medicine due, not one of them.
+_ALL_OF_THEM = re.compile(r"\b(?:both|all)\b")
+
+
 async def _vague_medication(
     message: str,
     today: dict[str, list],
@@ -1526,11 +1541,15 @@ async def _vague_medication(
 
     if resolution.action == "ask":
         stated = stated_count(message)
-        set_offer(session_id, {
-            "kind": "which_medicines",
-            "occurrence_ids": [d["occurrence_id"] for d in resolution.choices],
-            "stated": stated,
-        })
+        offer = {"kind": "which_medicines", "occurrence_ids": [d["occurrence_id"] for d in resolution.choices], "stated": stated}
+
+        # "I have taken both the medicine", "I've taken all my tablets": she has already
+        # answered the question we would ask, so it is handled as her answer "both".
+        # Not when she gives a count ("one tablet of both"): that is never saved on a guess.
+        if stated is None and _ALL_OF_THEM.search(message.lower()):
+            return await _answer_which_medicines("both", offer, today, now, first_name, session_id, tool_trace)
+
+        set_offer(session_id, offer)
         # She gave a count ("one tablet"): ask which one, not "which, or both?".
         return which_one_question(resolution.choices) if stated else ask_which_medicine(resolution.choices)
 
@@ -1584,7 +1603,9 @@ async def chat(
     session = hash_session(session_id)
 
     try:
-        result = await _chat_turn(message, session_id, patient_context, **options)
+        # Every MCP call in this turn shares one connection (see mcp_turn).
+        async with mcp_turn():
+            result = await _chat_turn(message, session_id, patient_context, **options)
     except Exception as exc:
         log("agent_turn", level="error", error=exc, session_id_hash=session, status="error",
             ms=timer.ms, chat_ms=timer.ms)
@@ -1703,6 +1724,12 @@ async def _chat_turn(
     # what the previous turn saved can be corrected now.
     offer = pop_offer(session_id)
     last_saved = pop_last_saved(session_id)
+
+    # Speech recognition often mishears a one-word "both" ("boat", "bolt"). Only while
+    # "...your blood thinner, or both?" is waiting is such a word read as "both".
+    if offer and offer.get("kind") in ("which_medicines", "meal_medicines") and sounds_like_both(cleaned_message):
+        cleaned_message = "both"
+        _TURN.get()["message"] = cleaned_message
 
     # Intent first, every turn. The waiting question is the offer from the last
     # reply, or a check-in she has not answered yet.

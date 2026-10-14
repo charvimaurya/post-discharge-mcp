@@ -151,7 +151,7 @@ def test_yes_records_the_meal_medicines(margaret):
     assert writes == ["para#1", "apix#1"]
     assert result["response"] == (
         "Thank you, Margaret. I've marked your paracetamol, 2 tablets, and your blood thinner, 1 tablet, as taken. "
-        "Next is your paracetamol, at midday."
+        "Next is 2 tablets of your paracetamol, at midday."
     )
 
 
@@ -287,4 +287,4 @@ def test_a_question_leaves_nothing_for_a_yes_to_record(margaret):
 def test_whats_left_with_breakfast_still_gets_whats_next(margaret):
     reply = margaret.say("What's left? I'm about to have breakfast.")[0]["response"]
 
-    assert reply == "Next is your paracetamol and blood thinner, after breakfast."
+    assert reply == "Next is 2 tablets of your paracetamol and 1 tablet of your blood thinner, after breakfast."

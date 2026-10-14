@@ -22,6 +22,7 @@ export type PlanItem = {
 export type Checkin = { id: string; text: string; itemId: string | null };
 export type Today = {
   clockLabel: string;
+  firstName: string | null;      // from the current plan, shown above "Today"
   openingGreeting: string;
   date: string | null;           // "2026-10-23", the server's "today"
   dischargeDate: string | null;  // "2026-10-16"
@@ -192,6 +193,7 @@ export function readToday(json: unknown): Today {
   const p = isObj(o.pending_checkin) ? o.pending_checkin : null;
   return {
     clockLabel: str(o.clock_label),
+    firstName: str(o.first_name).trim() || null,
     openingGreeting: str(o.opening_greeting),
     date: str(o.date) || null,
     dischargeDate: str(o.discharge_date) || null,
@@ -338,10 +340,16 @@ export function letterBlocks(source: NonNullable<Source>): LetterBlock[] {
 // ---------- The whole plan, for the screen shown right after upload ----------
 
 export type PlanRow = { section: 'Medicines' | 'Each day' | 'Appointments'; text: string; when: string; flag: string | null };
+// firstName: read from the letter when it was processed; null when the letter gives none.
 export type PlanSummary = {
   rows: PlanRow[]; quotes: { text: string; flagged: boolean }[]; taskQuotes: string[];
-  mustNot: number; warnings: number; careNotes: number;
+  mustNot: number; warnings: number; careNotes: number; firstName: string | null;
 };
+
+// "Margaret's discharge letter", or "The discharge letter" when the name is not known.
+export function letterTitle(firstName: string | null | undefined): string {
+  return firstName ? `${firstName}'s discharge letter` : 'The discharge letter';
+}
 
 // "2026-10-22" -> "Thu 22 Oct". Anything else is shown as written.
 function shortDate(date: string): string {
@@ -381,5 +389,6 @@ export function readPlan(state: Obj): PlanSummary {
   return {
     rows, quotes, taskQuotes, mustNot: list('restrictions').length, warnings: list('warning_signs').length,
     careNotes: list('diet_advice').length + list('monitoring').length,
+    firstName: str(state.first_name).trim() || null,
   };
 }

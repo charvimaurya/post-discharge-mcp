@@ -47,7 +47,7 @@ from app.aws.s3_service import (
     parse_document_key,
 )
 from app.clock import system_now_utc
-from app.observability.log import Timer, service_log
+from app.observability.log import Timer, hash_patient, service_log
 
 
 log = service_log("document_lambda")
@@ -192,7 +192,7 @@ def _process_s3_record(
     )
 
 
-    log("ingest_stage", stage="received", patient_id=patient_id, document_id=document_id,
+    log("ingest_stage", stage="received", patient_id_hash=hash_patient(patient_id), document_id=document_id,
         ms=_ms_since_upload(s3_record))
 
 

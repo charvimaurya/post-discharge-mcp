@@ -2,15 +2,18 @@
 // (docs/ui_mockups/source/screens.py) and uses the same CSS class names.
 import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import { Icon, Logo } from './icons';
-import { letterBlocks, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
+import { letterBlocks, letterTitle, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
 
 // ---------- Frame: top bar and footer ----------
 
-export function TopBar({ clock, dev, onDev }: { clock?: string; dev?: boolean; onDev?: () => void }) {
+// patient: the first name from the current plan, so every screen shows whose plan it is.
+export function TopBar({ clock, dev, onDev, patient }: { clock?: string; dev?: boolean; onDev?: () => void; patient?: string | null }) {
   const { day, time } = splitClock(clock || '');
   return <header className="top">
     <Logo /><span className="name">AfterWard</span>
-    {clock && <span className="clock">{day} &nbsp;<b>{time}</b></span>}
+    {patient && <span className="patient"><Icon name="family" size={18} stroke={2} />Patient: <b>{patient}</b></span>}
+    {/* The demo runs on a fixed clock; the label says so. */}
+    {clock && <span className="clock" title="The demo always runs at this time"><span className="demo-time">Demo time</span>{day} &nbsp;<b>{time}</b></span>}
     <span className="spacer" />
     {onDev && <button type="button" className={`dev${dev ? ' on' : ''}`} onClick={onDev} aria-pressed={dev}>Developer view <i /></button>}
     <span className="sim">Simulated Alexa+</span>
@@ -39,7 +42,7 @@ export function StartScreen({ onUpload, onOpen, busy }: { onUpload: (file: File)
       <h2 style={{ fontSize: 58, lineHeight: 1.08, maxWidth: 960 }}>Discharge is one moment.<br />Recovery happens every day.</h2>
       <p className="vision">No one should have to remember their recovery alone.</p>
       <p className="lead" style={{ fontSize: 18, maxWidth: 640, lineHeight: 1.45 }}>
-        Signed in as Margaret Ellis, a synthetic demo patient. Upload a discharge letter to build today&apos;s plan.</p>
+        Signed in as a synthetic demo patient. Upload any discharge letter to build today&apos;s plan.</p>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginTop: 8 }}>
         <label className="btn primary" style={{ cursor: busy ? 'default' : 'pointer' }}>
           <Icon name="upload" size={22} stroke={2.2} />{busy ? 'Uploading…' : 'Upload a discharge letter'}
@@ -69,10 +72,10 @@ export function BuildScreen({ step, plan, onOpen }: { step: 1 | 2 | 3; plan: Pla
   };
   const lines = [100, 84, 92, 100, 76, 90, 96, 70].map((w, i) => <div key={i} className="ln" style={{ width: `${w}%` }} />);
   return <Screen id="s01">
-    <TopBar />
+    <TopBar patient={plan?.firstName} />
     <div className="stage">
       <div className="panel letterside">
-        <div className="eyebrow" style={{ marginBottom: 10 }}>Her discharge letter</div>
+        <div className="eyebrow" style={{ marginBottom: 10 }}>{letterTitle(plan?.firstName)}</div>
         <div className="paper sm"><div className="banner">Synthetic document · Not a real patient</div>
           <div className="in letterlist">
             <h4>Discharge letter and recovery instructions</h4>
@@ -110,7 +113,7 @@ export function BuildScreen({ step, plan, onOpen }: { step: 1 | 2 | 3; plan: Pla
         </div>}
       </div>
     </div>
-    {step === 3 && <div className="caption"><span>Built from her discharge letter. Nobody typed this in.</span></div>}
+    {step === 3 && <div className="caption"><span>Built from {plan?.firstName ? `${plan.firstName}'s` : 'the'} discharge letter. Nobody typed this in.</span></div>}
   </Screen>;
 }
 
@@ -185,7 +188,7 @@ export function HelpCard({ actions, onDismiss, compact }: { actions: HelpAction[
 
 export function TodayPanel(props: {
   items: PlanItem[]; justDone: PlanItem | null; reminderItemId: string | null; clock: string;
-  dayAtHome: number | null; compact?: boolean; busy?: boolean; onDone?: (i: PlanItem) => void;
+  dayAtHome: number | null; firstName?: string | null; compact?: boolean; busy?: boolean; onDone?: (i: PlanItem) => void;
   empty?: boolean; onStart?: () => void;
   help?: HelpAction[] | null; helpCompact?: boolean; onDismissHelp?: () => void;
   focus?: string[]; hint?: string | null;
@@ -207,7 +210,7 @@ export function TodayPanel(props: {
   const doneCount = items.filter(i => i.done).length;
   return <div className={`panel grow${props.compact ? ' compact' : ''}`}>
     <div className="th">
-      <div><div className="eyebrow">{props.dayAtHome ? `Day ${props.dayAtHome} at home` : 'At home'}</div><h2>Today</h2></div>
+      <div><div className="eyebrow">{[props.firstName, props.dayAtHome ? `Day ${props.dayAtHome} at home` : 'At home'].filter(Boolean).join(' · ')}</div><h2>Today</h2></div>
       <Ring done={doneCount} total={items.length} />
     </div>
     {/* Everything under the heading scrolls inside the panel instead of running off the screen */}
@@ -273,8 +276,9 @@ function LetterBody({ blocks, flag }: { blocks: LetterBlock[]; flag?: string | n
   return <>{out}</>;
 }
 
-export function LetterPanel({ source, onBack, help, onDismissHelp }: {
+export function LetterPanel({ source, onBack, help, onDismissHelp, firstName }: {
   source: NonNullable<Source>; onBack: () => void; help?: HelpAction[] | null; onDismissHelp?: () => void;
+  firstName?: string | null;
 }) {
   const blocks = letterBlocks(source);
   // A list of several rows (the medicines) is set smaller, so every row and the marked one fit without scrolling.
@@ -284,7 +288,7 @@ export function LetterPanel({ source, onBack, help, onDismissHelp }: {
     <header className="letter-heading">
       <div className="letter-heading-icon"><Icon name="doc" size={25} /></div>
       <div className="letter-heading-copy">
-        <div className="eyebrow rose">From your discharge letter</div>
+        <div className="eyebrow rose">From {firstName ? `${firstName}'s` : 'your'} discharge letter</div>
         <h2>{source.section || 'Your letter, in its own words'}</h2>
       </div>
       {source.page && <span className="letter-page">Page {source.page}</span>}
@@ -330,7 +334,7 @@ const RINGS = <div className="ringbox"><svg className="rings" width="520" height
 
 export function VoicePanel(props: {
   head: string; turns: Turn[]; chips: { kind: string; icon: string; text: string }[];
-  speaking: boolean; listening: boolean; busy: boolean; canListen: boolean; typing: boolean;
+  speaking: boolean; listening: boolean; hearing?: string; busy: boolean; canListen: boolean; typing: boolean;
   onMic: () => void; onSend: (text: string) => void; onToggleTyping: () => void;
 }) {
   // Show her last question and the answer. Keep the reminder on screen for the first reply to it.
@@ -343,7 +347,8 @@ export function VoicePanel(props: {
     if (input.value.trim()) { props.onSend(input.value.trim()); input.value = ''; }
   };
   const state = props.busy ? ['Thinking', 'AfterWard is checking her plan.']
-    : props.listening ? ['Listening', 'Speak now.']
+    : props.listening
+      ? ['Listening', props.hearing ? 'Tap the microphone when you have finished.' : 'Speak now. Take your time.']
     : props.speaking ? ['Speaking', 'The same words are on screen.']
     : ['Listening', props.canListen ? 'Tap the microphone, tap Mark as done, or type.' : 'Type below. This browser cannot listen.'];
   return <div className={`panel voice${props.speaking ? ' speaking' : ''}`} aria-live="polite">
@@ -353,7 +358,10 @@ export function VoicePanel(props: {
       {shown.map((t, i) => t.who === 'you'
         ? <div key={i} className="turn you"><small>You said</small><p>&ldquo;{t.text}&rdquo;</p></div>
         : <div key={i} className={`turn aw${i === lastAw ? '' : ' past'}${t.text.length > 150 ? ' long' : ''}`}><small>AfterWard</small><p>{t.text}</p></div>)}
-      {props.chips.length > 0 && <div className="proof">{props.chips.map(c =>
+      {/* Her words in the bubble while she is still speaking, so they appear at once. */}
+      {props.listening && props.hearing &&
+        <div className="turn you live"><small>You&rsquo;re saying</small><p>&ldquo;{props.hearing}&hellip;&rdquo;</p></div>}
+      {!props.listening && props.chips.length > 0 && <div className="proof">{props.chips.map(c =>
         <span key={c.text} className={`pchip ${c.kind}`}><Icon name={c.icon} size={16} stroke={2.3} />{c.text}</span>)}</div>}
     </div>
     <div className="grow" />
@@ -362,7 +370,7 @@ export function VoicePanel(props: {
       <button type="submit" disabled={props.busy}>Send</button></form>}
     <div className="listen">
       <button type="button" className="micbtn" onClick={props.onMic} disabled={props.busy || !props.canListen}
-        aria-label={props.listening ? 'Listening' : 'Talk to AfterWard'}><Icon name="mic" size={26} stroke={2} /></button>
+        aria-label={props.listening ? 'Finish speaking' : 'Talk to AfterWard'}><Icon name="mic" size={26} stroke={2} /></button>
       <div className="h"><b>{state[0]}</b>{state[1]}</div>
       {props.speaking && !props.busy ? <span className="wave">{WAVE.map((h, i) => <i key={i} style={{ height: h }} />)}</span>
         : props.canListen && <button type="button" className="typelink" onClick={props.onToggleTyping}>{props.typing ? 'Hide' : 'Type'}</button>}
@@ -386,7 +394,7 @@ export function ConversationLog({ turns }: { turns: Turn[] }) {
   const list = useFollowNewest(turns.length);
   return <div className="panel" style={{ width: 384, flex: 'none', padding: '20px 20px' }}>
     <div className="eyebrow" style={{ marginBottom: 12 }}>Conversation</div>
-    <div className="legend">Margaret on the right, AfterWard on the left</div>
+    <div className="legend">The patient on the right, AfterWard on the left</div>
     <div className="msgs" ref={list} tabIndex={0} role="log" aria-label="The whole conversation">{turns.map((t, i) =>
       <div key={i} className={`msg ${t.who === 'you' ? 'me' : 'aw'}`}>{t.text}</div>)}</div>
   </div>;

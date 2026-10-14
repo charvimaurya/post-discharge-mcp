@@ -18,11 +18,14 @@ One JSON object per line, on stdout:
 
 The module decides, not the caller.
 
-- Only these field names are kept: `event`, `request_id`, `session_id_hash`, `patient_id`, `route`,
+- Only these field names are kept: `event`, `request_id`, `session_id_hash`, `patient_id_hash`, `route`,
   `status`, `ms`, `tool`, `kind`, `reason`, `model`, `tool_calls`, `tokens_in`, `tokens_out`,
   `document_id`, `stage`, `item_count`, `needs_confirmation_count`, `checkin_type`, `error_type`,
   `error_code`, and the five metric names below.
 - Any other field is dropped. The line then carries `dropped_fields` with the number dropped.
+- Session and patient ids are never logged as they are. `session_id_hash` and `patient_id_hash` are the
+  first 12 characters of the SHA-256 of the id, so one patient's or session's lines can be grouped, and
+  a known id can be looked up by hashing it, without the id appearing in the logs.
 - A kept value must be a number, true/false, or a short code with no spaces (an ID, a route, a
   reason code). A sentence under an allowed name is dropped too.
 - Errors are logged by type only (`ValueError`, or `ClientError` with its AWS error code). An

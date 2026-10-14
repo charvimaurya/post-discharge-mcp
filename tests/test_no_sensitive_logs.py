@@ -18,7 +18,7 @@ from app import web_bridge
 from app.agent import service
 from app.ingestion import bedrock
 from app.mcp import server as mcp_server
-from app.observability.log import ALLOWED_FIELDS, METRICS
+from app.observability.log import ALLOWED_FIELDS, METRICS, hash_patient
 from lambdas.document_processor import handler as document_handler
 from tests.conftest import log_lines
 
@@ -241,6 +241,11 @@ def test_full_upload_logs_no_content(monkeypatch, caplog, capsys):
 
     assert stages == ["received", "downloaded", "extracted", "checked", "saved", "indexed", "ready"]
     assert {line["request_id"] for line in lines} == {"msg-0123456789"}
+    # The patient is logged as a hash only, never as the id itself.
+    received = next(line for line in lines if line.get("stage") == "received")
+    assert received["patient_id_hash"] == hash_patient("demo_patient_001")
+    assert all("patient_id" not in line for line in lines)
+    assert "demo_patient_001" not in json.dumps(lines)
     ready = lines[-1]
     assert ready["event"] == "ingest_ready" and ready["document_id"] == "ui_44cf2b4c767a0f0e"
     assert ready["item_count"] == 2 and isinstance(ready["needs_confirmation_count"], int)

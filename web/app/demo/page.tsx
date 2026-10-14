@@ -21,7 +21,7 @@ import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
 import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, splitClock, str,
   type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
-import { canListen, listenOnce, speak } from '../../lib/voice';
+import { canListen, finishListening, listenOnce, speak } from '../../lib/voice';
 import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
 import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPanel, ToolPanel, TopBar, VoicePanel, type Turn } from './parts';
 
@@ -69,7 +69,7 @@ export default function DemoPage() {
   const [dischargeDate, setDischargeDate] = useState<string | null>(null);
 
   // Today and the conversation
-  const [today, setToday] = useState<Today>({ clockLabel: '', openingGreeting: '', date: null, dischargeDate: null, items: [], pendingCheckin: null });
+  const [today, setToday] = useState<Today>({ clockLabel: '', firstName: null, openingGreeting: '', date: null, dischargeDate: null, items: [], pendingCheckin: null });
   const [todayLoaded, setTodayLoaded] = useState(false);
   const [openingCheckComplete, setOpeningCheckComplete] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -91,6 +91,8 @@ export default function DemoPage() {
   const [justDone, setJustDone] = useState<PlanItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
+  // Her words so far while the microphone is on, shown as she speaks.
+  const [hearing, setHearing] = useState('');
   const [speaking, setSpeaking] = useState(false);
   const [typing, setTyping] = useState(false);
   const [dev, setDev] = useState(false);
@@ -241,6 +243,17 @@ export default function DemoPage() {
       setRequestId(reply.requestId);
       setSource(reply.source);
       if (reply.help) { setHelp(reply.help); setHelpCompact(false); } else setHelpCompact(true);
+      const letterChip = reply.source
+        ? [{ kind: '', icon: 'doc', text: `From your letter${reply.source.page ? `, page ${reply.source.page}` : ''}` }]
+        : [];
+      setChips(letterChip);
+      // After the first reply to a reminder the header says "spoke first"; after that, just "AfterWard".
+      setHead(h => (h.startsWith('AfterWard speaks first') ? h.replace('speaks', 'spoke') : 'AfterWard'));
+      // The answer is shown and spoken at once. Refreshing the plan (ticks, highlights, the
+      // "Saved" chip) follows alongside, instead of holding the answer back for it.
+      setTurns(t => [...t, { who: 'aw', text: reply.text || 'Sorry, I could not answer that.' }]);
+      setBusy(false);
+      const speaking = say(reply.text);
       const after = await loadToday();
       const named = after ? itemsMentioned(reply.text, after.items) : [];
       setFocus(named);
@@ -250,15 +263,10 @@ export default function DemoPage() {
       // Only claim a save when a report_* tool really succeeded in this reply.
       const newlyDone = reply.saved ? after?.items.find(i => i.done && !before.has(i.id)) || null : null;
       setJustDone(newlyDone);
-      const nextChips: typeof chips = [];
-      if (newlyDone) nextChips.push({ kind: 'ok', icon: 'check', text: `Saved to your plan${newlyDone.doneAt ? ` at ${localTime(newlyDone.doneAt)}` : ''}` });
-      if (reply.source) nextChips.push({ kind: '', icon: 'doc', text: `From your letter${reply.source.page ? `, page ${reply.source.page}` : ''}` });
-      setChips(nextChips);
-      // After the first reply to a reminder the header says "spoke first"; after that, just "AfterWard".
-      setHead(h => (h.startsWith('AfterWard speaks first') ? h.replace('speaks', 'spoke') : 'AfterWard'));
-      setTurns(t => [...t, { who: 'aw', text: reply.text || 'Sorry, I could not answer that.' }]);
-      setBusy(false);
-      await say(reply.text);
+      if (newlyDone) {
+        setChips([{ kind: 'ok', icon: 'check', text: `Saved to your plan${newlyDone.doneAt ? ` at ${localTime(newlyDone.doneAt)}` : ''}` }, ...letterChip]);
+      }
+      await speaking;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'AfterWard could not answer just now.');
       setBusy(false);
@@ -266,15 +274,20 @@ export default function DemoPage() {
   }
 
   async function mic() {
-    if (busy || listening) return;
+    if (busy) return;
+    // A second tap while listening means she has finished: send what was heard now.
+    if (listening) { finishListening(); return; }
     window.speechSynthesis?.cancel();
     setListening(true);
+    setHearing('');
     try {
-      const heard = await listenOnce();
+      const heard = await listenOnce(setHearing);
       setListening(false);
+      setHearing('');
       if (heard) await send(heard);
     } catch (e) {
       setListening(false);
+      setHearing('');
       setError(e instanceof Error ? e.message : 'The microphone did not work. Please type instead.');
       setTyping(true);
     }
@@ -311,9 +324,9 @@ export default function DemoPage() {
 
   const reminderItemId = today.pendingCheckin?.itemId || null;
   const leftPanel = source
-    ? <LetterPanel source={source} onBack={() => setSource(null)} help={help} onDismissHelp={() => setHelp(null)} />
+    ? <LetterPanel source={source} firstName={today.firstName} onBack={() => setSource(null)} help={help} onDismissHelp={() => setHelp(null)} />
     : <TodayPanel items={today.items} justDone={justDone} reminderItemId={reminderItemId} clock={today.clockLabel}
-        dayAtHome={dayAtHome} compact={dev} busy={busy} onDone={tapDone}
+        dayAtHome={dayAtHome} firstName={today.firstName} compact={dev} busy={busy} onDone={tapDone}
         empty={todayLoaded && today.items.length === 0} onStart={backToStart}
         help={help} helpCompact={helpCompact} onDismissHelp={() => setHelp(null)} focus={focus} hint={nextHint} />;
 
@@ -321,12 +334,12 @@ export default function DemoPage() {
   if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;
   else if (view === 'build') screen = <BuildScreen step={buildStep} plan={plan} onOpen={openToday} />;
   else screen = <Screen id="app">
-    <TopBar clock={today.clockLabel} dev={dev} onDev={() => setDev(d => !d)} />
+    <TopBar clock={today.clockLabel} patient={today.firstName} dev={dev} onDev={() => setDev(d => !d)} />
     <div className="stage">
       {dev && <ConversationLog turns={turns} />}
       {leftPanel}
       {dev ? <ToolPanel calls={calls} requestId={requestId} />
-        : <VoicePanel head={head} turns={turns} chips={chips} speaking={speaking} listening={listening} busy={busy}
+        : <VoicePanel head={head} turns={turns} chips={chips} speaking={speaking} listening={listening} hearing={hearing} busy={busy}
             canListen={micOk} typing={typing} onMic={mic} onSend={send} onToggleTyping={() => setTyping(t => !t)} />}
     </div>
     {reminderNote && !dev && !source &&

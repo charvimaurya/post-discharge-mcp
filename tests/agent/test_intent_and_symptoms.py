@@ -332,9 +332,9 @@ def test_every_saved_report_is_followed_by_the_next_step(agent):
     finally:
         service.call_mcp_tool = inner
 
-    assert "Next is your blood thinner" in asked
-    assert "Next is your blood thinner" in first
-    assert "done" in second and "Next is your blood thinner" in second
+    assert "Next is 1 tablet of your blood thinner" in asked
+    assert "Next is 1 tablet of your blood thinner" in first
+    assert "done" in second and "Next is 1 tablet of your blood thinner" in second
 
 
 @pytest.mark.parametrize("message, wording", [

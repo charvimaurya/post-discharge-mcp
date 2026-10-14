@@ -136,7 +136,7 @@ def test_a_plain_yes_saves_both(margaret, answer):
     assert writes == [("report_medication_taken", "para#2026-10-23#1"), ("report_medication_taken", "apix#2026-10-23#1")]
     assert result["response"] == (
         "Thank you, Margaret. I've marked your paracetamol, 2 tablets, and your blood thinner, 1 tablet, as taken. "
-        "Next is your paracetamol, at midday."
+        "Next is 2 tablets of your paracetamol, at midday."
     )
 
 
@@ -270,3 +270,56 @@ def test_undo_keeps_history_and_the_dose_can_be_saved_again(monkeypatch):
     assert again["already_completed"] is False
     assert status() == "completed"
     assert len(events) == 3 and events[-1]["idempotency_key"].endswith("#r1")
+
+
+# ---------- "I have taken both the medicine", said straight out, with no question waiting ----------
+
+BOTH_SAVED = [("report_medication_taken", "para#2026-10-23#1"), ("report_medication_taken", "apix#2026-10-23#1")]
+
+
+@pytest.mark.parametrize("message", [
+    "I have taken both the medicine",
+    "I've taken both my medicines",
+    "I have taken all my tablets",
+    "I've taken all the medicine",
+])
+def test_saying_both_or_all_records_every_medicine_due_without_asking_which(margaret, message):
+    result, writes = margaret.say(message, fresh=True)
+
+    assert writes == BOTH_SAVED, result["response"]
+    assert "Which one" not in result["response"]
+    assert result["response"].startswith("Thank you, Margaret. I've marked your paracetamol, 2 tablets, and your blood thinner, 1 tablet, as taken.")
+
+
+def test_a_vague_medicine_without_both_still_asks_which(margaret):
+    result, writes = margaret.say("I have taken my medicine", fresh=True)
+
+    assert writes == []
+    assert "paracetamol" in result["response"] and "blood thinner" in result["response"]
+
+
+def test_both_with_a_count_still_asks_rather_than_guessing(margaret):
+    # "One tablet" cannot be both full doses: never saved on a guess.
+    _, writes = margaret.say("I have taken one tablet of both", fresh=True)
+
+    assert writes == []
+
+
+# ---------- A one-word "both", as speech recognition hears it ----------
+
+@pytest.mark.parametrize("heard", ["both", "Both.", "boat", "Bolt.", "booth", "both please"])
+def test_a_one_word_both_answers_the_which_question_even_when_misheard(margaret, heard):
+    question, _ = margaret.say("have taken my medicines", fresh=True)
+    assert question["response"].endswith("or both?")
+
+    result, writes = margaret.say(heard)
+
+    assert writes == BOTH_SAVED, result["response"]
+
+
+def test_sounds_like_both_is_only_a_lone_word():
+    from app.agent.safety import sounds_like_both
+
+    assert sounds_like_both("Boat.") and sounds_like_both("both of them")
+    assert not sounds_like_both("I took the boat to town")
+    assert not sounds_like_both("bought it yesterday")

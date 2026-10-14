@@ -115,6 +115,12 @@ def expected_write_tool(message: str) -> str | None:
         "did my",
         "i've done",
         "i have done",
+        # "Thanks Alexa, I am done with my walk": a report, not a thank-you to the reminder.
+        "done with my",
+        "done with the",
+        "i'm done",
+        "i am done",
+        "all done",
     ]
 
     if any(term in text for term in medication_terms):
@@ -407,6 +413,18 @@ _MISSED_DOSE_WORDS = re.compile(
     r"\b(miss(ed|ing)? (a |my |the )?(dose|tablet)|missed it|forgot|forget|forgotten|double|"
     r"two doses|take two|two tablets|extra (dose|tablet)|catch up|too late)\b"
 )
+
+
+# What speech recognition makes of a lone "both" (heard in testing, or close to it).
+_SOUNDS_LIKE_BOTH = {"both", "boat", "boats", "bolt", "booth", "boath", "bowth", "bothe", "bot", "both of them", "both please"}
+
+
+def sounds_like_both(message: str) -> bool:
+    """A one-word reply that is, or sounds like, "both". Only used while a question offers "both"."""
+
+    words = re.sub(r"[^a-z ]", "", _plain(message)).strip()
+
+    return " ".join(words.split()) in _SOUNDS_LIKE_BOTH
 
 
 def is_affirmative(message: str) -> bool:

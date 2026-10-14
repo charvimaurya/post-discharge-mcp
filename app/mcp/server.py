@@ -1,3 +1,4 @@
+import asyncio
 import functools
 
 from mcp.server.mcpserver import MCPServer
@@ -11,6 +12,10 @@ from app.mcp.context import (
 )
 
 from app.observability.log import Timer, service_log
+
+# Every tool's work (DynamoDB, S3 Vectors, Bedrock embeddings) is blocking boto3 code.
+# It runs in a worker thread via asyncio.to_thread, so one slow read never holds up the
+# server's other requests: the agent's reads and the screen's refreshes run side by side.
 
 from app.mcp.tools.actions import (
     report_medication_taken_for_context,
@@ -99,7 +104,8 @@ def logged_tool(kind: str):
 async def get_recovery_plan() -> dict:
     context = get_current_patient_context()
 
-    return get_recovery_plan_for_context(
+    return await asyncio.to_thread(
+        get_recovery_plan_for_context,
         context
     )
 
@@ -125,7 +131,8 @@ async def get_recovery_plan() -> dict:
 async def get_today_tasks() -> dict:
     context = get_current_patient_context()
 
-    return get_today_tasks_for_context(
+    return await asyncio.to_thread(
+        get_today_tasks_for_context,
         context
     )
 
@@ -148,7 +155,8 @@ async def get_medications() -> dict:
 
     context = get_current_patient_context()
 
-    return get_medications_for_context(
+    return await asyncio.to_thread(
+        get_medications_for_context,
         context
     )
 
@@ -174,7 +182,8 @@ async def search_discharge_instructions(
 
     context = get_current_patient_context()
 
-    return search_discharge_instructions_for_context(
+    return await asyncio.to_thread(
+        search_discharge_instructions_for_context,
         context,
         query,
     )
@@ -202,7 +211,8 @@ async def report_task_completed(
 
     context = get_current_patient_context()
 
-    return report_task_completed_for_context(
+    return await asyncio.to_thread(
+        report_task_completed_for_context,
         context,
         occurrence_id,
     )
@@ -231,7 +241,8 @@ async def report_medication_taken(
 
     context = get_current_patient_context()
 
-    return report_medication_taken_for_context(
+    return await asyncio.to_thread(
+        report_medication_taken_for_context,
         context,
         occurrence_id,
     )
@@ -259,7 +270,8 @@ async def undo_report(
 
     context = get_current_patient_context()
 
-    return undo_report_for_context(
+    return await asyncio.to_thread(
+        undo_report_for_context,
         context,
         occurrence_id,
     )

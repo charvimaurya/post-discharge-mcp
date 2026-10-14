@@ -1,5 +1,6 @@
 """After a completion, and for "what's next?", AfterWard names what is next across tasks AND medicines."""
 
+import re
 import asyncio
 from datetime import datetime
 from types import SimpleNamespace
@@ -153,9 +154,10 @@ def margaret(monkeypatch):
 
 
 def _no_list(reply):
-    """One step: no digits, no counts, no offer to read a list."""
+    """One step: no counts, no offer to read a list. A medicine's dose ("2 tablets of") is not a count."""
 
-    assert not any(ch.isdigit() for ch in reply), reply
+    without_doses = re.sub(r"\b\d+ tablets? of\b", "", reply)
+    assert not any(ch.isdigit() for ch in without_doses), reply
     assert "more things" not in reply and "read them" not in reply and "more thing" not in reply
 
 
@@ -166,7 +168,7 @@ def test_back_from_walk_names_only_the_after_breakfast_medicines(margaret):
     assert writes == ["walk#1"]
     assert reply == (
         "Well done, Margaret, that's your morning walk done. "
-        "Next is your paracetamol and blood thinner, after breakfast."
+        "Next is 2 tablets of your paracetamol and 1 tablet of your blood thinner, after breakfast."
     )
     _no_list(reply)
     assert [t["tool"] for t in result["tool_trace"]][-1] == "next_up"
@@ -179,7 +181,7 @@ def test_and_after_that_moves_one_step_each_time(margaret):
     second = margaret.say("what's after that?", "08:15", session="steps", keep_history=True)[0]["response"]
 
     assert first == "After that, your knee exercises this morning."
-    assert second == "After that, your paracetamol, at midday."
+    assert second == "After that, 2 tablets of your paracetamol, at midday."
     _no_list(first)
 
 
@@ -191,7 +193,7 @@ def test_a_new_completion_resets_the_pointer(margaret):
     after = margaret.say("and after that?", "08:20", session="reset", keep_history=True)[0]["response"]
 
     # The step named after the exercises was the breakfast medicines; one on from there is midday.
-    assert after == "After that, your paracetamol, at midday."
+    assert after == "After that, 2 tablets of your paracetamol, at midday."
 
 
 def test_whats_next_names_only_the_next_step(margaret):
@@ -199,7 +201,7 @@ def test_whats_next_names_only_the_next_step(margaret):
 
     reply = margaret.say("What's next?", "08:15")[0]["response"]
 
-    assert reply == "Next is your paracetamol and blood thinner, after breakfast."
+    assert reply == "Next is 2 tablets of your paracetamol and 1 tablet of your blood thinner, after breakfast."
 
 
 def test_at_1240_with_the_morning_done_the_midday_medicine_is_next(margaret):
@@ -209,7 +211,7 @@ def test_at_1240_with_the_morning_done_the_midday_medicine_is_next(margaret):
 
     result, _ = margaret.say("What do I need to do now?", "12:40")
 
-    assert result["response"] == "Next is your paracetamol, after lunch."
+    assert result["response"] == "Next is 2 tablets of your paracetamol, after lunch."
 
 
 def test_taken_medicines_and_as_needed_ones_are_never_named(margaret):
@@ -218,7 +220,7 @@ def test_taken_medicines_and_as_needed_ones_are_never_named(margaret):
 
     reply = margaret.say("What's next?", "08:15")[0]["response"]
 
-    assert reply == "Next is your blood thinner, after breakfast."
+    assert reply == "Next is 1 tablet of your blood thinner, after breakfast."
     assert "codeine" not in reply.lower()
 
 

@@ -96,6 +96,8 @@ def test_tasks_medications_and_clock_pass_through_unchanged(bridge):
     # Each item gains its place in the day; nothing else changes.
     assert body == {
         "clock_label": "Friday 23 October, 07:00",
+        # This test patient's record has no first name.
+        "first_name": None,
         # 07:00: the 07:30 walk is inside its reminder window, so the greeting names it (same as the reminder).
         "opening_greeting": "Good morning. I hope you slept well. Next is your morning walk at half past seven. You can start getting ready.",
         "date": "2026-10-23",

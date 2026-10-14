@@ -18,6 +18,20 @@ def load_extraction_schema() -> dict:
 
 EXTRACTION_SCHEMA = load_extraction_schema()
 
+# The task kinds the schema allows. "other" is its default.
+TASK_KINDS = set(
+    EXTRACTION_SCHEMA["properties"]["tasks"]["items"]["properties"]["kind"]["enum"]
+)
+
+
+def _default_unknown_task_kinds(extracted: dict) -> None:
+    """A task kind is only a label, so an unlisted one (e.g. "activity") becomes
+    "other" instead of failing the whole letter. Every other field stays strict."""
+
+    for task in extracted.get("tasks") or []:
+        if isinstance(task, dict) and task.get("kind") not in TASK_KINDS | {None}:
+            task["kind"] = "other"
+
 
 PROMPT_CONSTRAINT = """You extract structured recovery information from hospital
 discharge documents.
@@ -167,6 +181,7 @@ def invoke_extraction_model(document_text: str) -> dict:
     for block in resp["output"]["message"]["content"]:
         if "toolUse" in block:
             extracted = block["toolUse"]["input"]
+            _default_unknown_task_kinds(extracted)
             try:
                 validate(instance=extracted, schema=EXTRACTION_SCHEMA)
             except ValidationError as exc:

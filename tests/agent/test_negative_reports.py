@@ -158,7 +158,7 @@ def test_paracetamol_at_0750_records_the_morning_dose_only(chat):
     assert writes == ["med_para#2026-10-23#1"]
     assert result["response"].startswith(
         "Thank you, Margaret, I've marked your morning paracetamol, 2 tablets, as taken. "
-        "Next is your blood thinner, this morning."
+        "Next is 1 tablet of your blood thinner, this morning."
     )
 
 

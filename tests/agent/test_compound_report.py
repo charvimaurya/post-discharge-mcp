@@ -83,7 +83,7 @@ def test_walk_and_paracetamol_are_both_recorded_and_both_named(agent):
     assert reply["response"] == (
         "Well done, Margaret, that's your morning walk done. "
         "I've also marked your morning paracetamol, 2 tablets, as taken. "
-        "Next is your blood thinner, after breakfast."
+        "Next is 1 tablet of your blood thinner, after breakfast."
     )
     assert agent.model_calls == 0
 
