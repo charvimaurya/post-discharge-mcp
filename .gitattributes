@@ -1,0 +1,5 @@
+# Never change line endings in documents and images.
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
