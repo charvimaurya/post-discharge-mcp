@@ -2,6 +2,10 @@
 
 A living recovery plan for Alexa+.
 
+> **Medical disclaimer:** AfterWard is a hackathon prototype. It does not give medical advice and does not replace your care team.
+
+People leave hospital with a long discharge letter and struggle to remember what to do and when.
+
 ## What it does
 
 AfterWard turns a discharge letter into a daily plan for medicines, tasks, appointments, and warning signs.
@@ -10,7 +14,7 @@ AWS stores the plan and progress, while reminder checks bring up the next action
 
 ## Demo video
 
-[Watch the demo video](https://example.com/afterward-demo-video) (placeholder).
+[TODO: add demo video link]
 
 ## Architecture
 
@@ -28,19 +32,17 @@ See [architecture details](docs/architecture.md).
 
 ## How judges can test
 
-[Open the public demo](https://example.com/afterward-demo) (placeholder).
+The quickest way to try AfterWard is the public demo: [TODO: add public demo link]. Running it locally needs your own AWS resources (see Local setup below).
 
 For a local demo, follow the setup below, then open [http://127.0.0.1:3000/demo](http://127.0.0.1:3000/demo).
 
-1. Upload `test_data/doc_001.pdf`. Wait for the new plan to be ready.
-2. Open Today. Use **Mark as done** on a medicine or task. Each button reports that specific occurrence through the agent and MCP tools.
+1. Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v3.pdf`. Wait for the new plan to be ready.
+2. Open Today. Press **Mark as done** on a medicine or task. Each button saves that item as done.
 3. Check the Done-first display. Completed items appear above Next up. The item just completed appears beside the next action.
 4. Ask about a medicine or food. Letter-backed answers show an evidence quote-card with a page reference. Food answers cite the letter when it contains relevant diet advice.
 5. Check the highlighted wording for the discussed item. When the passage refers to an appointment, its wording appears with the evidence too. Use **Back to today** to return.
 6. Open **Developer view** to inspect the conversation and MCP tool calls.
-7. Upload a replacement letter. It asks the bridge to clear the previous plan's saved event history. If that reset fails, the upload response returns `history_cleared=false` and the web server logs the failure. The current page does not clear its conversation on upload; reload to start a fresh conversation.
-
-**13 October update check:** Today completion buttons, Done-first display, evidence quotes, related appointment wording, food citations, and highlighted letter wording exist in this checkout. The requested **Get help strip** is not present. Developer view currently shows the latest eight messages, so **full Developer-view conversation history** is still pending.
+7. Upload `test_data/letter3_priya_asthma_age30_SYNTHETIC.pdf`. AfterWard builds a new plan from it.
 
 Voice input depends on browser support and microphone permission. Text input is available too.
 
@@ -56,7 +58,7 @@ Use your normal AWS credential chain. If using a named profile, set `AWS_PROFILE
 | Python bridge | `http://127.0.0.1:8002` |
 | Web app | `http://127.0.0.1:3000/demo` |
 
-The MCP port is selected by the startup command. Use 8001 for this local setup. The old README command used 8000. The bridge script defaults to 8002.
+The MCP server port comes from the startup command below. Use 8001 for local setup. The bridge uses port 8002.
 
 ### macOS
 
@@ -67,8 +69,7 @@ git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-A
 cd AfterWard-A-Living-Recovery-Plan-for-Alexa
 python3.11 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m pip install uvicorn pytest tzdata
+python -m pip install -r requirements-dev.txt
 cp .env.example .env
 cd web
 npm ci
@@ -76,7 +77,7 @@ cp .env.example .env.local
 cd ..
 ```
 
-Fill in `.env` and `web/.env.local` as described below. Add `MCP_URL=http://127.0.0.1:8001/mcp` to the root `.env`.
+Fill in `.env` and `web/.env.local` as described in Settings below.
 
 Terminal 1, from the repository root:
 
@@ -108,8 +109,7 @@ git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-A
 cd AfterWard-A-Living-Recovery-Plan-for-Alexa
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m pip install uvicorn pytest tzdata
+python -m pip install -r requirements-dev.txt
 Copy-Item .env.example .env
 cd web
 npm ci
@@ -117,7 +117,7 @@ Copy-Item .env.example .env.local
 cd ..
 ```
 
-Fill in `.env` and `web/.env.local` as described below. Add `MCP_URL=http://127.0.0.1:8001/mcp` to the root `.env`.
+Fill in `.env` and `web/.env.local` as described in Settings below.
 
 Terminal 1, from the repository root:
 
@@ -149,11 +149,10 @@ Root `.env.example`, copied to `.env`:
 | Setting | Meaning |
 | --- | --- |
 | `AWS_REGION` | AWS region for the Python services, normally `eu-west-2`. |
-| `MODEL_MODE` | `test` uses `TEST_MODEL_ID`; `final` uses separate extraction and agent model IDs. |
+| `MODEL_MODE` | `test` uses `TEST_MODEL_ID` for everything; `final` uses `FINAL_EXTRACTION_MODEL_ID` and `FINAL_AGENT_MODEL_ID`. |
 | `TEST_MODEL_ID` | Bedrock model or inference profile used for extraction and chat in test mode; must be filled in. |
 | `FINAL_EXTRACTION_MODEL_ID` | Bedrock extraction model used in final mode. |
-| `BEDROCK_EXTRACTION_MODEL_ID` | Legacy setting read by config but not used by the current extraction model selector. |
-| `AGENT_MODEL_ID` | Legacy setting read by config but not used by the current agent model selector. |
+| `FINAL_AGENT_MODEL_ID` | Bedrock model for the chat agent in final mode. |
 | `IMAGE_MODEL_ID` | Bedrock model for image transcription; needed for image scripts, not the PDF demo upload. |
 | `RECOVERY_STATE_TABLE` | DynamoDB table containing the current recovery plan. |
 | `EVENT_HISTORY_TABLE` | DynamoDB table containing completion events and other recorded history. |
@@ -168,11 +167,7 @@ Root `.env.example`, copied to `.env`:
 | `MCP_ALLOWED_ORIGINS` | Comma-separated origins accepted by the MCP transport. |
 | `CLOCK_MODE` | `real` uses current patient-local time; `demo` fixes time; `production` disables test hooks. |
 | `DEMO_FIXED_NOW` | ISO timestamp used only in demo clock mode. |
-
-Additional root settings needed by the current code:
-
-- `MCP_URL`: set to `http://127.0.0.1:8001/mcp` so the bridge reaches the local MCP server.
-- `FINAL_AGENT_MODEL_ID`: set a Bedrock agent model if using `MODEL_MODE=final`; this setting is missing from the example.
+| `MCP_URL` | Address the Python bridge uses to reach the MCP server. Keep `http://127.0.0.1:8001/mcp` for local setup. |
 
 Web `web/.env.example`, copied to `web/.env.local`:
 
@@ -182,12 +177,11 @@ Web `web/.env.example`, copied to `web/.env.local`:
 | `DOCUMENT_BUCKET` | Upload bucket; replace `<ACCOUNT_ID>` and match the Python configuration. |
 | `RECOVERY_STATE_TABLE` | Recovery table; match the Python configuration. |
 | `TEST_PATIENT_ID` | Synthetic demo patient ID; keep `demo_patient_001` for the supplied demo. |
-
-The web server defaults to bridge address `http://127.0.0.1:8002`. Optional `AGENT_API_URL` in `web/.env.local` overrides it.
+| `AGENT_API_URL` | Optional. Python bridge address; defaults to `http://127.0.0.1:8002`. |
 
 ## Load and reset the demo patient
 
-Upload `test_data/doc_001.pdf` through `/demo` first. This creates the recovery plan for `demo_patient_001`. The reset script does not upload or extract a letter and fails if no plan exists.
+Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v3.pdf` through `/demo` first. This creates the recovery plan for `demo_patient_001`. The reset script does not upload or extract a letter and fails if no plan exists.
 
 For a repeatable recording, set `CLOCK_MODE=demo` in the root `.env`. The supplied `DEMO_FIXED_NOW` is `2026-10-23T07:00:00+01:00`. Restart both Python services after changing settings.
 
@@ -210,6 +204,11 @@ npm test
 ```
 
 Default pytest discovery excludes live AWS integration tests. The web tests use Node's built-in TypeScript support. See [testing details](docs/testing.md).
+
+## Known limitations
+
+- Uploading a new letter replaces the plan, but the conversation on screen stays. Reload the page to start a fresh conversation.
+- If AfterWard cannot clear the old letter's saved history during a new upload, the upload still goes ahead. The upload reply then includes `history_cleared=false`, and the web server logs the error.
 
 ## Simulated Alexa+
 
