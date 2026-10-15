@@ -8,12 +8,13 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 import json
+from scripts.test_letters import DEFAULT_TEST_LETTER
 from app.ingestion.pdf_processor import extract_text
 from app.ingestion.bedrock import invoke_extraction_model
 from app.ingestion.pipeline import combine_pages
 
 # --- point this at your test PDF ---
-PDF_PATH = str(PROJECT_ROOT / "test_data" / "doc_001.pdf")   # <-- change to your actual PDF path
+PDF_PATH = str(DEFAULT_TEST_LETTER)
 
 # 1. Get page text from the PDF
 pages = extract_text(PDF_PATH)

@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.test_letters import DEFAULT_TEST_LETTER
 from app.aws.s3_service import upload_document
 from app.aws.sqs_service import (
     receive_messages,
@@ -29,7 +30,7 @@ def main():
     print("Uploading test file...")
 
     result = upload_document(
-        file_path=str(PROJECT_ROOT / "test_data" / "doc_001.pdf"),
+        file_path=str(DEFAULT_TEST_LETTER),
         patient_id=PATIENT_ID,
         document_id=document_id,
     )
