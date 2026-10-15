@@ -3,9 +3,10 @@
 from pathlib import Path
 
 from app.ingestion.pipeline import process_document
+from scripts.test_letters import DEFAULT_TEST_LETTER
 
 
-document_path = Path(__file__).parent / "test_data" / "doc_001.pdf"
+document_path = DEFAULT_TEST_LETTER
 recovery_plan = process_document(
     file_bytes=document_path.read_bytes(),
     filename=document_path.name,

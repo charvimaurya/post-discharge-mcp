@@ -133,7 +133,9 @@ configuration when imported. Never use dummy credentials for a live AWS test.
 python -m scripts.ingestion.test_extraction
 ```
 
-Reads `test_data/doc_001.pdf` and prints its text. No AWS calls.
+Reads the default test letter (`DEFAULT_TEST_LETTER` in `scripts/test_letters.py`,
+currently `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v3.pdf`) and
+prints its text. No AWS calls.
 The current sample has **2 pages**. You may see pypdf `startxref` warnings;
 the sample currently still extracts successfully.
 
@@ -603,7 +605,7 @@ After deployment, run the full-ingestion test from Step F.
 | What you see | What to check |
 |---|---|
 | `No module named app` | Run from the project root using the documented `python -m ...` command |
-| Missing PDF | The current file is `test_data/doc_001.pdf`, not `discharge.pdf` |
+| Missing PDF | Scripts read `DEFAULT_TEST_LETTER` from `scripts/test_letters.py`; check that file exists in `test_data/` |
 | S3 `NoSuchKey` | The object key hardcoded in that script may not exist in the bucket |
 | Bedrock `AccessDenied` | Check the AWS identity, model access/subscription, and permissions |
 | Empty or cut-off extraction | Inspect `BEDROCK_STOP_REASON` and `BEDROCK_USAGE` in logs |

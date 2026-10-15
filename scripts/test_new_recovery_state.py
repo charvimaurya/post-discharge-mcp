@@ -10,12 +10,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.test_letters import DEFAULT_TEST_LETTER
 from app.ingestion.pipeline import (
     process_document,
 )
 
 
-PDF_PATH = PROJECT_ROOT / "test_data" / "doc_001.pdf"
+PDF_PATH = DEFAULT_TEST_LETTER
 
 
 file_bytes = Path(
@@ -25,7 +26,7 @@ file_bytes = Path(
 
 state = process_document(
     file_bytes=file_bytes,
-    filename="doc_001.pdf",
+    filename=PDF_PATH.name,
     patient_id="demo_patient_001",
     document_id="new_schema_local_001",
 )

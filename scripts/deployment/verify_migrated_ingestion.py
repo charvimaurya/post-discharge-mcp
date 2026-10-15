@@ -1,10 +1,17 @@
 """Upload a synthetic fixture for an isolated patient and verify the new AWS path."""
 
 import json
+import sys
 import time
 from pathlib import Path
 
 import boto3
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.test_letters import DEFAULT_TEST_LETTER
 
 
 def main():
@@ -12,7 +19,7 @@ def main():
     patient = "migration_check_20261013"
     document = "afterward_name_migration"
     key = f"patients/{patient}/documents/{document}.pdf"
-    s.client("s3").upload_file(str(Path("test_data/doc_001.pdf")), "afterward-documents-992617582533-london", key, ExtraArgs={"ContentType": "application/pdf"})
+    s.client("s3").upload_file(str(DEFAULT_TEST_LETTER), "afterward-documents-992617582533-london", key, ExtraArgs={"ContentType": "application/pdf"})
     print("Uploaded synthetic fixture for an isolated migration-check patient", flush=True)
     table = s.resource("dynamodb").Table("PostDischargeRecoveryState")
     for attempt in range(90):
