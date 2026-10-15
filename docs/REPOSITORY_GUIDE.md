@@ -59,7 +59,7 @@ for this local setup. The old README used 8000, which was a different launch
 argument rather than a fixed server port.
 
 The upload flow uses live AWS services and needs the deployed document pipeline.
-Upload `test_data/doc_001.pdf`, wait for the new document to be ready, then open
+Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v3.pdf`, wait for the new document to be ready, then open
 Today. To reset progress in an existing demo plan:
 
 ```sh
@@ -79,14 +79,14 @@ cd AfterWard-A-Living-Recovery-Plan-for-Alexa
 
 Follow the [README](../README.md#local-setup) to create the virtual environment,
 install Python and web dependencies, and copy both environment examples.
-The root requirements include the AWS SDK. No second requirements file is
-needed for local startup. Install pytest separately as shown in the README.
+The root requirements include the AWS SDK and uvicorn. `requirements-dev.txt`
+adds pytest on top of them, as shown in the README.
 
 ### Add your settings
 
 See the [setting-by-setting reference](../README.md#settings). Fill in the AWS
-resource names and Bedrock model IDs. Set `MCP_URL` for the bridge. Final model
-mode also needs `FINAL_AGENT_MODEL_ID`, which is absent from the example.
+resource names and Bedrock model IDs. Keep the example `MCP_URL` for the bridge.
+Final model mode also needs `FINAL_AGENT_MODEL_ID`.
 Exported terminal settings take priority over the root `.env`.
 
 ### Check AWS access
@@ -438,7 +438,8 @@ Afterward/
 │   └── aws/
 │       └── test_sqs.py                 # Notification parsing; optional live queue test
 ├── test_data/                         # Synthetic documents used by manual checks
-│   ├── doc_001.pdf                     # Sample two-page discharge PDF
+│   ├── letter1_…letter4_*.pdf          # Four synthetic discharge letters
+│   ├── letter1_…, letter4_…_one_page.png # One-page image versions of letters 1 and 4
 │   ├── test_image1.jpeg                # Sample image for transcription
 │   └── test_image2.jpeg                # Additional image fixture
 ├── deployment/                        # Settings used when building/deploying Lambda
@@ -554,7 +555,7 @@ or upload a matching object before running them.
 | `tests/aws/test_sqs.py` | S3/SQS message parsing; optional live queue check |
 | `tests/rag/test_rag_chunking.py` | Chunking behavior |
 | `tests/sample_discharge.txt` | Supplemental text fixture |
-| `test_data/doc_001.pdf` | Fictional two-page discharge fixture |
+| `test_data/letter1_…` to `letter4_…` (`*_SYNTHETIC*.pdf`) | Four fictional discharge letters |
 | `test_data/test_image1.jpeg`, `test_image2.jpeg` | Image transcription fixtures |
 
 ### Deployment and documentation
