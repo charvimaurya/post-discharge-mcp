@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 from app.agent.occurrence_resolver import everyday_name, item_name, part_of_day
-from app.reminders.text import short_task_name, time_to_words
+from app.reminders.text import is_or_are, short_task_name, time_to_words
 
 
 _NUMBER_WORDS = {
@@ -256,7 +256,11 @@ def step_phrase(step: list[Any]) -> str:
 def next_step_sentence(steps: list[list[Any]]) -> str:
     """'Next is your paracetamol and blood thinner, after breakfast.'"""
 
-    return f"Next is {step_phrase(steps[0])}." if steps else "That's everything for today."
+    if not steps:
+        return "That's everything for today."
+    # One item names its own verb ("Next are your knee exercises"); a group keeps "is".
+    verb = is_or_are(steps[0][0].spoken) if len(steps[0]) == 1 else "is"
+    return f"Next {verb} {step_phrase(steps[0])}."
 
 
 def after_that_sentence(steps: list[list[Any]], index: int) -> str:

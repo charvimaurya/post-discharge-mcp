@@ -577,3 +577,6 @@
 .awapp .top .patient b{font-weight:800;color:#FFE3EA}
 .awapp .top .patient svg{color:#FFE3EA}
 .awapp .top .clock .demo-time{margin-right:10px;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.18);font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:#FFFFFF;vertical-align:2px}
+.awapp .voice .choices{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
+.awapp .voice .choice{padding:12px 22px;border-radius:999px;border:1.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.08);color:#FFFFFF;font:inherit;font-size:19px;font-weight:700;cursor:pointer}
+.awapp .voice .choice:hover,.awapp .voice .choice:focus-visible{background:#B3264F;border-color:#B3264F;outline:none}

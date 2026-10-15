@@ -176,3 +176,39 @@ def test_medications_error_result_is_not_shown_as_no_medicines(bridge, monkeypat
 
     assert response.status_code == 502
     assert "medications" not in response.json()
+
+
+# ---------- First greeting of the day, then "Welcome back" ----------
+
+def test_first_visit_today_says_good_morning(bridge):
+    body = bridge.client.get("/today").json()
+
+    assert body["opening_greeting"].startswith("Good morning. I hope you slept well.")
+
+
+def test_a_second_visit_today_says_welcome_back_without_slept_well(bridge):
+    bridge.state["greeted_on"] = "2026-10-23"
+
+    greeting = bridge.client.get("/today").json()["opening_greeting"]
+
+    assert greeting.startswith("Welcome back.")
+    assert "slept well" not in greeting and "Good morning" not in greeting
+    # Still names what is next.
+    assert "morning walk" in greeting
+
+
+def test_a_greeting_from_yesterday_is_a_new_good_morning(bridge):
+    bridge.state["greeted_on"] = "2026-10-22"
+
+    assert bridge.client.get("/today").json()["opening_greeting"].startswith("Good morning.")
+
+
+def test_greeted_records_the_patient_local_date(bridge, monkeypatch):
+    recorded = []
+    monkeypatch.setattr(web_bridge, "record_greeting", lambda patient, day: recorded.append((patient, day)))
+
+    response = bridge.client.post("/greeted", params={"patient_id": "someone_else", "day": "2030-01-01"})
+
+    assert response.status_code == 200
+    # 06:00 UTC is 07:00 in London on 23 October; the caller cannot choose patient or day.
+    assert recorded == [("demo_patient_001", "2026-10-23")]

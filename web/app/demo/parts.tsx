@@ -2,7 +2,7 @@
 // (docs/ui_mockups/source/screens.py) and uses the same CSS class names.
 import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import { Icon, Logo } from './icons';
-import { letterBlocks, letterTitle, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
+import { answerChoices, letterBlocks, letterTitle, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
 
 // ---------- Frame: top bar and footer ----------
 
@@ -341,6 +341,9 @@ export function VoicePanel(props: {
   const n = props.turns.length;
   const shown = props.turns.slice(n >= 3 && props.turns[n - 3].reminder ? -3 : -2);
   const lastAw = shown.map(t => t.who).lastIndexOf('aw');
+  // Only while AfterWard's question is the latest thing said.
+  const choices = !props.busy && !props.listening && n > 0 && props.turns[n - 1].who === 'aw'
+    ? answerChoices(props.turns[n - 1].text) : [];
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const input = e.currentTarget.elements.namedItem('msg') as HTMLInputElement;
@@ -361,6 +364,8 @@ export function VoicePanel(props: {
       {/* Her words in the bubble while she is still speaking, so they appear at once. */}
       {props.listening && props.hearing &&
         <div className="turn you live"><small>You&rsquo;re saying</small><p>&ldquo;{props.hearing}&hellip;&rdquo;</p></div>}
+      {choices.length > 0 && <div className="choices" role="group" aria-label="Answer">{choices.map(c =>
+        <button key={c.say} type="button" className="choice" onClick={() => props.onSend(c.say)}>{c.label}</button>)}</div>}
       {!props.listening && props.chips.length > 0 && <div className="proof">{props.chips.map(c =>
         <span key={c.text} className={`pchip ${c.kind}`}><Icon name={c.icon} size={16} stroke={2.3} />{c.text}</span>)}</div>}
     </div>

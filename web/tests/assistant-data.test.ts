@@ -3,7 +3,7 @@
 // app/agent/service.py (tool_trace) and app/agent/evidence.py (source).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daysAtHome, letterBlocks, readChat, readToday, shortTaskLabel, splitClock, prettyTime } from '../lib/assistant-data.ts';
+import { answerChoices, daysAtHome, letterBlocks, readChat, readToday, shortTaskLabel, splitClock, prettyTime } from '../lib/assistant-data.ts';
 
 const WALK_1 = 'task_walk#2026-10-23#1';
 
@@ -212,4 +212,16 @@ test('the Today screen gets the first name of the patient whose plan it is', () 
   assert.equal(readToday({ first_name: 'Margaret' }).firstName, 'Margaret');
   assert.equal(readToday({ first_name: null }).firstName, null);
   assert.equal(readToday({}).firstName, null);
+});
+
+test('answerChoices turns the which-medicine question into buttons', () => {
+  assert.deepEqual(answerChoices('Your paracetamol, your blood thinner, or both?'), [
+    { label: 'Paracetamol', say: 'my paracetamol' },
+    { label: 'Blood thinner', say: 'my blood thinner' },
+    { label: 'Both', say: 'both' },
+  ]);
+  assert.deepEqual(answerChoices('Your aspirin, your ticagrelor, your statin, or all of them?').map(c => c.say),
+    ['my aspirin', 'my ticagrelor', 'my statin', 'all of them']);
+  assert.deepEqual(answerChoices('Which one did you take: your paracetamol or your blood thinner?'), []);
+  assert.deepEqual(answerChoices('Next is your walk. Shall we go, or both?'), []);
 });

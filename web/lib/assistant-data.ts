@@ -392,3 +392,18 @@ export function readPlan(state: Obj): PlanSummary {
     firstName: str(state.first_name).trim() || null,
   };
 }
+
+// "Your paracetamol, your blood thinner, or both?" as tap-to-answer buttons. Speech recognition
+// often hears nothing at all for a lone short word like "both", so she can tap instead.
+export type AnswerChoice = { label: string; say: string };
+export function answerChoices(question: string): AnswerChoice[] {
+  const m = /^(your .+), or (both|all of them)\?$/i.exec(question.trim());
+  if (!m) return [];
+  const names = m[1].split(/,\s*/).map(s => s.replace(/^your\s+/i, '').trim()).filter(Boolean);
+  if (names.length < 2) return [];
+  const all = m[2].toLowerCase();
+  return [
+    ...names.map(n => ({ label: n[0].toUpperCase() + n.slice(1), say: `my ${n}` })),
+    { label: all === 'both' ? 'Both' : 'All of them', say: all },
+  ];
+}

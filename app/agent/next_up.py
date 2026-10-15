@@ -25,7 +25,7 @@ from datetime import datetime, time
 from typing import Any
 
 from app.agent.occurrence_resolver import SLOT_STARTS, everyday_name, item_id, item_name, part_of_day
-from app.reminders.text import build_opening_greeting, short_task_name, time_to_words
+from app.reminders.text import build_opening_greeting, build_return_greeting, is_or_are, short_task_name, time_to_words
 
 
 # Sorting positions only (AfterWard's defaults, never spoken as times).
@@ -271,9 +271,16 @@ def build_opening_message(
     tasks: list[dict[str, Any]],
     medications: list[dict[str, Any]],
     now: datetime,
+    returning: bool = False,
 ) -> str:
-    """Greet and name today's next eligible item, without reviving earlier items."""
-    greeting = build_opening_greeting(first_name, now)
+    """Greet and name today's next eligible item, without reviving earlier items.
+    returning: she was already greeted today, so "Welcome back" and her progress, not "Good morning"."""
+    if returning:
+        everything = [*tasks, *medications]
+        done = sum(1 for item in everything if item.get("status") == "completed")
+        greeting = build_return_greeting(first_name, done, len(everything))
+    else:
+        greeting = build_opening_greeting(first_name, now)
     def eligible(items):
         return [item for item in items
                 if not item.get("needs_confirmation")
@@ -300,7 +307,7 @@ def build_opening_message(
         instruction = f"{dose} of {medicine}" if dose else medicine
         message = f"{greeting} You need to take {instruction}{schedule}."
     else:
-        message = f"{greeting} Next is {item.spoken}{schedule}."
+        message = f"{greeting} Next {is_or_are(item.spoken)} {item.spoken}{schedule}."
     clock = item.occurrence.get("clock_time")
     if clock and not item.is_medication:
         due = datetime.combine(now.date(), time.fromisoformat(str(clock)), tzinfo=now.tzinfo)

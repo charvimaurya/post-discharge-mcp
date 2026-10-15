@@ -29,6 +29,7 @@ from app.database.recovery_state import (
     get_recovery_state,
     plan_end_date,
     record_chat_activity,
+    record_greeting,
 )
 from app.ingestion.document_validation import (
     WRONG_DOCUMENT_MESSAGE, WrongDocumentError, validate_discharge_document,
@@ -234,6 +235,8 @@ async def today(request: Request) -> JSONResponse:
                 tasks,
                 medications,
                 now,
+                # Already greeted today (the page says so once it has shown a greeting).
+                returning=state.get("greeted_on") == now.date().isoformat(),
             ),
             "date": tasks_result["data"]["date"],
             "discharge_date": state.get("discharge_date"),
@@ -243,6 +246,21 @@ async def today(request: Request) -> JSONResponse:
         },
         headers={"Cache-Control": "no-store"},
     )
+
+
+async def greeted(request: Request) -> JSONResponse:
+    """The page has shown today's greeting (or a reminder, which greets too). Later visits
+    today say "Welcome back". Only the demo patient and the patient-local date; nothing from the caller."""
+
+    patient = get_demo_patient_context()
+    try:
+        state = await asyncio.to_thread(get_recovery_state, patient.patient_id) or {}
+        day = get_patient_datetime(state.get("timezone") or "Europe/London").date().isoformat()
+        await asyncio.to_thread(record_greeting, patient.patient_id, day)
+    except Exception as exc:
+        log("greeted_failed", level="error", error=exc, route="/greeted")
+        return JSONResponse({"error": "Could not save the greeting."}, status_code=502)
+    return JSONResponse({"ok": True}, headers={"Cache-Control": "no-store"})
 
 
 async def validate_document(request: Request) -> JSONResponse:
@@ -437,6 +455,7 @@ app = Starlette(
         Route("/documents/uploaded", document_uploaded, methods=["POST"]),
         Route("/chat", chat_message, methods=["POST"]),
         Route("/today", today, methods=["GET"]),
+        Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
     ],
     lifespan=lifespan,

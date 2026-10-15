@@ -31,6 +31,24 @@ def build_opening_greeting(first_name: str | None, now: datetime) -> str:
     return f"{_greeting(now)}{name}. {_warm_line(now)}"
 
 
+def is_or_are(spoken: str) -> str:
+    """"Next are your knee exercises", "Next is your walk": the last word of the name decides."""
+    last = spoken.split(",")[0].split()[-1].lower() if spoken.strip() else ""
+    plural = last.endswith("s") and not last.endswith(("ss", "us", "is"))
+    return "are" if plural else "is"
+
+
+def build_return_greeting(first_name: str | None, done: int, total: int) -> str:
+    """A second visit the same day: no second "I hope you slept well", and how far she has got."""
+    name = f", {first_name}" if first_name else ""
+    greeting = f"Welcome back{name}."
+    if total and done >= total:
+        return f"{greeting} You've done everything for today."
+    if done:
+        return f"{greeting} You've done {done} of {total} so far."
+    return greeting
+
+
 def _part_of_day(clock_time: str | None) -> str | None:
     """'07:30' -> 'morning'. Describes a time; never sets one."""
 

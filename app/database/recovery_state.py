@@ -166,6 +166,17 @@ def record_chat_activity(patient_id: str, at_utc_iso: str) -> None:
     )
 
 
+def record_greeting(patient_id: str, local_date: str) -> None:
+    """The patient-local day AfterWard last greeted her, so a return visit says "Welcome back".
+    A new letter saves a fresh record, so the next visit is a first greeting again."""
+
+    table.update_item(
+        Key={"patient_id": patient_id},
+        UpdateExpression="SET greeted_on = :day",
+        ExpressionAttributeValues={":day": local_date},
+    )
+
+
 def clear_pending_checkin(
     patient_id: str,
 ) -> None:

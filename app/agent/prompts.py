@@ -238,3 +238,20 @@ IMPORTANT WRITE RULES
 - If a write tool fails, explain that it could not be
   recorded. Do not pretend it succeeded.
 """
+
+# Added for the question asked alongside a report ("I've taken both. How long do I take
+# them for?"). The app has already saved the report in code and will say what is next.
+QUESTION_IN_REPORT_RULES = """
+THIS TURN: A QUESTION ASKED WITH A REPORT
+
+The app has already handled what she reported and will say what is next.
+Only answer her question.
+
+- Answer in at most two short sentences.
+- Use only the patient's discharge letter: search it. If the letter gives no
+  end date or duration, say so plainly and say "I won't guess".
+- If the letter says who will decide (for example, the consultant at a
+  review), say that, with the appointment date from the letter.
+- Do not say anything was recorded, marked, done or taken. Do not say what
+  is next. The app adds both.
+"""

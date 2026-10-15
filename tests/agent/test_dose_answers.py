@@ -282,6 +282,12 @@ BOTH_SAVED = [("report_medication_taken", "para#2026-10-23#1"), ("report_medicat
     "I've taken both my medicines",
     "I have taken all my tablets",
     "I've taken all the medicine",
+    # As speech recognition writes it: no "the" or "my", and "Alexa" in front.
+    "I have taken both medicine",
+    "Alexa, I have taken both medicine",
+    "I've taken both medicines",
+    "I took both tablets",
+    "I have taken all medicines",
 ])
 def test_saying_both_or_all_records_every_medicine_due_without_asking_which(margaret, message):
     result, writes = margaret.say(message, fresh=True)
@@ -323,3 +329,19 @@ def test_sounds_like_both_is_only_a_lone_word():
     assert sounds_like_both("Boat.") and sounds_like_both("both of them")
     assert not sounds_like_both("I took the boat to town")
     assert not sounds_like_both("bought it yesterday")
+
+
+# ---------- The answer buttons on the demo screen send these words ----------
+
+@pytest.mark.parametrize("button, saved", [
+    ("my paracetamol", [("report_medication_taken", "para#2026-10-23#1")]),
+    ("my blood thinner", [("report_medication_taken", "apix#2026-10-23#1")]),
+    ("both", "BOTH"),
+])
+def test_each_answer_button_answers_the_which_question(margaret, button, saved):
+    question, _ = margaret.say("I have taken my medicine", fresh=True)
+    assert question["response"] == "Your paracetamol, your blood thinner, or both?"
+
+    result, writes = margaret.say(button)
+
+    assert writes == (BOTH_SAVED if saved == "BOTH" else saved), result["response"]

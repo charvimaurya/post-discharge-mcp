@@ -91,7 +91,7 @@ from app.agent.occurrence_resolver import (
     resolve_occurrence,
     resolve_vague_medication,
 )
-from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.prompts import QUESTION_IN_REPORT_RULES, SYSTEM_PROMPT
 from app.agent.safety import (
     sounds_like_both,
     asked_about_completion,
@@ -121,6 +121,7 @@ from app.reminders.engine import recheck_text
 from app.reminders.text import short_task_name, time_to_words
 from app.agent.session import (
     add_message,
+    clear_session,
     get_crisis,
     get_history,
     get_last_prompt,
@@ -1586,6 +1587,94 @@ def _extract_text(message: dict) -> str:
     ).strip()
 
 
+# Where a question starts inside a report: "...both the tablets, how long do I need to take this for".
+_QUESTION_START = re.compile(
+    r"\b(?:how (?:long|many|much|often|soon)|when (?:do|can|should|will|is|are|am|does|did)|"
+    r"what (?:time|do|should|is|are|if|about|happens|can)|can i|could i|should i|do i|"
+    r"am i|is it|is that|is this|are they|will i|why)\b"
+)
+
+
+def _question_in_report(message: str) -> str | None:
+    """The question asked after a report, or None. Questions about the day ("what's next?")
+    are left out: the reply already says what is next."""
+
+    match = _QUESTION_START.search(message.lower())
+    if match is None:
+        return None
+    question = message[match.start():].strip(" ,.;")
+    if len(question.split()) < 3 or is_next_up_question(question) or asks_whats_left_today(question):
+        return None
+    return question
+
+
+def _saved_names(tool_trace: list[dict], today: dict[str, list] | None) -> list[str]:
+    """Everyday names of what was recorded this turn: "paracetamol", "knee exercises"."""
+
+    items = {
+        str(item.get("occurrence_id")): (item, kind == "medications")
+        for kind in ("medications", "tasks") for item in (today or {}).get(kind, [])
+    }
+    names: list[str] = []
+    for step in tool_trace:
+        if step["tool"] not in _SCHEDULE_READ_FOR_WRITE or not step.get("ok"):
+            continue
+        found = items.get(str((step.get("arguments") or {}).get("occurrence_id")))
+        if found is None:
+            continue
+        item, is_medication = found
+        name = medicine_name(item_name(item)) if is_medication else str(item_name(item)).lower()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+async def _answer_question_too(
+    question: str,
+    about: list[str],
+    session_id: str,
+    patient_context: str | None,
+    first_name: str | None,
+    timezone: str,
+    tool_trace: list[dict],
+) -> tuple[str, dict | None]:
+    """Answer the question as its own turn (letter, plan, model as usual), told what she means
+    by "this". Its own session, so the report's waiting questions are not touched."""
+
+    named = " and ".join(about)
+    asked = f"About my {named}: {question}" if named else question
+    side = f"{session_id}#question"
+    clear_session(side)
+    parent = _TURN.get()
+    try:
+        result = await _chat_turn(
+            asked, side, patient_context, first_name=first_name, timezone=timezone, answer_only=True,
+        )
+    except Exception as exc:
+        log("question_after_report_failed", level="error", error=exc)
+        return "I couldn't look up your question just now. Please ask me again.", None
+    finally:
+        _TURN.set(parent)
+        clear_session(side)
+    tool_trace.extend(result.get("tool_trace") or [])
+    return str(result.get("response") or "").strip(), result.get("source")
+
+
+# The "what's next" sentence that ends a completion reply.
+_NEXT_SENTENCE = re.compile(r"\s(?=(?:Next (?:is|are)|Your next one is|That's everything for today)\b)")
+
+
+def _with_answer(reply: str, answer: str) -> str:
+    """Recorded, then the answer, then what is next: the order she would expect."""
+
+    if not answer:
+        return reply
+    match = _NEXT_SENTENCE.search(reply)
+    if match is None:
+        return f"{reply} {answer}"
+    return f"{reply[:match.start()]} {answer} {reply[match.end():]}"
+
+
 async def chat(
     message: str,
     session_id: str,
@@ -1641,9 +1730,13 @@ async def _chat_turn(
     first_name: str | None = None,
     timezone: str = "Europe/London",
     schedule_checkin: Callable[[dict], None] | None = None,
+    answer_only: bool = False,
 ) -> dict[str, Any]:
     """
     Run one conversational turn.
+
+    answer_only: the question asked alongside a report that was already saved.
+    Nothing is written, and the model follows QUESTION_IN_REPORT_RULES.
 
     pending_checkin, first_name and timezone come from the caller's
     server-side RecoveryState, never from the patient's message.
@@ -1695,7 +1788,7 @@ async def _chat_turn(
     # "No, I haven't taken it" must never become a write. Anything
     # negative blocks every report_* tool for this turn.
     negative = is_negative_report(cleaned_message)
-    required_write = None if negative else expected_write_tool(cleaned_message)
+    required_write = None if negative or answer_only else expected_write_tool(cleaned_message)
 
     # The facts for this turn: the patient's local time (shared
     # clock, so DEMO_FIXED_NOW applies) and today's occurrences.
@@ -1724,6 +1817,18 @@ async def _chat_turn(
     # what the previous turn saved can be corrected now.
     offer = pop_offer(session_id)
     last_saved = pop_last_saved(session_id)
+
+    # Her whole message, kept for a question asked alongside the answer (see below).
+    full_message = cleaned_message
+
+    # "I've taken both. How long do I take them for?" while "...or both?" is waiting:
+    # the answer is the part before the question; the question is answered after the save.
+    if offer and offer.get("kind") in ("which_medicines", "meal_medicines"):
+        asked = _question_in_report(cleaned_message)
+        answer_part = cleaned_message[:cleaned_message.find(asked)].strip(" ,.;") if asked else ""
+        if answer_part:
+            cleaned_message = answer_part
+            _TURN.get()["message"] = cleaned_message
 
     # Speech recognition often mishears a one-word "both" ("boat", "bolt"). Only while
     # "...your blood thinner, or both?" is waiting is such a word read as "both".
@@ -1760,7 +1865,7 @@ async def _chat_turn(
             pending_checkin = None
 
     # Nothing is written unless she reported something or answered a question.
-    writes_allowed = intent in (Intent.REPORT, Intent.ANSWER)
+    writes_allowed = intent in (Intent.REPORT, Intent.ANSWER) and not answer_only
     # The question she is answering: a medicine question, or a waiting check-in.
     _TURN.get()["question"] = offer if offer and "occurrence_ids" in offer else pending_checkin
     missed_dose_pending = bool(pending_checkin) and pending_checkin.get("type") == "missed_dose"
@@ -1929,7 +2034,20 @@ async def _chat_turn(
             resolved_reply, intent, today, now, session_id, saved=_saved_this_turn(tool_trace),
         )
         _remember_saves(session_id, tool_trace, today, now)
-        add_message(session_id, "user", cleaned_message)
+
+        # "I've taken both tablets, how long do I take them for?": the report is recorded
+        # above in code; the question is answered too, never dropped.
+        question = _question_in_report(full_message) if _saved_this_turn(tool_trace) else None
+        if question is not None:
+            answer, answer_source = await _answer_question_too(
+                question, _saved_names(tool_trace, today), session_id, patient_context,
+                first_name, timezone, tool_trace,
+            )
+            resolved_reply = _with_answer(resolved_reply, answer)
+            resolved_source = resolved_source or answer_source
+
+        # What she really said, question included.
+        add_message(session_id, "user", full_message)
         add_message(session_id, "assistant", resolved_reply)
 
         return {
@@ -1947,7 +2065,7 @@ async def _chat_turn(
     )
 
     # Next steps are offered only after a report or a question about the plan.
-    quiet = intent is Intent.OTHER
+    quiet = intent is Intent.OTHER or answer_only
 
     facts = (
         _describe_facts(today, now, pending_checkin, first_name, quiet=quiet)
@@ -1956,6 +2074,8 @@ async def _chat_turn(
     )
 
     system = _build_system_prompt(patient_context, facts)
+    if answer_only:
+        system.append({"text": QUESTION_IN_REPORT_RULES})
     model_id = get_agent_model_id()
 
     response_text = ""
@@ -1977,7 +2097,8 @@ async def _chat_turn(
             system=system,
             messages=messages,
             toolConfig=tool_config,
-            inferenceConfig={"maxTokens": 512},
+            # The question asked with a report is answered the same way every time.
+            inferenceConfig={"maxTokens": 512, **({"temperature": 0} if answer_only else {})},
         )
 
         usage = response.get("usage") or {}

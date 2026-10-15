@@ -57,6 +57,11 @@ function tabStore(): Storage | undefined {
   try { return window.sessionStorage; } catch { return undefined; }
 }
 
+// She has been greeted today: her next visit today opens with "Welcome back". Not worth an error.
+function markGreeted() {
+  void fetch('/api/greeted', { method: 'POST', cache: 'no-store' }).catch(() => undefined);
+}
+
 export default function DemoPage() {
   const frame = useFitFrame();
   const [view, setView] = useState<View>('start');
@@ -172,10 +177,12 @@ export default function DemoPage() {
         setTurns(t => [...t, { who: 'aw', text: today.openingGreeting }]);
         // After a reload the greeting is shown again, but not spoken twice.
         if (shouldSpeakOpening(tabStore(), today.openingGreeting)) void say(today.openingGreeting);
+        markGreeted();
       }
       return;
     }
     // A pending reminder already includes a greeting, so do not add a second welcome.
+    if (!openingGreetingShown.current) markGreeted();
     openingGreetingShown.current = true;
     if (checkin.id === shownCheckin.current) return;
     shownCheckin.current = checkin.id;
@@ -280,11 +287,14 @@ export default function DemoPage() {
     window.speechSynthesis?.cancel();
     setListening(true);
     setHearing('');
+    setError('');
     try {
       const heard = await listenOnce(setHearing);
       setListening(false);
       setHearing('');
+      // Silence on screen looked like nothing was working; a lone short word is often not caught.
       if (heard) await send(heard);
+      else setError('I didn’t catch that. Please try again with a few more words, tap an answer, or type.');
     } catch (e) {
       setListening(false);
       setHearing('');

@@ -55,6 +55,18 @@ def is_ambiguous_medication_write(message: str) -> bool:
         "my tablets",
         "the medicine",
         "the medication",
+        # Speech recognition often drops "the"/"my": "I have taken both medicine".
+        "both medicine",
+        "both medication",
+        "both tablets",
+        "both pills",
+        "all medicine",
+        "all medication",
+        "all tablets",
+        "all pills",
+        "my pills",
+        "the tablets",
+        "the pills",
     ]
 
     # Words suggesting that the user is reporting completion.
