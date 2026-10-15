@@ -166,7 +166,8 @@ async def chat_message(request: Request) -> JSONResponse:
     related = related_appointment_lines(source, state.get("appointments"))
 
     if related:
-        source = dict(source, related=related)
+        # Added to any line the agent already linked (the letter's emergency number).
+        source = dict(source, related=[*(source.get("related") or []), *related])
 
     note = open_ended_medicine_note(source, f"{message} {result['response']}", state)
 

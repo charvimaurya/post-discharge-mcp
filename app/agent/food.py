@@ -56,7 +56,8 @@ _EATING = re.compile(
 # A food report is never one of these: they go the usual way.
 _NOT_FOOD = re.compile(
     r"\b(sick|vomit\w*|nause\w*|can't keep|cannot keep|keep (it|food|anything) down|"
-    r"pain|fall|fell|bleed\w*|walk|exercises?|tablets?|dose|medicine|medication|pill)\b"
+    r"pain|fall|fell|bleed\w*|walk|exercises?|tablets?|doses?|medicines?|medications?|meds|pills?|"
+    r"capsules?|caplets?|sachets?|inhalers?|puffs?|injections?)\b"
 )
 
 

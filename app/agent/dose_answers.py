@@ -31,6 +31,10 @@ _PLAIN_ALL = re.compile(
     r"^\W*(yes|yeah|yep|yup)?\W*(both( of them)?|all( of them)?|i('?ve| have) taken (them|both|all)|"
     r"took them|taken them|i have|i did|i('?ve| have) had them|done|yes)?\W*(both|please|thanks)?\W*$"
 )
+# "I have taken both the medicines", "I took all my tablets": "both" or "all" with a taken word.
+_TOOK_ALL = re.compile(
+    r"\b(took|taken|had|done)\b.*\b(both|all( of)? (them|my \w+|the \w+))\b"
+)
 # The letter's dose as a count of tablets, capsules or similar: "2 tablets" -> 2.
 _DOSE_COUNT = re.compile(r"^\s*(\d+)\s*(tablet|capsule|caplet|pill|sachet)s?\b", re.IGNORECASE)
 
@@ -182,7 +186,7 @@ def parse_dose_answer(
 
     partial = bool(numbers) or bool(_PARTIAL.search(_plain(message))) or bool(_ONE_OF.search(_plain(message)))
 
-    if not partial and _PLAIN_ALL.match(_plain(message)) and _plain(message).strip(" .!"):
+    if not partial and (_PLAIN_ALL.match(_plain(message)) or _TOOK_ALL.search(_plain(message))) and _plain(message).strip(" .!"):
         return DoseAnswer(kind="all", take=list(doses))
 
     return DoseAnswer(kind="ask", stated=numbers[0] if len(numbers) == 1 else carried, partial=partial)

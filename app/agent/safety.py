@@ -67,6 +67,12 @@ def is_ambiguous_medication_write(message: str) -> bool:
         "my pills",
         "the tablets",
         "the pills",
+        "my meds",
+        "the meds",
+        "both meds",
+        "all meds",
+        "my capsules",
+        "the capsules",
     ]
 
     # Words suggesting that the user is reporting completion.
@@ -405,12 +411,27 @@ def accepts_offer(message: str, last_reply: str) -> bool:
 
 
 def is_permission_question(message: str) -> bool:
-    """Questions about allowed activities need fresh discharge-letter evidence."""
+    """Questions about allowed activities need fresh discharge-letter evidence.
+    Speech recognition often hears "can I" as "can a": "Alexa can a plan to go for drive"."""
     return bool(re.search(
-        r"\b(?:am i allowed|can i|may i|could i|is it (?:safe|okay|ok)|"
-        r"allowed to|permitted to|when can i|when may i)\b",
+        r"\b(?:am i allowed|can (?:i|a|we)|may i|could i|is it (?:safe|okay|ok|alright|all right|fine)|"
+        r"allowed to|permitted to|when can i|when may i|i plan to|planning to|"
+        r"is \w+ing (?:safe|okay|ok|alright|all right|fine|allowed))\b",
         _plain(message),
     ))
+
+
+# The model saying the letter does not cover something. Only said after a letter search.
+_SAYS_NOT_IN_LETTER = re.compile(
+    r"\b(?:don't|do not) have (?:any )?(?:information|details)|\bnot (?:in|mentioned in|covered in) your "
+    r"(?:recovery plan|plan|letter)|\byour (?:letter|plan) (?:doesn't|does not) (?:say|mention|cover)"
+)
+
+
+def says_not_in_letter(reply: str) -> bool:
+    """'I don't have information about driving in your recovery plan.'"""
+
+    return bool(_SAYS_NOT_IN_LETTER.search(_plain(reply)))
 
 
 # ---------- Missed doses ----------

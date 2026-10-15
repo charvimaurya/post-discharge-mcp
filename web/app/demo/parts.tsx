@@ -2,7 +2,7 @@
 // (docs/ui_mockups/source/screens.py) and uses the same CSS class names.
 import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
 import { Icon, Logo } from './icons';
-import { answerChoices, letterBlocks, letterTitle, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
+import { answerChoices, emergencyNumber, replyPoints, letterBlocks, letterTitle, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
 
 // ---------- Frame: top bar and footer ----------
 
@@ -165,20 +165,23 @@ function dueText(item: PlanItem, clock: string): string | null {
 }
 
 // ---------- "Get help" card: shown on top of Today after she says she feels unwell ----------
-// The 999 and NHS 111 lines are the same fixed wording AfterWard speaks (app/agent/symptoms.py).
+// The emergency and NHS 111 lines are the same fixed wording AfterWard speaks (app/agent/symptoms.py).
 // "Your letter says" lines are the letter's own actions, never invented.
 export function HelpCard({ actions, onDismiss, compact }: { actions: HelpAction[]; onDismiss: () => void; compact?: boolean }) {
-  // After she moves on to another question, the card shrinks to one line, still one tap from 999.
+  // The letter's own emergency number when it gives one ("...straight away: 555-555-0199"), else 999.
+  const sos = emergencyNumber(actions) || '999';
+  const dial = sos.replace(/[^\d+]/g, '');
+  // After she moves on to another question, the card shrinks to one line, still one tap from emergency help.
   if (compact) return <section className="helpstrip" aria-label="Getting help">
     <span className="help-ico sm"><Icon name="alert" size={16} stroke={2.4} /></span>
-    <span className="help-strip-text"><b>Feeling unwell?</b> Severe or sudden: call 999. Not urgent: NHS 111 or your care team.</span>
-    <a className="help-strip-call" href="tel:999">Call 999</a>
+    <span className="help-strip-text"><b>Feeling unwell?</b> Severe or sudden: call {sos}. Not urgent: NHS 111 or your care team.</span>
+    <a className="help-strip-call" href={`tel:${dial}`}>Call {sos}</a>
     <button type="button" className="help-strip-close" onClick={onDismiss}>Close</button>
   </section>;
   return <section className="helpcard" role="alert" aria-label="Getting help">
     <div className="help-head"><span className="help-ico"><Icon name="alert" size={22} stroke={2.2} /></span>
       <div><div className="help-eyebrow">If you feel unwell</div><h3>Getting help</h3></div></div>
-    <a className="help-row urgent" href="tel:999"><b>Severe or sudden?</b><span>Call 999</span></a>
+    <a className="help-row urgent" href={`tel:${dial}`}><b>Severe or sudden?</b><span>Call {sos}</span></a>
     <a className="help-row" href="tel:111"><b>Not urgent?</b><span>Call NHS 111 or your care team</span></a>
     {actions.length > 0 && <div className="help-letter"><small>Your letter says</small>
       <ul>{actions.map(a => <li key={a.action} className={a.urgency === 'emergency' ? 'emergency' : ''}>{a.action}</li>)}</ul></div>}
@@ -301,13 +304,13 @@ export function LetterPanel({ source, onBack, help, onDismissHelp, firstName }: 
       </div>
       <div className="letter-scroll" tabIndex={0} role="region" aria-label="Original letter passage">
         <div className="in letterbody">
-          {/* One card for what the letter says, and one for each appointment it points at. */}
+          {/* One card for what the letter says, and one for each appointment it points at (or its emergency number). */}
           <div className="quotecard">
             <div className="quotehead"><span>Your letter says</span>{source.page && <b>Page {source.page}</b>}</div>
             <LetterBody blocks={blocks} flag={source.note?.flag} />
           </div>
           {(source.related || []).map((r, i) => <div key={i} className="quotecard linked">
-            <div className="quotehead"><span>Linked appointment</span>{r.page && <b>Page {r.page}</b>}</div>
+            <div className="quotehead"><span>{r.label || 'Linked appointment'}</span>{r.page && <b>Page {r.page}</b>}</div>
             <p className="txt">{r.text}</p>
           </div>)}
         </div>
@@ -331,6 +334,13 @@ export type Turn = { who: 'you' | 'aw'; text: string; reminder?: boolean };
 const WAVE = [10, 22, 32, 18, 28, 12, 20];
 const RINGS = <div className="ringbox"><svg className="rings" width="520" height="520" viewBox="0 0 520 520" fill="none" stroke="currentColor">
   {[[62, .45], [104, .24], [156, .12]].map(([r, o]) => <circle key={r} cx="260" cy="260" r={r} strokeOpacity={o} strokeWidth="1.5" />)}</svg></div>;
+
+// AfterWard's reply. A long one is shown smaller, one sentence per bullet.
+function AwTurn({ text, past }: { text: string; past: boolean }) {
+  const points = replyPoints(text);
+  return <div className={`turn aw${past ? ' past' : ''}${text.length > 150 ? ' long' : ''}`}><small>AfterWard</small>
+    {points.length > 1 ? <ul className="points">{points.map((p, j) => <li key={j}>{p}</li>)}</ul> : <p>{text}</p>}</div>;
+}
 
 export function VoicePanel(props: {
   head: string; turns: Turn[]; chips: { kind: string; icon: string; text: string }[];
@@ -360,7 +370,7 @@ export function VoicePanel(props: {
     <div className="turns">
       {shown.map((t, i) => t.who === 'you'
         ? <div key={i} className="turn you"><small>You said</small><p>&ldquo;{t.text}&rdquo;</p></div>
-        : <div key={i} className={`turn aw${i === lastAw ? '' : ' past'}${t.text.length > 150 ? ' long' : ''}`}><small>AfterWard</small><p>{t.text}</p></div>)}
+        : <AwTurn key={i} text={t.text} past={i !== lastAw} />)}
       {/* Her words in the bubble while she is still speaking, so they appear at once. */}
       {props.listening && props.hearing &&
         <div className="turn you live"><small>You&rsquo;re saying</small><p>&ldquo;{props.hearing}&hellip;&rdquo;</p></div>}

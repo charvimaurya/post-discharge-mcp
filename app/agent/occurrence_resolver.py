@@ -163,6 +163,12 @@ def _is_due(occurrence: dict[str, Any], now: datetime) -> bool:
     return due_at(occurrence, now) <= now + window
 
 
+def _has_time(occurrence: dict[str, Any]) -> bool:
+    """A clock time or a time of day; False for 'any time today'."""
+
+    return bool(occurrence.get("clock_time")) or str(occurrence.get("time_of_day_label") or "").lower() in SLOT_STARTS
+
+
 def due_at(occurrence: dict[str, Any], now: datetime) -> datetime:
     """When this occurrence is due today, in the patient's local time."""
 
@@ -394,6 +400,13 @@ def resolve_vague_medication(
     for dose in sorted(scheduled, key=lambda d: due_at(d, now)):
         if _is_due(dose, now):
             first_due.setdefault(item_id(dose), dose)
+
+    # A medicine with no time at all ("three times a day") counts only when no timed
+    # one is due, as in the greeting (app.agent.next_up): "You need to take your
+    # cetirizine this morning", then "I took my tablets" means the cetirizine.
+    timed = {key: dose for key, dose in first_due.items() if _has_time(dose)}
+    if timed:
+        first_due = timed
 
     if len(first_due) == 1:
         (dose,) = first_due.values()

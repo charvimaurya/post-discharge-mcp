@@ -127,7 +127,8 @@ def test_one_tablet_then_paracetamol_does_not_save_it(margaret):
     assert result["response"].startswith("Your letter says 2 tablets of paracetamol")
 
 
-@pytest.mark.parametrize("answer", ["yes, both", "Yes", "Yes I have", "I've taken them", "both"])
+@pytest.mark.parametrize("answer", ["yes, both", "Yes", "Yes I have", "I've taken them", "both",
+                                    "I have taken both the medicines", "I took all my tablets"])
 def test_a_plain_yes_saves_both(margaret, answer):
     margaret.asked()
 
@@ -150,6 +151,34 @@ def test_paracetamol_but_not_the_blood_thinner_saves_only_paracetamol(margaret):
         "Thank you, Margaret. I've marked your paracetamol, 2 tablets, as taken. "
         "Your blood thinner is still in today's plan."
     )
+
+
+@pytest.mark.parametrize("message", [
+    "I had my breakfast and I have also taken the medicines",
+    "I had my breakfast and I also have taken my medicine",
+    "had breakfast and took my medications",
+    "I've had breakfast and taken my pills",
+    "I had my breakfast and my meds",
+])
+def test_breakfast_and_medicines_asks_which_not_have_you_taken_them(margaret, message):
+    # She has already said she took them: never "Have you taken them?" again.
+    result, writes = margaret.say(message, fresh=True)
+
+    assert writes == []
+    assert result["response"] == "Your paracetamol, your blood thinner, or both?"
+
+
+def test_breakfast_and_both_medicines_saves_both(margaret):
+    result, writes = margaret.say("I had my breakfast and I have taken both the medicines", fresh=True)
+
+    assert writes == BOTH_SAVED, result["response"]
+
+
+def test_breakfast_alone_still_asks_have_you_taken_them(margaret):
+    result, writes = margaret.say("I had my breakfast", fresh=True)
+
+    assert writes == []
+    assert result["response"].endswith("Have you taken them?")
 
 
 @pytest.mark.parametrize("answer", ["just one", "only one of them", "one of them"])

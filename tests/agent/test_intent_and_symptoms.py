@@ -243,8 +243,9 @@ def test_a_symptom_wins_over_the_blood_thinner_question(agent, capsys):
     assert reply["response"] == f"I'm sorry your head hurts, Margaret. {NO_MATCH}"
     assert agent.saved == [] and agent.model_calls == 0
     assert not any(step["tool"].startswith("report_") for step in reply["tool_trace"])
-    # The letter was looked in: the plan's warning signs, then a search.
-    assert [step["tool"] for step in reply["tool_trace"]][-2:] == ["get_recovery_plan", "search_discharge_instructions"]
+    # The letter was looked in: the plan's warning signs, its emergency number, then a search.
+    assert [step["tool"] for step in reply["tool_trace"]][-3:] == [
+        "get_recovery_plan", "search_discharge_instructions", "search_discharge_instructions"]
 
     logged = capsys.readouterr().out
     symptom_lines = [line for line in log_lines(logged) if line["event"] == "symptom"]
@@ -348,7 +349,8 @@ def test_a_warning_sign_in_the_letter_is_quoted_word_for_word(agent, capsys, mes
     assert reply["response"] == f"I'm sorry to hear that, Margaret. Your letter says: {wording}"
     assert reply["source"]["section"] == "Warning signs" and reply["source"]["highlight"] == wording
     assert not _mentions_medicine(reply["response"])
-    assert agent.saved == [] and agent.model_calls == 0 and agent.searches == []
+    # Only the letter's emergency number is looked up; the sign itself needs no search.
+    assert agent.saved == [] and agent.model_calls == 0 and agent.searches == ["emergency services phone number"]
 
     symptom_lines = [line for line in log_lines(capsys.readouterr().out) if line["event"] == "symptom"]
     assert len(symptom_lines) == 1 and symptom_lines[0]["reason"].startswith("warning_")

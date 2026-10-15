@@ -106,6 +106,7 @@ from app.agent.safety import (
     is_negative_report,
     is_next_up_question,
     is_permission_question,
+    says_not_in_letter,
     mentions_appointment,
     mentions_date,
     remove_hollow_openers,
@@ -144,7 +145,9 @@ from app.agent.symptoms import (
     no_match_reply,
     sign_source,
     warning_sign_reply,
+    emergency_contact,
     help_actions,
+    with_emergency_line,
 )
 from app.mcp.client import (
     call_mcp_tool,
@@ -1206,12 +1209,17 @@ async def _symptom_turn(
 
     warning_signs = ((plan or {}).get("data") or {}).get("warning_signs") or [] if ok else []
     sign = match_warning_sign(symptom, warning_signs)
-    help_lines = help_actions(warning_signs)
+    # The letter's own emergency number ("Emergency services number: 555-555-0199"),
+    # so neither the reply nor the help card says 999 when the letter gives another.
+    contact = await _letter_emergency_contact(tool_trace)
+    number = contact["number"] if contact else None
+    help_lines = help_actions(warning_signs, number)
 
     if sign is not None:
         sign_id = str(sign.get("id") or "unknown")
         log("symptom", reason=sign_id, kind="warning_sign")
-        return warning_sign_reply(sign, first_name), sign_source(sign), help_lines
+        source = with_emergency_line(sign_source(sign), contact if sign.get("urgency") == "emergency" else None)
+        return warning_sign_reply(sign, first_name, number), source, help_lines
 
     # Not among the warning signs: look in the rest of the letter for the same symptom.
     arguments = {"query": message}
@@ -1229,11 +1237,28 @@ async def _symptom_turn(
         sentence = match_letter_sentence(symptom, items)
         if sentence:
             log("symptom", reason="letter_passage", kind="letter")
-            return letter_sentence_reply(sentence, first_name), evidence_source(match, sentence), help_lines
+            source = with_emergency_line(evidence_source(match, sentence), contact)
+            return letter_sentence_reply(sentence, first_name, number), source, help_lines
 
     log("symptom", reason="none", kind="template")
 
-    return no_match_reply(symptom, first_name), None, help_lines
+    return no_match_reply(symptom, first_name, number), with_emergency_line(None, contact), help_lines
+
+
+async def _letter_emergency_contact(tool_trace: list[dict]) -> dict | None:
+    """The emergency number written in her letter, its line and page; None if it gives none."""
+
+    arguments = {"query": "emergency services phone number"}
+
+    try:
+        found = get_structured_tool_result(await call_mcp_tool("search_discharge_instructions", arguments))
+    except Exception:
+        found = None
+
+    matches = collect_rag_matches("search_discharge_instructions", found)
+    tool_trace.append({"tool": "search_discharge_instructions", "arguments": arguments, "ok": bool(matches)})
+
+    return emergency_contact([(match.get("text") or "", match.get("page")) for match in matches])
 
 
 async def _food_turn(
@@ -1587,6 +1612,46 @@ def _extract_text(message: dict) -> str:
     ).strip()
 
 
+def _appointments_fact(appointments: list | None) -> str:
+    """Her plan's appointments as the model reads them. Dates come only from here."""
+
+    lines = []
+    for appointment in appointments or []:
+        if not isinstance(appointment, dict):
+            continue
+        title = appointment.get("title") or "Appointment"
+        if appointment.get("needs_confirmation") or appointment.get("conflicting_dates"):
+            when = "date needs confirmation"
+        elif appointment.get("date"):
+            when = str(appointment["date"]) + (f" at {appointment['time']}" if appointment.get("time") else "")
+        else:
+            when = "date not stated"
+        place = f", {appointment['location']}" if appointment.get("location") else ""
+        lines.append(f"- {title}: {when}{place}")
+
+    heading = (
+        "APPOINTMENTS FROM HER PLAN (get_recovery_plan, already read this turn). "
+        "Give an appointment date only from this list; if it says the date is not "
+        "stated or needs confirmation, say so."
+    )
+    return f"{heading}\n" + ("\n".join(lines) if lines else "- None in her plan.")
+
+
+async def _preload_appointments(tool_trace: list[dict]) -> str | None:
+    """Read the plan once, in code, for its appointments. None if it cannot be read:
+    the model then calls get_recovery_plan itself, as before."""
+
+    try:
+        result = get_structured_tool_result(await call_mcp_tool("get_recovery_plan", {}))
+    except Exception:
+        return None
+    ok = isinstance(result, dict) and result.get("ok") is True
+    tool_trace.append({"tool": "get_recovery_plan", "arguments": {}, "ok": ok})
+    if not ok:
+        return None
+    return _appointments_fact((result.get("data") or {}).get("appointments"))
+
+
 # Where a question starts inside a report: "...both the tablets, how long do I need to take this for".
 _QUESTION_START = re.compile(
     r"\b(?:how (?:long|many|much|often|soon)|when (?:do|can|should|will|is|are|am|does|did)|"
@@ -1632,6 +1697,7 @@ def _saved_names(tool_trace: list[dict], today: dict[str, list] | None) -> list[
 async def _answer_question_too(
     question: str,
     about: list[str],
+    today: dict[str, list] | None,
     session_id: str,
     patient_context: str | None,
     first_name: str | None,
@@ -1649,6 +1715,7 @@ async def _answer_question_too(
     try:
         result = await _chat_turn(
             asked, side, patient_context, first_name=first_name, timezone=timezone, answer_only=True,
+            preloaded_today=today,
         )
     except Exception as exc:
         log("question_after_report_failed", level="error", error=exc)
@@ -1731,12 +1798,15 @@ async def _chat_turn(
     timezone: str = "Europe/London",
     schedule_checkin: Callable[[dict], None] | None = None,
     answer_only: bool = False,
+    preloaded_today: dict[str, list] | None = None,
 ) -> dict[str, Any]:
     """
     Run one conversational turn.
 
     answer_only: the question asked alongside a report that was already saved.
     Nothing is written, and the model follows QUESTION_IN_REPORT_RULES.
+    preloaded_today: today's tasks and medicines already read this turn (with what
+    was just saved marked done), so they are not read again.
 
     pending_checkin, first_name and timezone come from the caller's
     server-side RecoveryState, never from the patient's message.
@@ -1793,7 +1863,7 @@ async def _chat_turn(
     # The facts for this turn: the patient's local time (shared
     # clock, so DEMO_FIXED_NOW applies) and today's occurrences.
     now = get_patient_datetime(timezone or "Europe/London")
-    today = await _load_today(tool_trace)
+    today = preloaded_today if preloaded_today is not None else await _load_today(tool_trace)
     _TURN.get()["today"] = today
     _TURN.get()["now"] = now
 
@@ -1826,6 +1896,8 @@ async def _chat_turn(
     if offer and offer.get("kind") in ("which_medicines", "meal_medicines"):
         asked = _question_in_report(cleaned_message)
         answer_part = cleaned_message[:cleaned_message.find(asked)].strip(" ,.;") if asked else ""
+        # "...both the medicines and how long...": drop the joining word.
+        answer_part = re.sub(r"\s*\b(and|but|so)$", "", answer_part, flags=re.IGNORECASE).strip(" ,.;")
         if answer_part:
             cleaned_message = answer_part
             _TURN.get()["message"] = cleaned_message
@@ -2040,7 +2112,7 @@ async def _chat_turn(
         question = _question_in_report(full_message) if _saved_this_turn(tool_trace) else None
         if question is not None:
             answer, answer_source = await _answer_question_too(
-                question, _saved_names(tool_trace, today), session_id, patient_context,
+                question, _saved_names(tool_trace, today), today, session_id, patient_context,
                 first_name, timezone, tool_trace,
             )
             resolved_reply = _with_answer(resolved_reply, answer)
@@ -2057,7 +2129,12 @@ async def _chat_turn(
             "completed": True,
         }
 
-    tool_config = await build_bedrock_tool_config()
+    # Her plan's appointments are read now, alongside the tool list, and given to the model
+    # up front. An answer that names a date ("your review on 23 November") is then checked
+    # against the plan before it is written, rather than redone after (two extra model calls).
+    tool_config, appointments_fact = await asyncio.gather(
+        build_bedrock_tool_config(), _preload_appointments(tool_trace),
+    )
 
     messages = build_bedrock_messages(
         history,
@@ -2074,6 +2151,8 @@ async def _chat_turn(
     )
 
     system = _build_system_prompt(patient_context, facts)
+    if appointments_fact:
+        system.append({"text": appointments_fact})
     if answer_only:
         system.append({"text": QUESTION_IN_REPORT_RULES})
     model_id = get_agent_model_id()
@@ -2161,7 +2240,9 @@ async def _chat_turn(
                 item["tool"] == "search_discharge_instructions"
                 for item in tool_trace
             )
-            if is_permission_question(cleaned_message) and not searched_letter and not letter_search_nudged:
+            # "Not in your letter" is said only after the letter itself was searched.
+            if (is_permission_question(cleaned_message) or says_not_in_letter(response_text)) \
+                    and not searched_letter and not letter_search_nudged:
                 letter_search_nudged = True
                 response_text = ""
                 messages.append({

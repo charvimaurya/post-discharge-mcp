@@ -207,19 +207,85 @@ def sign_wording(sign: dict[str, Any]) -> str:
     return _quote(f"{action} if you have: {snippet or sign.get('text')}")
 
 
-def warning_sign_reply(sign: dict[str, Any], first_name: str | None) -> str:
-    return f"I'm sorry to hear that{_who(first_name)}. Your letter says: {sign_wording(sign)}"
+# "Emergency services number: 555-555-0199", "Emergency number - 112": the letter's own number.
+_EMERGENCY_NUMBER = re.compile(
+    r"emergency[^\n.]{0,30}?(?:number|phone|telephone|line)\s*(?:is|:|-|–)?\s*(\+?\(?\d[\d\s\-()]{1,18}\d)",
+    re.IGNORECASE,
+)
 
 
-def letter_sentence_reply(sentence: str, first_name: str | None) -> str:
+def emergency_contact(passages: list[tuple[str, Any]]) -> dict[str, Any] | None:
+    """
+    The letter's emergency number, the whole line it is on and its page, from
+    (text, page) passages: {"number": "555-555-0199", "line": "Emergency services
+    number: 555-555-0199 (fictional number)", "page": 2}. None if the letter gives none.
+    """
+
+    for text, page in passages:
+        text = text or ""
+        match = _EMERGENCY_NUMBER.search(text)
+        if match:
+            start = text.rfind("\n", 0, match.start()) + 1
+            end = text.find("\n", match.end())
+            line = " ".join(text[start:end if end != -1 else len(text)].split()).lstrip("•·*-\x7f ").strip()
+            return {"number": " ".join(match.group(1).split()), "line": line, "page": page}
+
+    return None
+
+
+def emergency_number(texts: list[str]) -> str | None:
+    """The emergency phone number the letter gives, word for word, or None (then 999 is said)."""
+
+    contact = emergency_contact([(text, None) for text in texts])
+
+    return contact["number"] if contact else None
+
+
+def with_emergency_line(source: dict[str, Any] | None, contact: dict[str, Any] | None) -> dict[str, Any] | None:
+    """
+    The letter panel's source with the letter's emergency-number line as a card of its
+    own, so the number the reply says is shown in the letter's words. With no other
+    source (the letter does not mention the symptom), that line is the source.
+    """
+
+    if not contact:
+        return source
+
+    card = {"text": contact["line"], "page": contact["page"], "label": "Emergency number"}
+
+    if source is None:
+        line = contact["line"]
+        return {"document_id": None, "page": contact["page"], "chunk_id": None, "section": "Emergency number",
+                "text": line, "highlight": line, "passage": line, "highlighted_line": line}
+
+    if any(contact["number"] in str(r.get("text") or "") for r in source.get("related") or []):
+        return source
+
+    return {**source, "related": [*(source.get("related") or []), card]}
+
+
+def _call_emergency(number: str | None) -> str:
+    return f"call {number}" if number else "call 999"
+
+
+def warning_sign_reply(sign: dict[str, Any], first_name: str | None, number: str | None = None) -> str:
+    reply = f"I'm sorry to hear that{_who(first_name)}. Your letter says: {sign_wording(sign)}"
+
+    if number and sign.get("urgency") == "emergency" and number not in reply:
+        reply += f" The emergency number in your letter is {number}."
+
+    return reply
+
+
+def letter_sentence_reply(sentence: str, first_name: str | None, number: str | None = None) -> str:
     return (
         f"I'm sorry to hear that{_who(first_name)}. Your letter says: {_quote(sentence)} "
-        "I can't give medical advice. If it's severe or sudden, call 999. "
+        f"I can't give medical advice. If it's severe or sudden, {_call_emergency(number)}. "
         "Otherwise, please call NHS 111 or your care team."
     )
 
 
-def no_match_reply(symptom: Symptom, first_name: str | None) -> str:
+def no_match_reply(symptom: Symptom, first_name: str | None, number: str | None = None) -> str:
     """The fixed sentence when the letter says nothing about this symptom."""
 
     if "pain" in symptom.groups and symptom.part_word:
@@ -227,7 +293,9 @@ def no_match_reply(symptom: Symptom, first_name: str | None) -> str:
     else:
         sorry = f"I'm sorry you're not feeling well{_who(first_name)}"
 
-    return NO_MATCH_TEMPLATE.format(sorry=sorry)
+    reply = NO_MATCH_TEMPLATE.format(sorry=sorry)
+
+    return reply.replace("call 999", _call_emergency(number))
 
 
 def sign_source(sign: dict[str, Any]) -> dict[str, Any] | None:
@@ -251,14 +319,30 @@ def sign_source(sign: dict[str, Any]) -> dict[str, Any] | None:
     }
 
 
-def help_actions(warning_signs: list[dict[str, Any]]) -> list[dict[str, str]]:
+def help_actions(warning_signs: list[dict[str, Any]], number: str | None = None) -> list[dict[str, str]]:
     """
     Who to call, in the letter's own words, for the "Get help" card.
 
     One line per distinct action ("Call the ward on ...", "Call emergency
     services straight away"), emergencies first. Nothing is invented: an
-    action not written in the letter is never shown.
+    action not written in the letter is never shown. The letter's emergency
+    number, when it gives one, is added to its emergency action, and the
+    card's call button uses it.
     """
+
+    out = _help_actions(warning_signs)
+
+    if number:
+        emergency = next((a for a in out if a["urgency"] == "emergency"), None)
+        if emergency is None:
+            out.insert(0, {"urgency": "emergency", "action": f"Emergency number: {number}"})
+        elif number not in emergency["action"]:
+            emergency["action"] = f"{emergency['action'].rstrip('.')}: {number}"
+
+    return out
+
+
+def _help_actions(warning_signs: list[dict[str, Any]]) -> list[dict[str, str]]:
 
     seen: set[str] = set()
     out: list[dict[str, str]] = []

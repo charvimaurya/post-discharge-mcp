@@ -3,7 +3,7 @@
 // app/agent/service.py (tool_trace) and app/agent/evidence.py (source).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerChoices, daysAtHome, letterBlocks, readChat, readToday, shortTaskLabel, splitClock, prettyTime } from '../lib/assistant-data.ts';
+import { answerChoices, daysAtHome, emergencyNumber, replyPoints, reprompt, letterBlocks, readChat, readToday, shortTaskLabel, splitClock, prettyTime } from '../lib/assistant-data.ts';
 
 const WALK_1 = 'task_walk#2026-10-23#1';
 
@@ -220,8 +220,47 @@ test('answerChoices turns the which-medicine question into buttons', () => {
     { label: 'Blood thinner', say: 'my blood thinner' },
     { label: 'Both', say: 'both' },
   ]);
+  assert.deepEqual(answerChoices('Your paracetamol, your blood thinner, or both?').map(c => c.label),
+    ['Paracetamol', 'Blood thinner', 'Both']);
   assert.deepEqual(answerChoices('Your aspirin, your ticagrelor, your statin, or all of them?').map(c => c.say),
     ['my aspirin', 'my ticagrelor', 'my statin', 'all of them']);
   assert.deepEqual(answerChoices('Which one did you take: your paracetamol or your blood thinner?'), []);
   assert.deepEqual(answerChoices('Next is your walk. Shall we go, or both?'), []);
+});
+
+test('reprompt repeats the question still waiting, without what came before it', () => {
+  assert.equal(reprompt([{ who: 'aw', text: 'Your paracetamol, your blood thinner, or both?' }]),
+    "Sorry, I didn't catch that. Your paracetamol, your blood thinner, or both?");
+  assert.equal(reprompt([{ who: 'aw', text: 'Good morning, Margaret. Have you taken them?' }]),
+    "Sorry, I didn't catch that. Have you taken them?");
+  assert.equal(reprompt([{ who: 'aw', text: 'Next is your walk.' }]), "Sorry, I didn't catch that. Please say it again.");
+  assert.equal(reprompt([{ who: 'you', text: 'what?' }]), "Sorry, I didn't catch that. Please say it again.");
+  assert.equal(reprompt([]), "Sorry, I didn't catch that. Please say it again.");
+});
+
+test('a long reply is one point per sentence; a short opener stays with the next one', () => {
+  const reply = "Thank you, Priya. I've marked your prednisolone, 8 tablets (40 mg), your fostair, 2 puffs, and your omeprazole, 1 capsule, as taken. "
+    + 'Your prednisolone is for 5 more days. Your Fostair is to take every day, even when you feel well.';
+  assert.deepEqual(replyPoints(reply), [
+    "Thank you, Priya. I've marked your prednisolone, 8 tablets (40 mg), your fostair, 2 puffs, and your omeprazole, 1 capsule, as taken.",
+    'Your prednisolone is for 5 more days.',
+    'Your Fostair is to take every day, even when you feel well.',
+  ]);
+  assert.deepEqual(replyPoints('Your paracetamol, your blood thinner, or both?'), ['Your paracetamol, your blood thinner, or both?']);
+  assert.deepEqual(replyPoints('Thank you. Next is your walk.'), ['Thank you. Next is your walk.']);
+});
+
+test("the help card calls the letter's emergency number, or 999 when it gives none", () => {
+  assert.equal(emergencyNumber([
+    { urgency: 'contact_care_team', action: 'Call the ward on 0000 000 000 (fictional number)' },
+    { urgency: 'emergency', action: 'Call emergency services straight away: 555-555-0199' },
+  ]), '555-555-0199');
+  assert.equal(emergencyNumber([{ urgency: 'emergency', action: 'Call emergency services straight away' }]), null);
+  assert.equal(emergencyNumber([{ urgency: 'contact_care_team', action: 'Ward: 0000 000 001' }]), null);
+});
+
+test('a related line keeps its own heading, such as the emergency number', () => {
+  const r = readChat({ response: 'x', tool_trace: [], source: { page: 2, text: 'Call emergency services.', highlight: 'Call emergency services.',
+    related: [{ text: 'Emergency services number: 555-555-0199 (fictional number)', page: 2, label: 'Emergency number' }] } });
+  assert.deepEqual(r.source?.related, [{ text: 'Emergency services number: 555-555-0199 (fictional number)', page: 2, label: 'Emergency number' }]);
 });

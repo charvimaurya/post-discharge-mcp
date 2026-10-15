@@ -127,7 +127,7 @@ def test_completion_report_uses_write_tool_then_clears(bridge):
     assert ("report_task_completed", {"occurrence_id": WALK_ID}) in bridge.tool_calls
     # Today's facts are read first; "7:30" names the walk, so the model chooses and writes it.
     assert [step["tool"] for step in body["tool_trace"]] == [
-        "get_today_tasks", "get_medications", "get_today_tasks", "report_task_completed",
+        "get_today_tasks", "get_medications", "get_recovery_plan", "get_today_tasks", "report_task_completed",
     ]
     assert body["session_id"] == "s-walk"
     assert set(body) == {"response", "tool_trace", "source", "help", "session_id", "request_id"}

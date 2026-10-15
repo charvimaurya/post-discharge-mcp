@@ -580,3 +580,8 @@
 .awapp .voice .choices{display:flex;flex-wrap:wrap;gap:12px;margin-top:22px}
 .awapp .voice .choice{padding:12px 22px;border-radius:999px;border:1.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.08);color:#FFFFFF;font:inherit;font-size:19px;font-weight:700;cursor:pointer}
 .awapp .voice .choice:hover,.awapp .voice .choice:focus-visible{background:#B3264F;border-color:#B3264F;outline:none}
+/* A long reply: smaller, one sentence per bullet. */
+.awapp .turn.aw .points{margin:0;padding-left:1.15em;font-family:var(--serif);font-size:21px;line-height:1.38;font-weight:600;letter-spacing:-.1px;color:#FFFFFF}
+.awapp .turn.aw .points li{margin-bottom:10px;padding-left:4px}
+.awapp .turn.aw .points li::marker{color:#F7B7C6}
+.awapp .turn.aw.past .points{font-size:17px;margin-bottom:20px}

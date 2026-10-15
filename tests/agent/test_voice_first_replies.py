@@ -107,8 +107,10 @@ def test_model_reply_is_spoken_in_full(scripted_chat):
     )
 
     assert result["response"] == WHATS_LEFT_REPLY
-    # Today's facts are read first, then the model's own reads.
-    assert scripted_chat.tool_calls == ["get_today_tasks", "get_medications"] * 2
+    # Today's facts are read first, and the plan's appointments for the model; then the model's own reads.
+    assert scripted_chat.tool_calls == [
+        "get_today_tasks", "get_medications", "get_recovery_plan", "get_today_tasks", "get_medications",
+    ]
 
 
 def test_fixed_replies_never_mention_a_screen():

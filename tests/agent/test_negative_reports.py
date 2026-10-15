@@ -177,6 +177,25 @@ def test_my_tablets_with_one_medicine_due_records_it(chat):
     assert writes == ["med_para#2026-10-23#1"]
 
 
+def test_my_tablets_means_the_timed_medicine_not_an_any_time_one(chat):
+    # Leo: "You need to take your cetirizine this morning"; his ibuprofen has no time
+    # in the letter. "I took my tablets" is the cetirizine, not "ibuprofen or both?".
+    ibuprofen = [{"occurrence_id": f"med_ibu#2026-10-23#{n}", "medication_id": "med_ibu", "name": "Ibuprofen",
+                  "dose": "2 tablets", "occurrence_number": n, "status": "pending"} for n in (1, 2, 3)]
+    cetirizine = [{"occurrence_id": "med_cet#2026-10-23#1", "medication_id": "med_cet", "name": "Cetirizine",
+                   "dose": "1 tablet", "time_of_day_label": "morning", "occurrence_number": 1, "status": "pending"}]
+    chat.medications = ibuprofen + cetirizine
+
+    result, writes = chat.say("I have taken my tablets")
+
+    assert writes == ["med_cet#2026-10-23#1"], result["response"]
+
+    # With nothing timed left, the any-time medicine is the one.
+    _, writes = chat.say("I have taken my tablets")
+
+    assert writes == ["med_ibu#2026-10-23#1"]
+
+
 def test_negative_question_goes_to_the_model_but_cannot_write(chat):
     chat.model_turns = [
         {"role": "assistant", "content": [

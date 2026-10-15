@@ -34,7 +34,8 @@ export type ToolCall = { name: string; kind: 'read' | 'write'; args: string; res
 // text: the clean excerpt (or, from an older bridge, the raw passage); highlight: the sentence that answers;
 // section: the letter heading above it, e.g. "Medicines".
 // related: the letter's own line for an appointment the passage refers to ("Consultant review: ...").
-export type RelatedLine = { text: string; page: number | null };
+// label: the card's heading; "Linked appointment" unless the bridge names it ("Emergency number").
+export type RelatedLine = { text: string; page: number | null; label?: string };
 // note: shown under the marked line when the letter leaves something open ("no end date").
 export type SourceNote = { flag: string; text: string };
 export type Source = { text: string; highlight: string | null; page: number | null; section: string | null; related?: RelatedLine[]; note?: SourceNote | null } | null;
@@ -42,6 +43,17 @@ export type Source = { text: string; highlight: string | null; page: number | nu
 // requestId: the ID this turn has in every server log line (shown small in Developer view).
 // "Get help" card: who to call, in the letter's own words. Only set on a symptom reply.
 export type HelpAction = { urgency: string; action: string };
+
+// The letter's emergency number, added by the bridge to its emergency action
+// ("Call emergency services straight away: 555-555-0199"). Null when the letter gives none.
+export function emergencyNumber(actions: HelpAction[]): string | null {
+  for (const a of actions) {
+    if (a.urgency !== 'emergency') continue;
+    const m = /:\s*(\+?\(?\d[\d\s\-()]{1,18}\d)\s*$/.exec(a.action);
+    if (m) return m[1].replace(/\s+/g, ' ');
+  }
+  return null;
+}
 export type ChatReply = { text: string; tools: ToolCall[]; source: Source; completed: boolean; saved: boolean; requestId: string | null; help: HelpAction[] | null };
 
 type Obj = Record<string, unknown>;
@@ -234,7 +246,8 @@ export function readChat(json: unknown): ChatReply {
   const text = s ? str(s.text) || str(s.passage) : '';
   const highlight = s ? str(s.highlight) || str(s.highlighted_line) : '';
   const related: RelatedLine[] = (s && Array.isArray(s.related) ? s.related : []).filter(isObj)
-    .map(r => ({ text: str(r.text), page: Number(r.page) || null })).filter(r => r.text);
+    .map(r => ({ text: str(r.text), page: Number(r.page) || null, ...(str(r.label) ? { label: str(r.label) } : {}) }))
+    .filter(r => r.text);
   const note: SourceNote | null = s && isObj(s.note) && str(s.note.flag) ? { flag: str(s.note.flag), text: str(s.note.text) } : null;
   return {
     text: str(o.response),
@@ -406,4 +419,29 @@ export function answerChoices(question: string): AnswerChoice[] {
     ...names.map(n => ({ label: n[0].toUpperCase() + n.slice(1), say: `my ${n}` })),
     { label: all === 'both' ? 'Both' : 'All of them', say: all },
   ];
+}
+
+// Spoken when the microphone heard nothing. A question AfterWard is still waiting on is asked
+// again, so someone with no screen knows what to say: "Sorry, I didn't catch that. Your
+// paracetamol, your blood thinner, or both?"
+export function reprompt(turns: { who: string; text: string }[]): string {
+  const last = turns[turns.length - 1];
+  const waiting = last && last.who === 'aw' && last.text.includes('?')
+    ? last.text.slice(last.text.lastIndexOf('. ', last.text.indexOf('?')) + 1).trim()
+    : '';
+  return waiting ? `Sorry, I didn't catch that. ${waiting}` : "Sorry, I didn't catch that. Please say it again.";
+}
+
+// A long reply on screen as one point per sentence, easier to read than a block of text.
+// Alexa still speaks the whole reply. A short opener ("Thank you, Priya.") stays with the
+// sentence after it. A short reply, or one sentence, comes back as it is.
+export function replyPoints(text: string): string[] {
+  const sentences = text.trim().split(/(?<=[.?!])\s+(?=[A-Z"“‘(])/);
+  const points: string[] = [];
+  for (const s of sentences) {
+    const prev = points[points.length - 1];
+    if (prev !== undefined && prev.length < 25) points[points.length - 1] = `${prev} ${s}`;
+    else points.push(s);
+  }
+  return text.length > 150 && points.length > 1 ? points : [text];
 }

@@ -141,7 +141,7 @@ def chat_bridge(monkeypatch, mcp_hop):
                         lambda context, query: {"ok": False, "error": {"code": "INSUFFICIENT_EVIDENCE", "message": LETTER}})
 
     def converse(**kwargs):
-        text = {"role": "assistant", "content": [{"text": "Your letter does not say."}]}
+        text = {"role": "assistant", "content": [{"text": "I can only help with your recovery plan."}]}
         return {"output": {"message": text}, "stopReason": "end_turn",
                 "usage": {"inputTokens": 1200, "outputTokens": 30}}
 

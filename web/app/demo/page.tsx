@@ -18,7 +18,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './afterward.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
-import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, splitClock, str,
+import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str,
   type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
 import { canListen, finishListening, listenOnce, speak } from '../../lib/voice';
@@ -294,7 +294,11 @@ export default function DemoPage() {
       setHearing('');
       // Silence on screen looked like nothing was working; a lone short word is often not caught.
       if (heard) await send(heard);
-      else setError('I didn’t catch that. Please try again with a few more words, tap an answer, or type.');
+      else {
+        // Many people will have no screen: say it, and repeat the question still waiting, as Alexa re-prompts.
+        setError('I didn’t catch that. Please try again with a few more words, tap an answer, or type.');
+        void say(reprompt(turns));
+      }
     } catch (e) {
       setListening(false);
       setHearing('');
