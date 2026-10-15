@@ -7,7 +7,7 @@ from app.ingestion.normalizer import normalize_recovery_plan
 from app.ingestion.validator import validate_recovery_plan
 
 
-SCHEMA = json.loads(Path("app/ingestion/schemas/discharge-extraction.schema.json").read_text())
+SCHEMA = json.loads(Path("app/ingestion/schemas/discharge-extraction.schema.json").read_text(encoding="utf-8"))
 
 LETTER = """DAILY ACTIVITIES
 Rest with your leg raised between activities.

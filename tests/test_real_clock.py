@@ -116,7 +116,7 @@ def test_only_clock_reads_system_time():
         for path in Path(root).rglob('*.py'):
             if path == Path('app/clock.py'):
                 continue
-            for node in ast.walk(ast.parse(path.read_text())):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
                     assert node.func.attr not in {'now', 'utcnow', 'today'}, str(path)
                     assert not (node.func.attr == 'time' and isinstance(node.func.value, ast.Name) and node.func.value.id == 'time'), str(path)

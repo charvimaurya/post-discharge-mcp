@@ -300,7 +300,7 @@ def _content_names_used(expr):
 def _sources():
     for root in ("app", "lambdas"):
         for path in sorted(Path(root).rglob("*.py")):
-            yield path, ast.parse(path.read_text())
+            yield path, ast.parse(path.read_text(encoding="utf-8"))
 
 
 def test_no_log_line_uses_patient_content():

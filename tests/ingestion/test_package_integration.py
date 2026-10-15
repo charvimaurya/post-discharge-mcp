@@ -56,6 +56,6 @@ def test_package_schema_matches_existing_extraction_contract():
     local = Path(bedrock.__file__).parent / "schemas" / "discharge-extraction.schema.json"
     schema = bedrock.load_extraction_schema()
     assert isinstance(schema, dict)
-    assert schema == load_schema() == json.loads(local.read_text())
+    assert schema == load_schema() == json.loads(local.read_text(encoding="utf-8"))
     schema.clear()
     assert bedrock.load_extraction_schema() == bedrock.EXTRACTION_SCHEMA

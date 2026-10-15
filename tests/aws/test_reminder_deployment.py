@@ -9,7 +9,7 @@ DEPLOYMENT = Path(__file__).resolve().parents[2] / "deployment"
 
 
 def _load(name):
-    return json.loads((DEPLOYMENT / name).read_text())
+    return json.loads((DEPLOYMENT / name).read_text(encoding="utf-8"))
 
 
 def _actions_by_table(policy):
@@ -47,10 +47,10 @@ def test_schedule_input_never_sets_demo_now():
 
 
 def test_readme_creates_exactly_one_five_minute_schedule():
-    readme = (DEPLOYMENT / "README.md").read_text()
+    readme = (DEPLOYMENT / "README.md").read_text(encoding="utf-8")
 
     schedules = re.findall(r"aws scheduler create-schedule .*", readme)
 
     assert len(schedules) == 1
     assert '--schedule-expression "rate(5 minutes)"' in schedules[0]
-    assert "DEMO_FIXED_NOW" not in (DEPLOYMENT / "reminder-env.json").read_text()
+    assert "DEMO_FIXED_NOW" not in (DEPLOYMENT / "reminder-env.json").read_text(encoding="utf-8")
