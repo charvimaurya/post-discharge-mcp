@@ -3,14 +3,32 @@
 Built 31 Aug to 23 Oct 2026. Team: Charvi Maurya (developer), Shilpa Agarwal (mentor).
 First time using AWS and building a voice agent.
 
+Ordered by impact on patient safety, then on the demo. Every item below was found by testing the
+working app end to end with synthetic discharge letters. Items 1–5 are fixed in the app and each has
+automated tests using the patient's exact words (925 Python tests, 76 web tests in total).
+
 | # | Date | Product / service | What I was trying to do | What happened | Time lost | Workaround | Suggestion | Severity |
 |---|---|---|---|---|---|---|---|---|
-| 1 | | | | | | | | High / Med / Low |
+| 1 | 15 Oct | Amazon Bedrock (Claude Haiku 4.5, Converse API with tool use) | Answer "Can I go for a drive?" only from the patient's own letter | The model sometimes answered "I don't have information about driving in your recovery plan" **without calling the letter-search tool**. The letter does say "Do not drive until your consultant has reviewed you". A wrong "not in your letter" is a safety risk. | ~2 h | Code checks every model reply: a question about whether something is allowed, or any "not in your letter" answer, must follow a letter search; if not, the model is sent back to search first | A documented "answer only after retrieval" pattern for Converse tool use, or a grounding check that flags "not found" claims made without a retrieval call | High |
+| 2 | 15 Oct | Amazon Bedrock (structured extraction from the PDF) | Turn the discharge letter into a plan, including who to call in an emergency | Extraction kept "Call emergency services straight away" but **silently dropped the next line, "Emergency services number: 555-555-0199"**, because no field in our schema held it. The app fell back to saying 999. | ~1.5 h | At answer time, AfterWard looks the number up in the patient's own letter (S3 Vectors) and uses it in the spoken reply, the help banner and the evidence panel; 999 only when the letter gives no number | A report of letter lines the extraction did not map to any field, so safety-relevant text (phone numbers, contacts) is never lost silently | High |
+| 3 | 15 Oct | Browser speech recognition (Web Speech API, Chrome), standing in for Alexa+ | Let an older patient speak naturally | Short words were misheard: "can I" became **"can a"**, "both" became "boat" or "bolt". "Can a plan to go for drive" skipped the letter search entirely. | ~1.5 h | Misheard forms are accepted where the meaning is clear ("can a" = "can I"; "boat" = "both" only while "…or both?" is waiting); tap-to-answer buttons for short answers | Expose recognition alternatives and confidence for short utterances; give hackathon teams access to the Alexa+ MCP Toolkit so this can run on real Alexa+ speech | High |
+| 4 | 15 Oct | Our conversation rules (natural speech variety) | Understand "I had my breakfast and I have also taken the medicines" | Plural "medicines" was not recognised as a medicine word, so AfterWard asked "Have you taken them?" again, straight after she said she had | ~1 h | Plurals and everyday words (meds, pills, capsules, puffs, inhalers) recognised; regression tests for each wording | (Our learning) Test with how people actually talk, not how the code expects them to talk | Med |
+| 5 | 15 Oct | Amazon Bedrock (extraction) + real-world letters | Remind the right medicine at the right time | A letter gave ibuprofen with **no time of day**. It was treated as due all day, so "I took my tablets" asked "ibuprofen or cetirizine?" when the greeting had just said cetirizine | ~1 h | "My tablets" follows the same rule as the greeting: untimed medicines count only when nothing timed is due | Extraction could flag doses with no stated time, so the plan can ask the care team instead of guessing | Med |
+| 6 | 15 Oct | Amazon Bedrock (agent replies) | Write a word-for-word voiceover script for the demo video | The agent's wording varies slightly between runs, so the script and the app drifted apart | ~0.5 h | Record a practice run and copy the app's real words into the script; safety replies (symptoms, emergency number) are built in code, word for word, with no model | Per-request seed or deterministic mode for demos and regression tests | Low |
+| 7 | 15 Oct | Python on Windows | Run the test suite as judges would | 5 source-scanning tests fail on Windows with UnicodeDecodeError: Python reads files as cp1252 unless told otherwise | ~0.5 h | Run with `PYTHONUTF8=1` (all tests then pass) | UTF-8 by default on Windows (Python 3.15 makes UTF-8 mode the default) | Med |
+| 8 | 15 Oct | Amazon S3 Vectors console | Show judges that the letter is indexed for search | The console shows the vector bucket and index settings but not the stored passages, so there is nothing meaningful to show on screen | ~0.3 h | Architecture slide in the video at that point | A console view of a few vectors' metadata (text, page) | Low |
+| 9 | 15 Oct | Amazon ECS on Fargate console | Show the MCP server is healthy in the demo | The running task shows health "UNKNOWN", which looks like a problem on screen | ~0.2 h | Explained in the video; the service shows 1/1 tasks running since 13 Oct | Show "No health check configured" instead of "UNKNOWN" | Low |
+| 10 | 15 Oct | GitHub (team workflow) | Make sure the whole team works from the latest code | The repository had been renamed, and a teammate's README work sat on a branch that was never merged, so main did not have it | ~0.5 h | Merged the branch, fixed two stale file paths during the merge, ran all tests, pushed | (Our learning) One shared branch for submission week, and a quick check of open branches before every push | Low |
 
 ## Top 3 suggestions
-1.
-2.
-3.
+1. **Amazon Bedrock tool use:** make "answer only after retrieval" easy to enforce, so a health assistant can never say "your letter doesn't say" without having looked. Today this needs app-side checks and a second model call.
+2. **Amazon Bedrock extraction:** report the text a structured extraction did not map to any field. In a discharge letter, a dropped phone number is a safety gap, not a formatting issue.
+3. **Alexa+:** open the Alexa+ MCP Toolkit to hackathon teams. Our MCP server already works; browser speech recognition is the weakest part of the voice experience, especially for the short answers older patients give.
 
 ## What worked well
--
+- **S3 → SQS → Lambda → Bedrock** turned an uploaded letter into a ready plan in about 15 seconds, with a clear log line for every stage (received, extracted, checked, saved, indexed, ready) and no patient details in the logs.
+- **EventBridge Scheduler** ran the reminder check every five minutes with no errors.
+- **ECS on Fargate** kept the MCP server running without a restart since 13 Oct.
+- **S3 Vectors** with a patient filter returned the right passage of the right patient's letter, with its page number, so every answer can show its evidence.
+- **Safety replies built in code, not by the model:** symptoms are answered only with the letter's own warning signs, word for word, so the most important replies are predictable.
+- **Automated tests** caught every regression while fixing the items above: each fix added a test with the patient's exact words.
