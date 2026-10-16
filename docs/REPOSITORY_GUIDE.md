@@ -464,8 +464,7 @@ Afterward/
 ├── pytest.ini                         # Test discovery and default integration exclusions
 ├── .env                               # Local settings; excluded from Git
 ├── .env.example                       # Incomplete configuration template
-├── .gitignore                         # Keep secrets, caches, and builds out of Git
-└── output.txt                         # Index pointing to maintained documentation
+└── .gitignore                         # Keep secrets, caches, and builds out of Git
 ```
 
 The MCP folder contains preliminary helpers, but the **MCP server is not
