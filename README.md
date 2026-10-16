@@ -30,6 +30,30 @@ See [architecture details](docs/architecture.md).
 - **AWS Builder:** see [AWS integrations](docs/aws-integrations.md) for services and code links.
 - **Open Source:** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) is the standalone Python validator split out of AfterWard.
 
+## Built with, and where to find it
+
+| Step | Tag | Where it is | What it does |
+| --- | --- | --- | --- |
+| 1. Read the letter | `amazon-s3` | [app/aws/s3_service.py](app/aws/s3_service.py), [web/app/api/upload/route.ts](web/app/api/upload/route.ts) | Stores the uploaded discharge letter |
+| | `amazon-sqs` | [app/aws/sqs_service.py](app/aws/sqs_service.py), [deployment/redrive-policy.json](deployment/redrive-policy.json) | Queues processing work, keeps failed messages for retry |
+| | `aws-lambda` | [lambdas/document_processor/handler.py](lambdas/document_processor/handler.py), [lambdas/reminder_checker/handler.py](lambdas/reminder_checker/handler.py) | Processes letters; checks reminders |
+| | `pypdf` | [app/ingestion/pdf_processor.py](app/ingestion/pdf_processor.py) | Reads text from PDF letters |
+| 2. Answer from her letter | `amazon-bedrock`, `claude` | [app/ingestion/bedrock.py](app/ingestion/bedrock.py), [app/agent/service.py](app/agent/service.py) | Turns the letter into a plan; runs the agent that calls MCP tools |
+| | `amazon-titan` | [app/rag/embeddings.py](app/rag/embeddings.py) | Makes search embeddings of letter passages |
+| | `rag` | [app/rag/chunking.py](app/rag/chunking.py), [app/rag/service.py](app/rag/service.py), [app/mcp/tools/rag.py](app/mcp/tools/rag.py) | Finds the exact passage behind each answer |
+| | `amazon-s3-vectors` | [app/rag/vector_store.py](app/rag/vector_store.py) | Stores and searches those embeddings, per patient |
+| 3. One shared MCP server | `model-context-protocol` | [app/mcp/server.py](app/mcp/server.py), [app/mcp/http_server.py](app/mcp/http_server.py), [app/mcp/tools/](app/mcp/tools/) | 7 tools on MCP spec 2025-11-25 over Streamable HTTP |
+| | `python` | [app/](app/) | Server, agent and pipeline code |
+| | `docker`, `amazon-ecs` | [Dockerfile](Dockerfile), [ecs-task-definition.json](ecs-task-definition.json) | Runs the MCP server on ECS Fargate |
+| | `amazon-cloudfront` | [cloudfront-config.json](cloudfront-config.json), [app/mcp/http_server.py](app/mcp/http_server.py) | Gives the MCP server its HTTPS address |
+| 4. Talk to her | `web-speech-api` | [web/lib/voice.ts](web/lib/voice.ts) | Browser voice in and out |
+| | `next.js`, `typescript` | [web/app/demo/page.tsx](web/app/demo/page.tsx), [web/app/api/](web/app/api/) | The web demo and its API routes |
+| 5. Remember, remind, protect | `amazon-dynamodb` | [app/database/recovery_state.py](app/database/recovery_state.py), [app/database/event_history.py](app/database/event_history.py) | Keeps her plan and history |
+| | `amazon-eventbridge` | [deployment/reminder-schedule-target.json](deployment/reminder-schedule-target.json) | Runs the reminder check every 5 minutes |
+| | `aws-secrets-manager` | [app/auth/mcp_token.py](app/auth/mcp_token.py) | Holds the MCP server's login token |
+| | `aws-iam` | [infra/security/](infra/security/), [deployment/reminder-policy.json](deployment/reminder-policy.json) | Limits what each part can access |
+| | `amazon-cloudwatch` | [app/observability/log.py](app/observability/log.py), [infra/observability/template.yaml](infra/observability/template.yaml) | Logs and measurements from each part |
+
 ## How judges can test
 
 The quickest way to try AfterWard is the public demo: [TODO: add public demo link]. Running it locally needs your own AWS resources (see Local setup below).

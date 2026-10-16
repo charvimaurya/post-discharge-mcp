@@ -275,16 +275,21 @@ def after_that_sentence(steps: list[list[Any]], index: int) -> str:
 def day_summary(items: list[Any], first_name: str | None) -> str:
     """
     "What's left today?": one short sentence per part of the day, no counts,
-    no clock times. Midday counts as afternoon and bedtime as evening.
+    no clock times. Midday counts as afternoon and bedtime as evening. Items
+    the letter gives no time of day ("Rest with your leg raised") get their own
+    sentence, so nothing pending is left out.
     """
 
     parts = {"morning": [], "afternoon": [], "evening": []}
     belongs = {"morning": "morning", "midday": "afternoon", "afternoon": "afternoon",
                "evening": "evening", "bedtime": "evening"}
+    any_time: list[str] = []
 
     for item in items:
         part = belongs.get(item.slot or "")
         if part is None:
+            if item.spoken not in any_time:
+                any_time.append(item.spoken)
             continue
         if item.is_medication:
             name = medicine_name(item_name(item.occurrence))
@@ -295,6 +300,9 @@ def day_summary(items: list[Any], first_name: str | None) -> str:
 
     openers = {"morning": "This morning", "afternoon": "This afternoon", "evening": "This evening"}
     sentences = [f"{openers[part]}, your {_words_and(names)}." for part, names in parts.items() if names]
+
+    if any_time:
+        sentences.append(f"Any time today, {_words_and(any_time)}.")
 
     if not sentences:
         return everything_done(first_name)

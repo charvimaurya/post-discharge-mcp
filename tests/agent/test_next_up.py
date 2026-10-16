@@ -239,6 +239,54 @@ def test_whats_left_today_is_grouped_by_part_of_day(margaret):
     assert "codeine" not in reply.lower()
 
 
+def test_whats_left_today_names_items_with_no_time_of_day():
+    from app.agent.completion_replies import day_summary
+
+    tasks, meds = _day()
+    done(tasks, "walk#1", "walk#2", "ex#1", "ex#2", "ex#3")
+    done(meds, "para#1", "para#2", "para#3", "para#4", "apix#1", "apix#2")
+    tasks += [
+        {"occurrence_id": "ice#1", "task_id": "ice", "status": "pending", "occurrence_number": 1,
+         "description": "Ice pack on the knee for 20 minutes after each set of exercises"},
+        {"occurrence_id": "rest#1", "task_id": "rest", "status": "pending", "occurrence_number": 1,
+         "description": "Rest with your leg raised between activities"},
+        # A label that is not one of the five parts of the day.
+        {"occurrence_id": "tea#1", "task_id": "tea", "status": "pending", "occurrence_number": 1,
+         "description": "Check your wound", "time_of_day_label": "teatime"},
+    ]
+
+    reply = day_summary(build_next_up(tasks, meds, at("08:15")), "Margaret")
+
+    assert reply.startswith("Any time today, your ice pack on the knee, rest with your leg raised")
+    assert "wound" in reply and "codeine" not in reply.lower()
+
+
+@pytest.mark.parametrize("message", [
+    "Alexa can you tell me what is the plan for today",
+    "What's today's plan?",
+    "what's my plan",
+    "What does my day look like?",
+    "what do I need to do today",
+    "what's my schedule for today",
+])
+def test_asking_for_the_plan_for_today_gets_the_whole_day_summary(margaret, message):
+    reply = margaret.say(message, "07:00")[0]["response"]
+
+    assert reply.startswith("This morning, your paracetamol, blood thinner, knee exercises and walk.")
+    assert "This afternoon" in reply and "This evening" in reply
+
+
+@pytest.mark.parametrize("message", [
+    "What does my plan say about driving?",
+    "Can I plan to go for a drive?",
+    "what's next",
+])
+def test_other_questions_about_the_plan_are_not_the_day_summary(message):
+    from app.agent.safety import asks_whats_left_today
+
+    assert not asks_whats_left_today(message)
+
+
 def test_what_else_do_i_have_today_is_the_same_summary(margaret):
     done(margaret.tasks, "walk#1")
 

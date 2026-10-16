@@ -258,7 +258,9 @@ def with_emergency_line(source: dict[str, Any] | None, contact: dict[str, Any] |
         return {"document_id": None, "page": contact["page"], "chunk_id": None, "section": "Emergency number",
                 "text": line, "highlight": line, "passage": line, "highlighted_line": line}
 
-    if any(contact["number"] in str(r.get("text") or "") for r in source.get("related") or []):
+    # Already on screen, in the passage or a card: not shown twice.
+    shown = [str(source.get("text") or ""), *(str(r.get("text") or "") for r in source.get("related") or [])]
+    if any(contact["number"] in text for text in shown):
         return source
 
     return {**source, "related": [*(source.get("related") or []), card]}
@@ -298,8 +300,69 @@ def no_match_reply(symptom: Symptom, first_name: str | None, number: str | None 
     return reply.replace("call 999", _call_emergency(number))
 
 
-def sign_source(sign: dict[str, Any]) -> dict[str, Any] | None:
-    """The letter panel's source for a quoted warning sign."""
+def _same(a: dict[str, Any], b: dict[str, Any] | None) -> bool:
+    return b is not None and (a is b or bool(b.get("id") and a.get("id") == b.get("id")))
+
+
+def _where(sign: dict[str, Any]) -> tuple[Any, Any]:
+    source = sign.get("source") or {}
+    return source.get("document_id"), source.get("page")
+
+
+def _warning_box(sign: dict[str, Any] | None, warning_signs: list[dict[str, Any]]) -> tuple[str, str | None]:
+    """
+    The letter's whole warning-signs box, rebuilt from the plan's signs on the same
+    page, and the matched sign's words within it (None with no sign matched: then
+    the box is anchored on the first sign). Signs that share an action are listed
+    under it, as the letter does:
+
+        Call the ward on 0000 000 000 (fictional number) if you have:
+        - Pain, swelling, redness or heat in your calf.
+        - A temperature of 38°C or higher.
+        Call emergency services straight away if you have chest pain or ...
+    """
+
+    quoted = [s for s in warning_signs if (s.get("source") or {}).get("snippet")]
+    anchor = sign if sign is not None else (quoted[0] if quoted else None)
+
+    if anchor is None:
+        return "", None
+
+    signs = [s for s in quoted if _where(s) == _where(anchor)]
+
+    if not any(_same(s, anchor) for s in signs):
+        signs = [anchor]
+
+    lines: list[str] = []
+    highlight = sign["source"]["snippet"] if sign is not None else None
+    heading = None
+
+    for s in signs:
+        snippet = s["source"]["snippet"]
+        head = f"{s.get('action') or ''} if you have:"
+        item = snippet[len(head):].strip() if s.get("action") and snippet.lower().startswith(head.lower()) else ""
+        is_match = _same(s, sign)
+
+        if not item:
+            lines.append(snippet)
+            heading = None
+            continue
+
+        if heading != head:
+            lines.append(head)
+            heading = head
+        lines.append(f"- {item}")
+        if is_match:
+            highlight = item
+
+    return "\n".join(lines), highlight
+
+
+def sign_source(sign: dict[str, Any], warning_signs: list[dict[str, Any]] | None = None) -> dict[str, Any] | None:
+    """
+    The letter panel's source for a quoted warning sign. Given the plan's warning
+    signs, the panel shows the letter's whole box with this sign marked.
+    """
 
     source = sign.get("source") or {}
     snippet = source.get("snippet")
@@ -307,16 +370,94 @@ def sign_source(sign: dict[str, Any]) -> dict[str, Any] | None:
     if not snippet:
         return None
 
+    text, highlight = _warning_box(sign, warning_signs) if warning_signs else (snippet, snippet)
+
     return {
         "document_id": source.get("document_id"),
         "page": source.get("page"),
         "chunk_id": None,
         "section": "Warning signs",
-        "text": snippet,
-        "highlight": snippet,
-        "passage": snippet,
-        "highlighted_line": snippet,
+        "text": text,
+        "highlight": highlight,
+        "passage": text,
+        "highlighted_line": highlight,
     }
+
+
+def warning_signs_source(
+    warning_signs: list[dict[str, Any]],
+    sign: dict[str, Any] | None = None,
+    emergency: dict[str, Any] | None = None,
+    contacts: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    """
+    The letter panel for a symptom: the letter's whole warning-signs box, with the
+    matched sign marked (none marked when she only says she is unwell), then every
+    other way to get help the letter gives. Each number is shown once:
+
+    * the emergency line sits inside the box when the letter puts it on the same page,
+      otherwise it is a card of its own;
+    * other contact lines ("Switchboard: ... · Ward: ...") are one card each, and only
+      when they give a number not already on screen.
+
+    None when the letter has no quoted warning signs; the caller then falls back.
+    """
+
+    text, highlight = _warning_box(sign, warning_signs)
+
+    if not text:
+        return None
+
+    anchor = sign if sign is not None else next(s for s in warning_signs if (s.get("source") or {}).get("snippet"))
+    document_id, page = _where(anchor)
+    source = {
+        "document_id": document_id, "page": page, "chunk_id": None, "section": "Warning signs",
+        "text": text, "highlight": highlight, "passage": text, "highlighted_line": highlight,
+    }
+
+    if emergency and emergency["number"] not in text and emergency.get("page") == page:
+        source["text"] = source["passage"] = f"{text}\n{emergency['line']}"
+
+    source = with_emergency_line(source, emergency)
+
+    for contact in contacts or []:
+        shown = " ".join([source["text"], *(str(r.get("text") or "") for r in source.get("related") or [])])
+        if any(number not in shown for number in contact["numbers"]):
+            source["related"] = [*(source.get("related") or []),
+                                 {"text": contact["line"], "page": contact["page"], "label": "Contact numbers"}]
+
+    return source
+
+
+# A phone number: 7 or more digits, in groups ("0000 000 001", "555-555-0199", "+44 (0)20 7946 0000").
+_PHONE = re.compile(r"(?<![\w/])\+?\(?\d[\d \-()]{5,}\d(?![\w/])")
+# A line that gives a number to call, not one that identifies her or the letter.
+_CONTACT_WORDS = re.compile(r"\b(switchboard|ward|tel|telephone|phone|helpline|contact|call|surgery|nurse|clinic|team)\b",
+                            re.IGNORECASE)
+_NOT_A_CONTACT = re.compile(r"\b(nhs (no|number)|hospital no|mrn|ref|date of birth|dob)\b", re.IGNORECASE)
+
+
+def letter_contacts(passages: list[tuple[str, Any]]) -> list[dict[str, Any]]:
+    """
+    The letter's lines that give a phone number to call, word for word, from
+    (text, page) passages: [{"line": "Switchboard: 0000 000 000 · Ward: 0000 000 001
+    (fictional numbers)", "numbers": ["0000 000 000", "0000 000 001"], "page": 1}].
+    Each line once, in the order found.
+    """
+
+    found: list[dict[str, Any]] = []
+
+    for text, page in passages:
+        for raw in (text or "").splitlines():
+            line = " ".join(raw.split()).lstrip("•·*-\x7f ").strip()
+            numbers = [" ".join(m.split()) for m in _PHONE.findall(line)
+                       if sum(ch.isdigit() for ch in m) >= 7]
+            if not numbers or not _CONTACT_WORDS.search(line) or _NOT_A_CONTACT.search(line):
+                continue
+            if all(f["line"] != line for f in found):
+                found.append({"line": line, "numbers": numbers, "page": page})
+
+    return found
 
 
 def help_actions(warning_signs: list[dict[str, Any]], number: str | None = None) -> list[dict[str, str]]:

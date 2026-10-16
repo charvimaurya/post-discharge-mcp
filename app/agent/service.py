@@ -93,6 +93,7 @@ from app.agent.occurrence_resolver import (
 )
 from app.agent.prompts import QUESTION_IN_REPORT_RULES, SYSTEM_PROMPT
 from app.agent.safety import (
+    is_reminder_request,
     sounds_like_both,
     asked_about_completion,
     asks_after_that,
@@ -147,6 +148,8 @@ from app.agent.symptoms import (
     warning_sign_reply,
     emergency_contact,
     help_actions,
+    letter_contacts,
+    warning_signs_source,
     with_emergency_line,
 )
 from app.mcp.client import (
@@ -1211,14 +1214,16 @@ async def _symptom_turn(
     sign = match_warning_sign(symptom, warning_signs)
     # The letter's own emergency number ("Emergency services number: 555-555-0199"),
     # so neither the reply nor the help card says 999 when the letter gives another.
-    contact = await _letter_emergency_contact(tool_trace)
+    contact, other_contacts = await _letter_emergency_contact(tool_trace)
     number = contact["number"] if contact else None
     help_lines = help_actions(warning_signs, number)
 
     if sign is not None:
         sign_id = str(sign.get("id") or "unknown")
         log("symptom", reason=sign_id, kind="warning_sign")
-        source = with_emergency_line(sign_source(sign), contact if sign.get("urgency") == "emergency" else None)
+        # The letter's whole box with this sign marked, then its other numbers, each once.
+        source = (warning_signs_source(warning_signs, sign, contact, other_contacts)
+                  or with_emergency_line(sign_source(sign), contact))
         return warning_sign_reply(sign, first_name, number), source, help_lines
 
     # Not among the warning signs: look in the rest of the letter for the same symptom.
@@ -1242,11 +1247,18 @@ async def _symptom_turn(
 
     log("symptom", reason="none", kind="template")
 
-    return no_match_reply(symptom, first_name, number), with_emergency_line(None, contact), help_lines
+    # Nothing about this symptom: the letter's warning signs and every number it gives
+    # to call, so she can see for herself which applies.
+    source = warning_signs_source(warning_signs, None, contact, other_contacts) or with_emergency_line(None, contact)
+
+    return no_match_reply(symptom, first_name, number), source, help_lines
 
 
-async def _letter_emergency_contact(tool_trace: list[dict]) -> dict | None:
-    """The emergency number written in her letter, its line and page; None if it gives none."""
+async def _letter_emergency_contact(tool_trace: list[dict]) -> tuple[dict | None, list[dict]]:
+    """
+    The emergency number written in her letter, its line and page (None if it gives
+    none), and the letter's other lines with a number to call, from the same search.
+    """
 
     arguments = {"query": "emergency services phone number"}
 
@@ -1258,7 +1270,9 @@ async def _letter_emergency_contact(tool_trace: list[dict]) -> dict | None:
     matches = collect_rag_matches("search_discharge_instructions", found)
     tool_trace.append({"tool": "search_discharge_instructions", "arguments": arguments, "ok": bool(matches)})
 
-    return emergency_contact([(match.get("text") or "", match.get("page")) for match in matches])
+    passages = [(match.get("text") or "", match.get("page")) for match in matches]
+
+    return emergency_contact(passages), letter_contacts(passages)
 
 
 async def _food_turn(
@@ -1858,7 +1872,10 @@ async def _chat_turn(
     # "No, I haven't taken it" must never become a write. Anything
     # negative blocks every report_* tool for this turn.
     negative = is_negative_report(cleaned_message)
-    required_write = None if negative or answer_only else expected_write_tool(cleaned_message)
+    # "Remind me to take it later" means it is not done: it never records anything.
+    # (Saying yes to AfterWard's own offer to remind her still schedules that reminder.)
+    reminder_ask = is_reminder_request(cleaned_message)
+    required_write = None if negative or answer_only or reminder_ask else expected_write_tool(cleaned_message)
 
     # The facts for this turn: the patient's local time (shared
     # clock, so DEMO_FIXED_NOW applies) and today's occurrences.
@@ -1937,7 +1954,7 @@ async def _chat_turn(
             pending_checkin = None
 
     # Nothing is written unless she reported something or answered a question.
-    writes_allowed = intent in (Intent.REPORT, Intent.ANSWER) and not answer_only
+    writes_allowed = intent in (Intent.REPORT, Intent.ANSWER) and not answer_only and not reminder_ask
     # The question she is answering: a medicine question, or a waiting check-in.
     _TURN.get()["question"] = offer if offer and "occurrence_ids" in offer else pending_checkin
     missed_dose_pending = bool(pending_checkin) and pending_checkin.get("type") == "missed_dose"
@@ -1963,7 +1980,7 @@ async def _chat_turn(
         resolved_reply = await _answer_follow_on_offer(
             cleaned_message, offer, now, first_name, schedule_checkin, tool_trace,
         )
-    elif offer and offer.get("kind") in ("meal_medicines", "which_medicines") and today is not None:
+    elif offer and offer.get("kind") in ("meal_medicines", "which_medicines") and today is not None and not reminder_ask:
         resolved_reply = await _answer_which_medicines(
             cleaned_message, offer, today, now, first_name, session_id, tool_trace,
         )
@@ -1971,7 +1988,7 @@ async def _chat_turn(
     if resolved_reply is not None:
         pass
 
-    elif missed_dose_pending and today is not None:
+    elif missed_dose_pending and today is not None and not reminder_ask:
         # "Have you taken your blood thinner?" — answered in code.
         answer = await _missed_dose_turn(
             cleaned_message, pending_checkin, today, now, first_name,
@@ -2069,11 +2086,11 @@ async def _chat_turn(
         resolved_reply = compound_reply
         resolved_source = extras.get("source") or resolved_source
 
-    elif is_ambiguous_medication_write(cleaned_message) or (
+    elif not reminder_ask and (is_ambiguous_medication_write(cleaned_message) or (
         required_write == "report_medication_taken"
         and today is not None
         and count_without_name(cleaned_message, today["medications"])
-    ):
+    )):
         # "I took my tablets" / "I've taken one tablet": never let the model
         # guess which medicine; ask in code, and remember any count she gave.
         # Never let the model guess which medicine "my tablets" means.

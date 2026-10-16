@@ -217,6 +217,28 @@ def agent(monkeypatch):
     return run
 
 
+@pytest.mark.parametrize("message, pending", [
+    ("remind me to take my blood thinner in 2 hours", None),
+    ("can you remind me to take my tablets later", None),
+    ("Alexa, remind me to take my apixaban after breakfast", None),
+    # Even when she was just asked "have you taken your blood thinner?".
+    ("yes, remind me in 30 minutes", MISSED),
+    ("remind me to take it later", MISSED),
+])
+def test_asking_to_be_reminded_never_records_a_medicine_as_taken(agent, message, pending):
+    reply = agent.say(message, pending=pending)
+
+    # The model here always tries to save the blood thinner; nothing may be saved.
+    assert agent.saved == []
+    assert reply["response"]
+
+
+def test_a_real_report_is_still_recorded(agent):
+    agent.say("I've taken my blood thinner")
+
+    assert agent.saved == [APIX]
+
+
 def _mentions_medicine(reply: str) -> bool:
     return any(word in reply.lower() for word in ("blood thinner", "apixaban", "paracetamol", "tablet"))
 
@@ -228,7 +250,8 @@ def test_next_step_then_a_symptom_then_next_step_again(agent):
     symptom = agent.say("my head is hurting")
     assert symptom["response"] == f"I'm sorry your head hurts, Margaret. {NO_MATCH}"
     assert not _mentions_medicine(symptom["response"])
-    assert symptom["source"] is None
+    # Not in the letter: the panel shows its warning signs, with none marked.
+    assert symptom["source"]["section"] == "Warning signs" and symptom["source"]["highlight"] is None
 
     # Allowed again, because she asked.
     again = agent.say("what's next?")
@@ -347,7 +370,9 @@ def test_a_warning_sign_in_the_letter_is_quoted_word_for_word(agent, capsys, mes
     reply = agent.say(message, pending=MISSED)
 
     assert reply["response"] == f"I'm sorry to hear that, Margaret. Your letter says: {wording}"
-    assert reply["source"]["section"] == "Warning signs" and reply["source"]["highlight"] == wording
+    assert reply["source"]["section"] == "Warning signs"
+    # The panel shows the letter's whole box, with this sign's own words marked in it.
+    assert reply["source"]["highlight"] in wording and reply["source"]["highlight"] in reply["source"]["text"]
     assert not _mentions_medicine(reply["response"])
     # Only the letter's emergency number is looked up; the sign itself needs no search.
     assert agent.saved == [] and agent.model_calls == 0 and agent.searches == ["emergency services phone number"]

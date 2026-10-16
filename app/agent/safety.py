@@ -501,8 +501,30 @@ _AFTER_THAT = re.compile(
 
 _WHATS_LEFT_TODAY = re.compile(
     r"\b(what'?s|what is) left (to do )?(for )?today\b|\bleft today\b|\bwhat else\b|"
-    r"\brest of (the|my) day\b|\bwhat do i (still )?have (left )?today\b|\bwhat remains\b"
+    r"\brest of (the|my) day\b|\bwhat do i (still )?have (left )?today\b|\bwhat remains\b|"
+    # The whole day: "what is the plan for today", "today's plan", "what does my day look like".
+    # Not "my plan" on its own: "what does my plan say about driving" is a question about the letter.
+    r"\b(plan|schedule) for (today|the day)\b|\btoday'?s (plan|schedule)\b|\bwhat'?s on today\b|"
+    r"\bwhat (do|have) i (got|have|need) to do today\b|\bwhat am i doing today\b|\bmy day look like\b|"
+    r"^(so )?what'?s (the|my) plan\??$|^(so )?what is (the|my) plan\??$"
 )
+
+
+_REMIND_ME = re.compile(
+    r"\b(remind me|set (?:a|an|me a) (?:reminder|timer|alarm)|give me a (?:reminder|nudge)|"
+    r"(?:can|could|will|would) you remind)\b"
+)
+
+
+def is_reminder_request(message: str) -> bool:
+    """
+    'Remind me to take my tablets later', 'yes, remind me in 30 minutes'.
+
+    Asking to be reminded means it is not done yet, so such a message never
+    records anything, even as an answer to "have you taken it?".
+    """
+
+    return bool(_REMIND_ME.search(_plain(message)))
 
 
 def asks_after_that(message: str) -> bool:

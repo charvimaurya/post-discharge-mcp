@@ -98,3 +98,50 @@ def test_the_letters_emergency_line_is_shown_as_its_own_card():
 
     # No number in the letter: nothing is added.
     assert with_emergency_line(sign_source(EMERGENCY), None) == sign_source(EMERGENCY)
+
+
+def test_feeling_unwell_shows_the_box_and_every_number_once():
+    from app.agent.symptoms import letter_contacts, warning_signs_source
+
+    ward = "Call the ward on 0000 000 000 (fictional number)"
+    where = {"document_id": "doc", "page": 2}
+    calf = {"id": "w1", "action": ward, "source": {**where, "snippet": f"{ward} if you have: Pain in your calf."}}
+    chest = {**EMERGENCY, "source": {**where, **EMERGENCY["source"]}}
+    header = "Hospital no.: SYN-0001\nNHS number: 485 777 3456\nSwitchboard: 0000 000 000 · Ward: 0000 000 001"
+    contacts = letter_contacts([(header, 1), (f"{ward} if you have:", 2)])
+    emergency = {"number": "555-555-0199", "line": "Emergency services number: 555-555-0199 (fictional number)",
+                 "page": 2}
+
+    # Her NHS number is not a number to call.
+    assert [c["line"] for c in contacts] == ["Switchboard: 0000 000 000 · Ward: 0000 000 001",
+                                             f"{ward} if you have:"]
+
+    source = warning_signs_source([calf, chest], None, emergency, contacts)
+
+    assert source["highlight"] is None
+    # The emergency line sits in the box, as in the letter; the ward line is not repeated.
+    assert source["text"].endswith("\nEmergency services number: 555-555-0199 (fictional number)")
+    assert source["related"] == [{"text": "Switchboard: 0000 000 000 · Ward: 0000 000 001", "page": 1,
+                                  "label": "Contact numbers"}]
+    assert sum(source["text"].count(n) for n in ("555-555-0199",)) == 1
+
+
+def test_the_panel_shows_the_whole_warning_signs_box_with_the_sign_marked():
+    from app.agent.symptoms import sign_source
+
+    ward = "Call the ward on 0000 000 000 (fictional number)"
+    where = {"document_id": "doc", "page": 2}
+    calf = {"id": "w1", "action": ward, "source": {**where, "snippet": f"{ward} if you have: Pain or heat in your calf."}}
+    fever = {"id": "w2", "action": ward, "source": {**where, "snippet": f"{ward} if you have: A temperature of 38°C."}}
+    chest = {**EMERGENCY, "source": {**where, **EMERGENCY["source"]}}
+    elsewhere = {"id": "w9", "action": ward, "source": {"document_id": "doc", "page": 5, "snippet": "Other page."}}
+
+    source = sign_source(calf, [calf, fever, chest, elsewhere])
+
+    assert source["text"] == (
+        f"{ward} if you have:\n- Pain or heat in your calf.\n- A temperature of 38°C.\n"
+        "Call emergency services straight away if you have chest pain or sudden shortness of breath."
+    )
+    assert source["highlight"] == "Pain or heat in your calf."
+    # A sign that is a sentence of its own is marked whole.
+    assert sign_source(chest, [calf, fever, chest])["highlight"] == chest["source"]["snippet"]
