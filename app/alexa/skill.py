@@ -33,8 +33,10 @@ def _flag(name: str) -> bool:
 
 def build_skill():
     builder = SkillBuilder()
+    # Order matters: the fallback handles any intent the others do not, so it comes last.
     for handler in (handlers.LaunchHandler(), handlers.OpeningHandler(), handlers.MedicineAnswerHandler(),
-                    handlers.SessionEndedHandler(), handlers.ComingSoonHandler()):
+                    handlers.HelpHandler(), handlers.StopHandler(), handlers.SessionEndedHandler(),
+                    handlers.FallbackHandler()):
         builder.add_request_handler(handler)
     builder.add_exception_handler(handlers.ErrorHandler())
     return builder.create()

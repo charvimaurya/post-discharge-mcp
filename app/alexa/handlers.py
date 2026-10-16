@@ -33,7 +33,9 @@ TURN_TIMEOUT_SECONDS = 7.0
 REPROMPT = "Anything else?"
 NOT_REACHED = "Sorry, I couldn't reach the assistant. Please try again."
 TOO_SLOW = "Sorry, that took too long. Please say it again."
-COMING_SOON = "That part is coming soon. You can tell me what you've done, or ask what's next."
+HELP = ("You can tell me what you've done, like: I'm back from my walk. You can ask about your letter, "
+        "like: can I have a bath? Or ask: what's next? If something is wrong right now, say: I need help.")
+FALLBACK = "Sorry, I didn't catch that. You can say what you've done, or ask about your letter."
 
 # Alexa says only which intent and slot matched, not which sample, so each opening
 # phrase is its own intent: "I've had" + "my breakfast and I've taken my medicine"
@@ -51,6 +53,44 @@ OPENINGS = {
     "BothIntent": "both",
     "JustTheIntent": "just the",
     "OnlyTheIntent": "only the",
+    # Questions about her letter.
+    "AskWhenCanIIntent": "when can I",
+    "AskCanIIntent": "can I",
+    "AskHowLongIntent": "how long",
+    "AskHowOftenIntent": "how often",
+    "AskIsItOkIntent": "is it ok to",
+    "AskIsItSafeIntent": "is it safe to",
+    "AskAllowedIntent": "am I allowed to",
+    "AskShouldIIntent": "should I",
+    "AskNeedToIntent": "do I need to",
+    "AskLetterSayIntent": "what does my letter say about",
+    "AskWhatAboutIntent": "what about",
+    "AskWhyIntent": "why do I",
+    # Feeling unwell.
+    "UnwellFeelIntent": "I feel",
+    "UnwellFeelingIntent": "I'm feeling",
+    "UnwellMyIntent": "my",
+    "UnwellGotIntent": "I've got",
+    "UnwellHaveIntent": "I have",
+    "UnwellThinkIntent": "I think I",
+    "UnwellTheresIntent": "there's",
+    "UnwellCantIntent": "I can't",
+}
+
+# Intents whose samples are whole phrases with no slot: the sentence sent for each.
+FIXED = {
+    "NeedHelpIntent": "I need help",
+    "NotWellIntent": "I'm not well",
+    "InPainIntent": "I'm in pain",
+    "BreathlessIntent": "I'm short of breath",
+    "WhatsNextIntent": "What's next?",
+    "PlanTodayIntent": "What's left today?",
+    "AfterThatIntent": "And after that?",
+}
+
+# Her saying she is unwell: the reply is spoken as it is, and never followed by "Anything else?".
+UNWELL = {name for name in [*OPENINGS, *FIXED] if name.startswith("Unwell")} | {
+    "NeedHelpIntent", "NotWellIntent", "InPainIntent", "BreathlessIntent",
 }
 
 
@@ -82,13 +122,14 @@ def _query(handler_input) -> str:
     return " ".join(str(slot.value or "").split()) if slot else ""
 
 
-def _say(handler_input, text: str):
-    """Speak text as plain text (never SSML: letter wording may hold "<" or "&"), session left open."""
+def _say(handler_input, text: str, reprompt: bool = True, end: bool = False):
+    """Speak text as plain text (never SSML: letter wording may hold "<" or "&")."""
 
     response = handler_input.response_builder.response
     response.output_speech = PlainTextOutputSpeech(text=text)
-    response.reprompt = Reprompt(output_speech=PlainTextOutputSpeech(text=REPROMPT))
-    response.should_end_session = False
+    if reprompt and not end:
+        response.reprompt = Reprompt(output_speech=PlainTextOutputSpeech(text=REPROMPT))
+    response.should_end_session = end
     return response
 
 
@@ -111,15 +152,19 @@ class LaunchHandler(AbstractRequestHandler):
 
 
 class OpeningHandler(AbstractRequestHandler):
-    """Every "<opening words> {query}" intent: the opening words plus what followed, as one sentence."""
+    """
+    Every "<opening words> {query}" intent and every fixed-phrase intent: her sentence,
+    rebuilt, through the same turn as the web chat. Unwell replies get no reprompt.
+    """
 
     def can_handle(self, handler_input):
-        return any(is_intent_name(name)(handler_input) for name in OPENINGS)
+        return any(is_intent_name(name)(handler_input) for name in [*OPENINGS, *FIXED])
 
     def handle(self, handler_input):
-        opening = OPENINGS[handler_input.request_envelope.request.intent.name]
-        message = f"{opening} {_query(handler_input)}".strip()
-        return _say(handler_input, _turn(message, _session_id(handler_input), handler_input))
+        name = handler_input.request_envelope.request.intent.name
+        message = FIXED[name] if name in FIXED else f"{OPENINGS[name]} {_query(handler_input)}".strip()
+        reply = _turn(message, _session_id(handler_input), handler_input)
+        return _say(handler_input, reply, reprompt=name not in UNWELL)
 
 
 class MedicineAnswerHandler(AbstractRequestHandler):
@@ -134,14 +179,34 @@ class MedicineAnswerHandler(AbstractRequestHandler):
         return _say(handler_input, _turn(message or "both", _session_id(handler_input), handler_input))
 
 
-class ComingSoonHandler(AbstractRequestHandler):
-    """Every other intent, until Step 7."""
+class HelpHandler(AbstractRequestHandler):
+    def can_handle(self, handler_input):
+        return is_intent_name("AMAZON.HelpIntent")(handler_input)
+
+    def handle(self, handler_input):
+        return _say(handler_input, HELP)
+
+
+class StopHandler(AbstractRequestHandler):
+    """Stop, Cancel, or Home: say goodbye by name and end the session."""
+
+    def can_handle(self, handler_input):
+        return any(is_intent_name(name)(handler_input)
+                   for name in ("AMAZON.StopIntent", "AMAZON.CancelIntent", "AMAZON.NavigateHomeIntent"))
+
+    def handle(self, handler_input):
+        name = (get_recovery_state(get_demo_patient_context().patient_id) or {}).get("first_name")
+        return _say(handler_input, f"Take care, {name}." if name else "Take care.", end=True)
+
+
+class FallbackHandler(AbstractRequestHandler):
+    """AMAZON.FallbackIntent, and any intent nothing else handles."""
 
     def can_handle(self, handler_input):
         return is_request_type("IntentRequest")(handler_input)
 
     def handle(self, handler_input):
-        return _say(handler_input, COMING_SOON)
+        return _say(handler_input, FALLBACK)
 
 
 class SessionEndedHandler(AbstractRequestHandler):

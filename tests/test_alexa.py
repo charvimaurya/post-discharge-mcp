@@ -86,6 +86,13 @@ def test_back_from_rebuilds_her_sentence_and_keeps_the_session_open(alexa):
     ("TakenIntent", {"query": "both how long do I take them for"}, "I've taken both how long do I take them for"),
     ("YesIntent", {"query": "both tablets taken and how long those for"}, "yes both tablets taken and how long those for"),
     ("MedicineAnswerIntent", {"medicine": "both"}, "both"),
+    ("AskWhenCanIIntent", {"query": "plan to go for a drive"}, "when can I plan to go for a drive"),
+    ("AskCanIIntent", {"query": "have a glass of wine"}, "can I have a glass of wine"),
+    ("UnwellMyIntent", {"query": "calf is swollen"}, "my calf is swollen"),
+    ("BreathlessIntent", {}, "I'm short of breath"),
+    ("NeedHelpIntent", {}, "I need help"),
+    ("WhatsNextIntent", {}, "What's next?"),
+    ("PlanTodayIntent", {}, "What's left today?"),
 ])
 def test_each_opening_reaches_the_agent_as_she_said_it(alexa, intent, slots, message):
     alexa.send(_intent(intent, **slots))
@@ -100,7 +107,13 @@ def test_every_opening_intent_in_the_model_has_its_opening_words():
             opening = handlers.OPENINGS[intent["name"]].lower()
             assert any(sample.lower().startswith(opening) for sample in intent["samples"]), intent["name"]
     names = {intent["name"] for intent in model["interactionModel"]["languageModel"]["intents"]}
-    assert set(handlers.OPENINGS) <= names
+    # Every handled intent is in the model, and every custom intent in the model is handled.
+    handled = set(handlers.OPENINGS) | set(handlers.FIXED) | {"MedicineAnswerIntent"}
+    assert handled <= names
+    assert {name for name in names if not name.startswith("AMAZON.")} <= handled
+
+    samples = [s.lower() for intent in model["interactionModel"]["languageModel"]["intents"] for s in intent["samples"]]
+    assert len(samples) == len(set(samples)), "a sample is in two intents"
 
 
 def test_the_sentence_is_echoed_only_when_asked(alexa, monkeypatch):
@@ -112,10 +125,33 @@ def test_the_sentence_is_echoed_only_when_asked(alexa, monkeypatch):
     assert echoed["sessionAttributes"]["sent_to_run_turn"] == "I'm back from my walk"
 
 
-def test_other_intents_say_coming_soon(alexa):
-    text, _, _ = alexa.speech(alexa.send(_intent("AskLetterIntent", query="have a bath")))
+@pytest.mark.parametrize("intent, slots", [("UnwellMyIntent", {"query": "calf is swollen"}), ("NeedHelpIntent", {})])
+def test_unwell_reply_is_spoken_as_it_is_with_no_reprompt(alexa, intent, slots):
+    text, reprompt, ends = alexa.speech(alexa.send(_intent(intent, **slots)))
 
-    assert text == handlers.COMING_SOON and alexa.turns == []
+    assert text == f"Reply to: {alexa.turns[0][0]}"
+    assert reprompt is None and ends is False
+
+
+def test_help_ends_with_how_to_get_help_now(alexa):
+    text, reprompt, ends = alexa.speech(alexa.send(_intent("AMAZON.HelpIntent")))
+
+    assert text.endswith("If something is wrong right now, say: I need help.")
+    assert reprompt and not ends and alexa.turns == []
+
+
+@pytest.mark.parametrize("intent", ["AMAZON.StopIntent", "AMAZON.CancelIntent"])
+def test_stop_and_cancel_say_goodbye_and_end(alexa, intent):
+    text, reprompt, ends = alexa.speech(alexa.send(_intent(intent)))
+
+    assert text == "Take care, Margaret." and ends is True and reprompt is None
+
+
+@pytest.mark.parametrize("intent", ["AMAZON.FallbackIntent", "SomeUnknownIntent"])
+def test_fallback(alexa, intent):
+    text, _, ends = alexa.speech(alexa.send(_intent(intent)))
+
+    assert text == handlers.FALLBACK and not ends and alexa.turns == []
 
 
 def test_another_skill_is_refused_and_logged(alexa, capsys):

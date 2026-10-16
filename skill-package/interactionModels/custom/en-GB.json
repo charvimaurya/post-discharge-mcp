@@ -5,104 +5,437 @@
       "intents": [
         {
           "name": "BackFromIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I'm back from {query}", "back from {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I'm back from {query}",
+            "back from {query}"
+          ]
         },
         {
           "name": "DoneIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I've done {query}", "I've just done {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've done {query}",
+            "I've just done {query}"
+          ]
         },
         {
           "name": "DidIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I did {query}", "I just did {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I did {query}",
+            "I just did {query}"
+          ]
         },
         {
           "name": "FinishedIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I've finished {query}", "I finished {query}", "I've completed {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've finished {query}",
+            "I finished {query}",
+            "I've completed {query}"
+          ]
         },
         {
           "name": "BeenForIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I've been for {query}", "I went for {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've been for {query}",
+            "I went for {query}"
+          ]
         },
         {
           "name": "DoneWithIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I'm done with {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I'm done with {query}"
+          ]
         },
         {
           "name": "TakenIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I've taken {query}", "I've just taken {query}", "I took {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've taken {query}",
+            "I've just taken {query}",
+            "I took {query}"
+          ]
         },
         {
           "name": "HadIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["I've had {query}", "I had {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've had {query}",
+            "I had {query}"
+          ]
         },
         {
           "name": "YesIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["yes {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "yes {query}"
+          ]
         },
         {
           "name": "BothIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["both {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "both {query}"
+          ]
         },
         {
           "name": "JustTheIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["just the {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "just the {query}"
+          ]
         },
         {
           "name": "OnlyTheIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": ["only the {query}"]
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "only the {query}"
+          ]
         },
         {
           "name": "MedicineAnswerIntent",
-          "slots": [{ "name": "medicine", "type": "MEDICINE" }],
-          "samples": ["{medicine}", "the {medicine}"]
+          "slots": [
+            {
+              "name": "medicine",
+              "type": "MEDICINE"
+            }
+          ],
+          "samples": [
+            "{medicine}",
+            "the {medicine}"
+          ]
         },
         {
-          "name": "AskLetterIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "name": "AskWhenCanIIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
           "samples": [
-            "when can I {query}",
-            "can I {query}",
-            "how long {query}",
-            "how often {query}",
-            "is it ok to {query}",
-            "is it safe to {query}",
-            "am I allowed to {query}",
-            "should I {query}",
-            "do I need to {query}",
-            "what does my letter say about {query}",
-            "what about {query}",
+            "when can I {query}"
+          ]
+        },
+        {
+          "name": "AskCanIIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "can I {query}"
+          ]
+        },
+        {
+          "name": "AskHowLongIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "how long {query}"
+          ]
+        },
+        {
+          "name": "AskHowOftenIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "how often {query}"
+          ]
+        },
+        {
+          "name": "AskIsItOkIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "is it ok to {query}"
+          ]
+        },
+        {
+          "name": "AskIsItSafeIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "is it safe to {query}"
+          ]
+        },
+        {
+          "name": "AskAllowedIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "am I allowed to {query}"
+          ]
+        },
+        {
+          "name": "AskShouldIIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "should I {query}"
+          ]
+        },
+        {
+          "name": "AskNeedToIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "do I need to {query}"
+          ]
+        },
+        {
+          "name": "AskLetterSayIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "what does my letter say about {query}"
+          ]
+        },
+        {
+          "name": "AskWhatAboutIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "what about {query}"
+          ]
+        },
+        {
+          "name": "AskWhyIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
             "why do I {query}"
           ]
         },
         {
-          "name": "UnwellIntent",
-          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "name": "UnwellFeelIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
           "samples": [
-            "I feel {query}",
-            "I'm feeling {query}",
-            "my {query}",
-            "I've got {query}",
-            "I have {query}",
-            "I think I {query}",
-            "there's {query}",
-            "I can't {query}",
+            "I feel {query}"
+          ]
+        },
+        {
+          "name": "UnwellFeelingIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I'm feeling {query}"
+          ]
+        },
+        {
+          "name": "UnwellMyIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "my {query}"
+          ]
+        },
+        {
+          "name": "UnwellGotIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've got {query}"
+          ]
+        },
+        {
+          "name": "UnwellHaveIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have {query}"
+          ]
+        },
+        {
+          "name": "UnwellThinkIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I think I {query}"
+          ]
+        },
+        {
+          "name": "UnwellTheresIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "there's {query}"
+          ]
+        },
+        {
+          "name": "UnwellCantIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I can't {query}"
+          ]
+        },
+        {
+          "name": "NeedHelpIntent",
+          "slots": [],
+          "samples": [
             "I need help",
-            "help me",
+            "help me"
+          ]
+        },
+        {
+          "name": "NotWellIntent",
+          "slots": [],
+          "samples": [
             "I'm not well",
-            "I don't feel well",
-            "I'm in pain",
+            "I don't feel well"
+          ]
+        },
+        {
+          "name": "InPainIntent",
+          "slots": [],
+          "samples": [
+            "I'm in pain"
+          ]
+        },
+        {
+          "name": "BreathlessIntent",
+          "slots": [],
+          "samples": [
             "I'm short of breath",
             "I'm out of breath"
           ]
@@ -115,30 +448,80 @@
             "what next",
             "what comes next",
             "what do I do now",
-            "what do I have to do",
+            "what do I have to do"
+          ]
+        },
+        {
+          "name": "PlanTodayIntent",
+          "slots": [],
+          "samples": [
             "what's my plan for today",
             "what is the plan for today",
             "what's left today",
             "what else do I have today",
-            "what's on today",
+            "what's on today"
+          ]
+        },
+        {
+          "name": "AfterThatIntent",
+          "slots": [],
+          "samples": [
             "and after that",
             "then what"
           ]
         },
-        { "name": "AMAZON.HelpIntent", "samples": [] },
-        { "name": "AMAZON.StopIntent", "samples": [] },
-        { "name": "AMAZON.CancelIntent", "samples": [] },
-        { "name": "AMAZON.FallbackIntent", "samples": [] },
-        { "name": "AMAZON.NavigateHomeIntent", "samples": [] }
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        }
       ],
       "types": [
         {
           "name": "MEDICINE",
           "values": [
-            { "name": { "value": "paracetamol" } },
-            { "name": { "value": "apixaban", "synonyms": ["blood thinner"] } },
-            { "name": { "value": "codeine" } },
-            { "name": { "value": "both", "synonyms": ["boat", "bolt"] } }
+            {
+              "name": {
+                "value": "paracetamol"
+              }
+            },
+            {
+              "name": {
+                "value": "apixaban",
+                "synonyms": [
+                  "blood thinner"
+                ]
+              }
+            },
+            {
+              "name": {
+                "value": "codeine"
+              }
+            },
+            {
+              "name": {
+                "value": "both",
+                "synonyms": [
+                  "boat",
+                  "bolt"
+                ]
+              }
+            }
           ]
         }
       ]
