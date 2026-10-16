@@ -45,6 +45,8 @@ ALLOWED_FIELDS = frozenset({
     "tool", "kind", "reason", "model", "tool_calls", "tokens_in", "tokens_out",
     "document_id", "stage", "item_count", "needs_confirmation_count", "checkin_type",
     "error_type", "error_code",
+    # Alexa requests: the request type and intent name (codes, never her words), and whether it timed out.
+    "request_type", "intent", "timed_out",
 })
 
 # name -> CloudWatch unit. A metric not listed here is dropped like any other field.

@@ -21,7 +21,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app.alexa import handlers
-from app.observability.log import service_log
+from app.observability.log import Timer, service_log
 
 
 log = service_log("alexa")
@@ -78,8 +78,16 @@ async def alexa_endpoint(request: Request) -> JSONResponse:
     if not expected or getattr(application, "application_id", None) != expected:
         return _refuse("skill_id", 403)
 
-    # The handlers find this loop through the context the worker thread copies.
+    # The handlers find this loop, and this request's info, through the context the worker thread copies.
+    timer = Timer()
+    info = {"timed_out": False}
     handlers.BRIDGE_LOOP.set(asyncio.get_running_loop())
+    handlers.REQUEST_INFO.set(info)
     reply = await asyncio.to_thread(_dispatcher.verify_request_and_dispatch, headers, body)
+
+    # One line per request: its type and intent name, never what she said.
+    intent = getattr(envelope.request, "intent", None)
+    log("alexa_request", request_type=envelope.request.object_type, intent=getattr(intent, "name", None),
+        ms=timer.ms, timed_out=info["timed_out"])
 
     return JSONResponse(reply, headers={"Cache-Control": "no-store"})

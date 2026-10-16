@@ -10,11 +10,12 @@ loop, so it is sent there with run_coroutine_threadsafe and waited for here.
 import asyncio
 import contextvars
 import os
+import re
 from concurrent.futures import TimeoutError as FutureTimeout
 
 from ask_sdk_core.dispatch_components import AbstractExceptionHandler, AbstractRequestHandler
 from ask_sdk_core.utils import get_slot, is_intent_name, is_request_type
-from ask_sdk_model.ui import PlainTextOutputSpeech, Reprompt
+from ask_sdk_model.ui import PlainTextOutputSpeech, Reprompt, SimpleCard
 
 from app.database.recovery_state import get_recovery_state
 from app.mcp.context import get_demo_patient_context
@@ -26,13 +27,32 @@ log = service_log("alexa")
 
 # The bridge's event loop, set by the /alexa route before it hands the request to a thread.
 BRIDGE_LOOP: contextvars.ContextVar[asyncio.AbstractEventLoop] = contextvars.ContextVar("bridge_loop")
-
-# Alexa waits about 8 seconds for a reply.
-TURN_TIMEOUT_SECONDS = 7.0
+# This request's facts for the route's alexa_request log line (the same dict, seen from the thread).
+REQUEST_INFO: contextvars.ContextVar[dict] = contextvars.ContextVar("alexa_request_info")
 
 REPROMPT = "Anything else?"
 NOT_REACHED = "Sorry, I couldn't reach the assistant. Please try again."
-TOO_SLOW = "Sorry, that took too long. Please say it again."
+TOO_SLOW = "Give me a moment, then ask me again."
+CARD_TITLE = "From your discharge letter"
+
+
+def _timeout_seconds() -> float:
+    """ALEXA_AGENT_TIMEOUT_SECONDS, default 7: Alexa waits about 8 seconds for a reply."""
+
+    try:
+        seconds = float(os.getenv("ALEXA_AGENT_TIMEOUT_SECONDS", "7"))
+    except ValueError:
+        return 7.0
+    return seconds if seconds > 0 else 7.0
+
+
+def plain_speech(text: str) -> str:
+    """Markdown the agent may write ("**bold**", "- item", "[text](url)") read as plain words."""
+
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text or "")
+    text = re.sub(r"(\*\*|__|`|\*)", "", text)
+    text = re.sub(r"(?m)^\s*(#{1,6}\s+|[-*•]\s+|\d+\.\s+)", "", text)
+    return " ".join(text.split())
 HELP = ("You can tell me what you've done, like: I'm back from my walk. You can ask about your letter, "
         "like: can I have a bath? Or ask: what's next? If something is wrong right now, say: I need help.")
 FALLBACK = "Sorry, I didn't catch that. You can say what you've done, or ask about your letter."
@@ -94,8 +114,8 @@ UNWELL = {name for name in [*OPENINGS, *FIXED] if name.startswith("Unwell")} | {
 }
 
 
-def _turn(message: str, session_id: str, handler_input=None) -> str:
-    """Run one turn on the bridge's loop and wait for it here; always returns something to say."""
+def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict | None]:
+    """Run one turn on the bridge's loop and wait for it here: (what to say, the letter source)."""
 
     # Local testing only: ALEXA_ECHO_SENTENCE=true returns the sentence sent to the agent in the
     # response's session attributes. Never logged: logs hold no patient words.
@@ -104,13 +124,18 @@ def _turn(message: str, session_id: str, handler_input=None) -> str:
 
     future = asyncio.run_coroutine_threadsafe(run_turn(message, session_id), BRIDGE_LOOP.get())
     try:
-        return future.result(timeout=TURN_TIMEOUT_SECONDS)["response"]
+        result = future.result(timeout=_timeout_seconds())
     except FutureTimeout:
-        log("alexa_turn_slow", level="error")
-        return TOO_SLOW
+        log("alexa_timeout", level="warning")
+        info = REQUEST_INFO.get(None)
+        if info is not None:
+            info["timed_out"] = True
+        return TOO_SLOW, None
     except TurnFailed as failed:
         log("alexa_turn_failed", level="error", error=failed.__cause__)
-        return NOT_REACHED
+        return NOT_REACHED, None
+
+    return result["response"], result.get("source")
 
 
 def _session_id(handler_input) -> str:
@@ -122,11 +147,22 @@ def _query(handler_input) -> str:
     return " ".join(str(slot.value or "").split()) if slot else ""
 
 
-def _say(handler_input, text: str, reprompt: bool = True, end: bool = False):
-    """Speak text as plain text (never SSML: letter wording may hold "<" or "&")."""
+def _letter_card(source: dict | None) -> SimpleCard | None:
+    """The letter's own words behind the answer, with the page, for the Alexa app or a screen."""
+
+    quote = plain_speech(str((source or {}).get("highlight") or (source or {}).get("text") or ""))
+    if not quote:
+        return None
+    page = (source or {}).get("page")
+    return SimpleCard(title=CARD_TITLE, content=f'"{quote}"' + (f" (page {page})" if page else ""))
+
+
+def _say(handler_input, text: str, reprompt: bool = True, end: bool = False, source: dict | None = None):
+    """Speak text as plain text (never SSML: letter wording may hold "<" or "&"), markdown removed."""
 
     response = handler_input.response_builder.response
-    response.output_speech = PlainTextOutputSpeech(text=text)
+    response.output_speech = PlainTextOutputSpeech(text=plain_speech(text))
+    response.card = _letter_card(source)
     if reprompt and not end:
         response.reprompt = Reprompt(output_speech=PlainTextOutputSpeech(text=REPROMPT))
     response.should_end_session = end
@@ -148,7 +184,8 @@ class LaunchHandler(AbstractRequestHandler):
 
         name = state.get("first_name")
         hello = f"Hello, {name}." if name else "Hello."
-        return _say(handler_input, f"{hello} {_turn('What is next?', _session_id(handler_input), handler_input)}")
+        reply, _ = _turn("What is next?", _session_id(handler_input), handler_input)
+        return _say(handler_input, f"{hello} {reply}")
 
 
 class OpeningHandler(AbstractRequestHandler):
@@ -163,8 +200,8 @@ class OpeningHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         name = handler_input.request_envelope.request.intent.name
         message = FIXED[name] if name in FIXED else f"{OPENINGS[name]} {_query(handler_input)}".strip()
-        reply = _turn(message, _session_id(handler_input), handler_input)
-        return _say(handler_input, reply, reprompt=name not in UNWELL)
+        reply, source = _turn(message, _session_id(handler_input), handler_input)
+        return _say(handler_input, reply, reprompt=name not in UNWELL, source=source)
 
 
 class MedicineAnswerHandler(AbstractRequestHandler):
@@ -176,7 +213,8 @@ class MedicineAnswerHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         medicine = get_slot(handler_input, "medicine")
         message = str(medicine.value or "").strip() if medicine else ""
-        return _say(handler_input, _turn(message or "both", _session_id(handler_input), handler_input))
+        reply, source = _turn(message or "both", _session_id(handler_input), handler_input)
+        return _say(handler_input, reply, source=source)
 
 
 class HelpHandler(AbstractRequestHandler):

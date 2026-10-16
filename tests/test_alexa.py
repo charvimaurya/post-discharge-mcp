@@ -147,6 +147,55 @@ def test_stop_and_cancel_say_goodbye_and_end(alexa, intent):
     assert text == "Take care, Margaret." and ends is True and reprompt is None
 
 
+def test_a_letter_answer_comes_with_a_card_and_plain_speech(alexa, monkeypatch):
+    async def letter_turn(message, session_id):
+        return {"response": "Your letter says: **Do not drive** until your consultant has reviewed you.",
+                "tool_trace": [], "help": None,
+                "source": {"highlight": "Do not drive until your consultant has reviewed you.", "page": 1}}
+
+    monkeypatch.setattr(handlers, "run_turn", letter_turn)
+    body = alexa.send(_intent("AskWhenCanIIntent", query="plan to go for a drive")).json()["response"]
+
+    assert body["outputSpeech"]["text"] == "Your letter says: Do not drive until your consultant has reviewed you."
+    assert body["card"] == {"type": "Simple", "title": "From your discharge letter",
+                            "content": '"Do not drive until your consultant has reviewed you." (page 1)'}
+
+
+def test_no_card_without_a_letter_source(alexa):
+    body = alexa.send(_intent("WhatsNextIntent")).json()["response"]
+
+    assert "card" not in body
+
+
+def test_a_slow_turn_says_give_me_a_moment_and_is_logged(alexa, monkeypatch, capsys):
+    import asyncio
+
+    async def slow_turn(message, session_id):
+        await asyncio.sleep(1)
+        return {"response": "late", "tool_trace": [], "source": None, "help": None}
+
+    monkeypatch.setattr(handlers, "run_turn", slow_turn)
+    monkeypatch.setenv("ALEXA_AGENT_TIMEOUT_SECONDS", "0.1")
+
+    text, _, _ = alexa.speech(alexa.send(_intent("AskCanIIntent", query="have a bath")))
+
+    assert text == "Give me a moment, then ask me again."
+    lines = log_lines(capsys.readouterr().out)
+    assert any(line["event"] == "alexa_timeout" for line in lines)
+    request = next(line for line in lines if line["event"] == "alexa_request")
+    assert request["timed_out"] is True and request["intent"] == "AskCanIIntent"
+
+
+def test_one_request_line_with_type_intent_and_time_and_never_her_words(alexa, capsys):
+    alexa.send(_intent("UnwellMyIntent", query="calf is swollen"))
+
+    out = capsys.readouterr().out
+    request = next(line for line in log_lines(out) if line["event"] == "alexa_request")
+    assert request["request_type"] == "IntentRequest" and request["intent"] == "UnwellMyIntent"
+    assert request["timed_out"] is False and isinstance(request["ms"], int)
+    assert "calf" not in out and "swollen" not in out
+
+
 @pytest.mark.parametrize("intent", ["AMAZON.FallbackIntent", "SomeUnknownIntent"])
 def test_fallback(alexa, intent):
     text, _, ends = alexa.speech(alexa.send(_intent(intent)))
