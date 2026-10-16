@@ -6,4 +6,6 @@ jsonschema==4.26.0
 httpx==0.28.1
 uvicorn==0.54.0
 tzdata==2026.5
+ask-sdk-core==1.19.0
+ask-sdk-webservice-support==1.3.3
 discharge-letter-check @ https://github.com/charvimaurya/discharge-letter-check/archive/refs/tags/v0.1.0.zip

@@ -34,6 +34,7 @@ from app.mcp.context import get_demo_patient_context
 from app.observability.log import (
     Timer, get_request_id, reset_request_id, service_log, set_request_id,
 )
+from app.alexa.skill import alexa_endpoint
 from app.turn import TurnFailed, run_turn
 from lambdas.reminder_checker.handler import handler as reminder_handler
 
@@ -349,6 +350,8 @@ app = Starlette(
         Route("/documents/validate", validate_document, methods=["POST"]),
         Route("/documents/uploaded", document_uploaded, methods=["POST"]),
         Route("/chat", chat_message, methods=["POST"]),
+        # The Alexa skill endpoint (app.alexa.skill): checked, then the same turn as /chat.
+        Route("/alexa", alexa_endpoint, methods=["POST"]),
         Route("/today", today, methods=["GET"]),
         Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
