@@ -16,3 +16,6 @@ infra/security/backup/
 
 # Local Claude Code settings (per-machine permissions); not committed.
 .claude/
+
+# Local run logs (e.g. logs/bridge-timing.log); not committed.
+logs/
