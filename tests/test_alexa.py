@@ -186,6 +186,14 @@ def test_a_slow_turn_says_give_me_a_moment_and_is_logged(alexa, monkeypatch, cap
     assert request["timed_out"] is True and request["intent"] == "AskCanIIntent"
 
 
+def test_the_agent_wait_is_7_seconds_unless_set(monkeypatch):
+    monkeypatch.delenv("ALEXA_AGENT_TIMEOUT_SECONDS", raising=False)
+    assert handlers._timeout_seconds() == 7.0
+
+    monkeypatch.setenv("ALEXA_AGENT_TIMEOUT_SECONDS", "not a number")
+    assert handlers._timeout_seconds() == 7.0
+
+
 def test_one_request_line_with_type_intent_and_time_and_never_her_words(alexa, capsys):
     alexa.send(_intent("UnwellMyIntent", query="calf is swollen"))
 
