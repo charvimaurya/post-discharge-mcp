@@ -1,5 +1,6 @@
 import asyncio
 import functools
+from pathlib import Path
 
 from mcp.server.mcpserver import MCPServer
 from mcp.types import ToolAnnotations
@@ -37,6 +38,25 @@ from app.mcp.tools.recovery import (
 mcp = MCPServer(
     "AfterWard"
 )
+
+
+# MCP Apps: hosts that support it draw this page next to a get_today_tasks
+# result. The tool links to it through _meta.ui.resourceUri; what the tool
+# returns is unchanged.
+TODAY_UI_URI = "ui://afterward/today.html"
+MCP_APP_MIME = "text/html;profile=mcp-app"
+TODAY_UI_FILE = Path(__file__).parent / "ui" / "today.html"
+
+
+@mcp.resource(
+    TODAY_UI_URI,
+    name="today",
+    title="Today",
+    description="The patient's Today card, drawn from the get_today_tasks result.",
+    mime_type=MCP_APP_MIME,
+)
+def today_ui() -> str:
+    return TODAY_UI_FILE.read_text(encoding="utf-8")
 
 
 log = service_log("mcp")
@@ -126,6 +146,7 @@ async def get_recovery_plan() -> dict:
     annotations=ToolAnnotations(
         read_only_hint=True,
     ),
+    meta={"ui": {"resourceUri": TODAY_UI_URI}},
 )
 @logged_tool("read")
 async def get_today_tasks() -> dict:
@@ -274,6 +295,29 @@ async def undo_report(
         undo_report_for_context,
         context,
         occurrence_id,
+    )
+
+
+@mcp.prompt()
+def ask_my_letter(question: str) -> str:
+    """Answer a question using passages from the discharge letter."""
+    return (
+        "Call search_discharge_instructions first with the question below. "
+        "Answer only from the returned passages and include the page number "
+        "for the evidence you use. If nothing is found, say: "
+        "I could not find that in your discharge letter, so I will not guess.\n\n"
+        f"Question: {question}"
+    )
+
+
+@mcp.prompt()
+def morning_checkin() -> str:
+    """Give one short spoken step from today's recorded recovery plan."""
+    return (
+        "Call get_today_tasks and get_medications first. "
+        "Use their returned completion status and schedule to give one short "
+        "spoken step: what is done and what is next. "
+        "Do not assume an item is done unless the returned status says so."
     )
 
 
