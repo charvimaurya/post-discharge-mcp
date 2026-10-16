@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from app import web_bridge
+from app import turn, web_bridge
 from app.agent import service
 from app.ingestion import bedrock
 from app.mcp import server as mcp_server
@@ -67,10 +67,12 @@ def failing_bridge(monkeypatch):
     async def tool_fails(name, arguments):
         raise RuntimeError(f"MCP said: {LETTER}")
 
-    monkeypatch.setattr(web_bridge, "chat", agent_fails)
+    monkeypatch.setattr(turn, "chat", agent_fails)
     monkeypatch.setattr(web_bridge, "call_mcp_tool", tool_fails)
+    # /today reads her record in the bridge; /chat reads it in app.turn.
     monkeypatch.setattr(web_bridge, "get_recovery_state", lambda patient_id: {"first_name": "Margaret"})
-    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: None)
+    monkeypatch.setattr(turn, "get_recovery_state", lambda patient_id: {"first_name": "Margaret"})
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: None)
     return TestClient(web_bridge.app)
 
 
@@ -164,9 +166,10 @@ def full_bridge(monkeypatch, mcp_hop):
     monkeypatch.setattr(web_bridge, "call_mcp_tool", mcp_hop)
     monkeypatch.setattr(service, "get_mcp_tools", tools)
     monkeypatch.setattr(service.bedrock, "converse", converse)
-    monkeypatch.setattr(web_bridge, "get_recovery_state",
-                        lambda patient_id: {"first_name": "Margaret", "patient_name": "Margaret Ellis"})
-    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: None)
+    for module in (web_bridge, turn):
+        monkeypatch.setattr(module, "get_recovery_state",
+                            lambda patient_id: {"first_name": "Margaret", "patient_name": "Margaret Ellis"})
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: None)
 
     return SimpleNamespace(client=TestClient(web_bridge.app), saved=saved)
 

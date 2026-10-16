@@ -8,7 +8,6 @@ caller sends can choose the patient, date or time.
 
 import asyncio
 import os
-import re
 import uuid
 from contextlib import asynccontextmanager, suppress
 
@@ -18,17 +17,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
-from app.agent.evidence import related_appointment_lines
-from app.agent.service import chat, get_structured_tool_result
+from app.agent.service import get_structured_tool_result
 from app.agent.next_up import build_opening_message, timing
-from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime, system_now_utc
+from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime
 from app.database.event_history import delete_events
 from app.database.recovery_state import (
-    add_scheduled_checkin,
-    clear_pending_checkin,
     get_recovery_state,
-    plan_end_date,
-    record_chat_activity,
     record_greeting,
 )
 from app.ingestion.document_validation import (
@@ -40,6 +34,7 @@ from app.mcp.context import get_demo_patient_context
 from app.observability.log import (
     Timer, get_request_id, reset_request_id, service_log, set_request_id,
 )
+from app.turn import TurnFailed, run_turn
 from lambdas.reminder_checker.handler import handler as reminder_handler
 
 
@@ -49,55 +44,8 @@ TODAY_ERROR = "Could not load today's plan. Please try again."
 CHAT_ERROR = "Sorry, I couldn't reach the assistant. Please try again."
 
 
-# A question about how long a medicine goes on for: "how long", "when do I stop", "end date".
-_ASKS_HOW_LONG = re.compile(
-    r"\b(how long|end date|until when|stop taking|when (do|can|should|will) i stop|how many (days|weeks|months))\b",
-    re.IGNORECASE,
-)
-
-NO_END_DATE_FLAG = "Needs confirmation: the letter gives no end date"
-NO_END_DATE_TEXT = "Today's doses stay in the plan. Only the end date is unanswered."
-
-
-def open_ended_medicine_note(source: dict | None, conversation: str, state: dict) -> dict | None:
-    """
-    The note shown under a medicine whose letter line gives no end date.
-
-    Only when the turn is about how long to take it, the marked line is one
-    regular medicine in the plan, and neither an end date nor a length
-    ("for 14 days") can be read from the letter. Nothing is said about a
-    medicine that has an end, or one taken only if needed.
-    """
-
-    if not source or not _ASKS_HOW_LONG.search(conversation or ""):
-        return None
-
-    marked = str(source.get("highlight") or "").lower()
-    medicines = [
-        medicine for medicine in state.get("medications") or []
-        if isinstance(medicine, dict)
-        and str(medicine.get("name") or "").strip()
-        and str(medicine["name"]).lower().split()[0] in re.findall(r"[a-z]+", marked)
-    ]
-
-    if len(medicines) != 1:
-        return None
-
-    (medicine,) = medicines
-
-    if medicine.get("as_needed") or plan_end_date(medicine, state) is not None:
-        return None
-
-    return {"flag": NO_END_DATE_FLAG, "text": NO_END_DATE_TEXT}
-
-
 async def chat_message(request: Request) -> JSONResponse:
-    """
-    Run one agent turn for the server-side patient.
-
-    A reminder waiting when the message arrived is cleared only
-    after the turn finishes; replying never marks anything done.
-    """
+    """Run one agent turn for the server-side patient (see app.turn.run_turn)."""
 
     try:
         body = await request.json()
@@ -114,73 +62,19 @@ async def chat_message(request: Request) -> JSONResponse:
     if not isinstance(session_id, str) or not session_id.strip():
         session_id = uuid.uuid4().hex
 
-    patient = get_demo_patient_context()
-
-    def schedule(entry: dict) -> None:
-        add_scheduled_checkin(patient.patient_id, entry)
-
-    # Recording when she last spoke (real time, so no check-in interrupts a chat) and
-    # reading her record are independent DynamoDB calls, so they run at the same time.
-    activity, state = await asyncio.gather(
-        asyncio.to_thread(record_chat_activity, patient.patient_id, system_now_utc().isoformat()),
-        asyncio.to_thread(get_recovery_state, patient.patient_id),
-        return_exceptions=True,
-    )
-
-    if isinstance(activity, Exception):
-        log("chat_activity_failed", level="error", error=activity)
-
     try:
-        if isinstance(state, BaseException):
-            raise state
-        state = state or {}
-        had_checkin = bool(state.get("pending_checkin"))
-
-        # The agent gets the waiting reminder, name and time zone
-        # from the server's own record, never from the message.
-        result = await chat(
-            message,
-            session_id,
-            pending_checkin=state.get("pending_checkin"),
-            first_name=state.get("first_name"),
-            timezone=state.get("timezone") or "Europe/London",
-            schedule_checkin=schedule,
-        )
-    except Exception as exc:
-        log("chat_failed", level="error", error=exc, route="/chat")
+        turn = await run_turn(message, session_id)
+    except TurnFailed as failed:
+        log("chat_failed", level="error", error=failed.__cause__, route="/chat")
         return JSONResponse({"error": CHAT_ERROR}, status_code=502)
-
-    # A crisis reply is not an answer to the reminder, so the reminder stays.
-    if had_checkin and result.get("completed") and not result.get("crisis"):
-        try:
-            await asyncio.to_thread(
-                clear_pending_checkin, patient.patient_id
-            )
-        except Exception as exc:
-            # The reply is already real; the reminder just stays visible.
-            log("clear_checkin_failed", level="error", error=exc)
-
-    # A passage that points at an appointment ("until your consultant has reviewed
-    # you") is shown with that appointment's own line from the letter, if the plan has it.
-    source = result["source"]
-    related = related_appointment_lines(source, state.get("appointments"))
-
-    if related:
-        # Added to any line the agent already linked (the letter's emergency number).
-        source = dict(source, related=[*(source.get("related") or []), *related])
-
-    note = open_ended_medicine_note(source, f"{message} {result['response']}", state)
-
-    if note:
-        source = dict(source, note=note)
 
     return JSONResponse(
         {
-            "response": result["response"],
-            "tool_trace": result["tool_trace"],
-            "source": source,
+            "response": turn["response"],
+            "tool_trace": turn["tool_trace"],
+            "source": turn["source"],
             # Only on a symptom reply: who to call, from her letter.
-            "help": result.get("help"),
+            "help": turn["help"],
             "session_id": session_id,
             # Shown small in Developer view, to find this turn in the logs.
             "request_id": get_request_id(),

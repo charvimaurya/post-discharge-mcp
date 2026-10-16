@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from app import web_bridge
+from app import turn, web_bridge
 from app.agent import service
 
 
@@ -81,10 +81,10 @@ def bridge(monkeypatch):
     monkeypatch.setattr(service.bedrock, "converse", converse)
     monkeypatch.setattr(service, "build_bedrock_tool_config", no_tools)
     monkeypatch.setattr(service, "get_agent_model_id", lambda: "test-model")
-    monkeypatch.setattr(web_bridge, "get_recovery_state", lambda patient_id: run.state)
-    monkeypatch.setattr(web_bridge, "clear_pending_checkin", lambda patient_id: run.state.pop("pending_checkin", None))
-    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: None)
-    monkeypatch.setattr(web_bridge, "add_scheduled_checkin", lambda patient_id, entry: None)
+    monkeypatch.setattr(turn, "get_recovery_state", lambda patient_id: run.state)
+    monkeypatch.setattr(turn, "clear_pending_checkin", lambda patient_id: run.state.pop("pending_checkin", None))
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: None)
+    monkeypatch.setattr(turn, "add_scheduled_checkin", lambda patient_id, entry: None)
 
     client = TestClient(web_bridge.app)
 

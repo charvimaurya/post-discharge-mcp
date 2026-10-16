@@ -510,6 +510,13 @@ _WHATS_LEFT_TODAY = re.compile(
 )
 
 
+# A question about how long a medicine goes on for: "how long", "when do I stop", "end date".
+_ASKS_HOW_LONG = re.compile(
+    r"\b(how long|end date|until when|stop taking|when (do|can|should|will) i stop|how many (days|weeks|months))\b",
+    re.IGNORECASE,
+)
+
+
 _REMIND_ME = re.compile(
     r"\b(remind me|set (?:a|an|me a) (?:reminder|timer|alarm)|give me a (?:reminder|nudge)|"
     r"(?:can|could|will|would) you remind)\b"

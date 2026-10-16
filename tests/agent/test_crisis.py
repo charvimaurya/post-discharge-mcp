@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from app import web_bridge
+from app import turn, web_bridge
 from app.agent import service
 from app.agent.crisis import asks_about_doses, crisis_reply, is_crisis, normalise
 from app.agent.session import clear_session, get_history
@@ -203,9 +203,9 @@ def test_k7_the_bridge_keeps_a_waiting_reminder_and_saves_nothing(monkeypatch):
         raise AssertionError("no MCP tool on a crisis turn")
 
     monkeypatch.setattr(service, "call_mcp_tool", no_tool)
-    monkeypatch.setattr(web_bridge, "get_recovery_state", lambda patient_id: state)
-    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: None)
-    monkeypatch.setattr(web_bridge, "clear_pending_checkin", cleared.append)
+    monkeypatch.setattr(turn, "get_recovery_state", lambda patient_id: state)
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: None)
+    monkeypatch.setattr(turn, "clear_pending_checkin", cleared.append)
 
     response = TestClient(web_bridge.app).post("/chat", json={"message": "I want to end my life", "session_id": "s-k7"})
 

@@ -1,6 +1,6 @@
 """A medicines table is shown as the letter's rows, with the row that answers marked."""
 
-from app import web_bridge
+from app import turn
 from app.agent.evidence import clean_passage, select_rag_source
 
 
@@ -71,7 +71,7 @@ STATE = {
         {"name": "Senna 7.5 mg tablets", "duration_text": None, "as_needed": True},
     ],
 }
-NOTE = {"flag": web_bridge.NO_END_DATE_FLAG, "text": web_bridge.NO_END_DATE_TEXT}
+NOTE = {"flag": turn.NO_END_DATE_FLAG, "text": turn.NO_END_DATE_TEXT}
 
 
 def marked(row):
@@ -79,28 +79,28 @@ def marked(row):
 
 
 def test_note_when_she_asks_how_long_and_the_letter_gives_no_end():
-    assert web_bridge.open_ended_medicine_note(marked(APIXABAN_ROW), f"{QUESTION} {REPLY}", STATE) == NOTE
+    assert turn.open_ended_medicine_note(marked(APIXABAN_ROW), f"{QUESTION} {REPLY}", STATE) == NOTE
 
 
 def test_no_note_for_a_medicine_with_an_end():
     row = "Paracetamol 500 mg tablets. Take 2 tablets four times a day for 14 days."
-    assert web_bridge.open_ended_medicine_note(marked(row), "How long do I take paracetamol?", STATE) is None
+    assert turn.open_ended_medicine_note(marked(row), "How long do I take paracetamol?", STATE) is None
 
 
 def test_no_note_for_an_only_if_needed_medicine():
     row = "Senna 7.5 mg tablets. Take 2 tablets at bedtime if constipated."
-    assert web_bridge.open_ended_medicine_note(marked(row), "How long do I take senna?", STATE) is None
+    assert turn.open_ended_medicine_note(marked(row), "How long do I take senna?", STATE) is None
 
 
 def test_no_note_when_the_question_is_not_about_how_long():
-    assert web_bridge.open_ended_medicine_note(marked(APIXABAN_ROW), "When do I take my blood thinner? After breakfast.", STATE) is None
+    assert turn.open_ended_medicine_note(marked(APIXABAN_ROW), "When do I take my blood thinner? After breakfast.", STATE) is None
 
 
 def test_no_note_without_a_source_or_when_no_single_medicine_is_marked():
-    assert web_bridge.open_ended_medicine_note(None, QUESTION, STATE) is None
-    assert web_bridge.open_ended_medicine_note(marked("Do not kneel on the operated knee."), QUESTION, STATE) is None
+    assert turn.open_ended_medicine_note(None, QUESTION, STATE) is None
+    assert turn.open_ended_medicine_note(marked("Do not kneel on the operated knee."), QUESTION, STATE) is None
     both = marked("Apixaban 2.5 mg tablets and Paracetamol 500 mg tablets.")
-    assert web_bridge.open_ended_medicine_note(both, QUESTION, STATE) is None
+    assert turn.open_ended_medicine_note(both, QUESTION, STATE) is None
 
 
 def test_the_paragraph_printed_after_the_table_is_not_part_of_the_last_row():

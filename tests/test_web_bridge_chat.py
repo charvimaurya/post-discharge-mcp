@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from app import web_bridge
+from app import turn, web_bridge
 from app.agent import service
 from app.agent.safety import remove_wake_word
 
@@ -78,10 +78,10 @@ def bridge(monkeypatch):
     monkeypatch.setattr(service, "call_mcp_tool", call_tool)
     monkeypatch.setattr(service, "build_bedrock_tool_config", no_tools)
     monkeypatch.setattr(service, "get_agent_model_id", lambda: "test-model")
-    monkeypatch.setattr(web_bridge, "get_recovery_state", get_state)
-    monkeypatch.setattr(web_bridge, "clear_pending_checkin", clear)
-    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: run.chats.append(at))
-    monkeypatch.setattr(web_bridge, "add_scheduled_checkin", lambda patient_id, entry: run.scheduled.append(entry))
+    monkeypatch.setattr(turn, "get_recovery_state", get_state)
+    monkeypatch.setattr(turn, "clear_pending_checkin", clear)
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: run.chats.append(at))
+    monkeypatch.setattr(turn, "add_scheduled_checkin", lambda patient_id, entry: run.scheduled.append(entry))
 
     run.client = TestClient(web_bridge.app)
     return run
@@ -164,7 +164,7 @@ def test_unfinished_turn_keeps_reminder(bridge):
 def test_no_reminder_means_nothing_to_clear(bridge, monkeypatch):
     bridge.state.pop("pending_checkin")
     monkeypatch.setattr(
-        web_bridge, "clear_pending_checkin", lambda patient_id: pytest.fail("nothing to clear")
+        turn, "clear_pending_checkin", lambda patient_id: pytest.fail("nothing to clear")
     )
     bridge.model_turns = [_text("Hello.")]
 

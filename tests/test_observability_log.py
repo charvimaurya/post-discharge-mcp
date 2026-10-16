@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pytest
 from starlette.testclient import TestClient
 
-from app import web_bridge
+from app import turn, web_bridge
 from app.agent import service
 from app.mcp import server
 from app.observability import log as obs
@@ -153,8 +153,10 @@ def chat_bridge(monkeypatch, mcp_hop):
     monkeypatch.setattr(service, "get_mcp_tools", no_tools)
     monkeypatch.setattr(service.bedrock, "converse", converse)
     monkeypatch.setattr(service, "get_agent_model_id", lambda: "test-model-1")
+    # /today reads her record in the bridge; /chat reads it in app.turn.
     monkeypatch.setattr(web_bridge, "get_recovery_state", lambda patient_id: {"first_name": "Margaret"})
-    monkeypatch.setattr(web_bridge, "record_chat_activity", lambda patient_id, at: None)
+    monkeypatch.setattr(turn, "get_recovery_state", lambda patient_id: {"first_name": "Margaret"})
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: None)
 
     return TestClient(web_bridge.app)
 
