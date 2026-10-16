@@ -20,7 +20,7 @@ import asyncio
 import json
 import re
 from contextvars import ContextVar
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Any, Callable
 
 import boto3
@@ -74,6 +74,7 @@ from app.agent.food import (
     medicines_for_meal,
 )
 from app.agent.evidence import (
+    related_appointment_lines,
     _blocks as letter_blocks,
     _sentences as letter_sentences,
     _source as evidence_source,
@@ -1667,6 +1668,90 @@ async def _preload_appointments(tool_trace: list[dict]) -> str | None:
     return _appointments_fact((result.get("data") or {}).get("appointments"))
 
 
+# "Can I drive?" in code: one activity she asks about -> (words in her question, words in a restriction).
+_ACTIVITIES = {
+    "drive": ({"drive", "driving", "car"}, {"drive", "driving"}),
+    "bath": ({"bath", "bathe", "swim", "swimming"}, {"bath", "swim", "swimming"}),
+    "shower": ({"shower", "showering"}, {"shower", "showering"}),
+    "kneel": ({"kneel", "kneeling"}, {"kneel", "kneeling"}),
+    "lift": ({"lift", "lifting", "carry", "carrying", "heavy"}, {"lift", "lifting", "carry", "heavy"}),
+    "fly": ({"fly", "flying", "flight", "plane"}, {"fly", "flying", "flight"}),
+    "work": ({"work", "working"}, {"work"}),
+    "stairs": ({"stairs", "upstairs", "downstairs"}, {"stairs"}),
+}
+# The rest of a plain permission question. Any other word means she asked more: the model answers.
+_PERMISSION_WORDS = {
+    "when", "can", "could", "may", "i", "is", "it", "ok", "okay", "alright", "safe", "fine", "to", "am", "allowed",
+    "should", "go", "going", "for", "a", "an", "the", "my", "plan", "start", "again", "have", "take", "get", "be",
+    "able", "back", "still", "yet", "now", "out", "in", "on", "up", "do", "some", "of", "please",
+}
+
+
+def _date_words(text: str) -> str | None:
+    """'2026-11-23' -> 'Monday 23 November'; None if it is not a date."""
+
+    try:
+        day = date.fromisoformat(str(text))
+    except ValueError:
+        return None
+    return f"{day:%A} {day.day} {day:%B}"
+
+
+async def _permission_in_code(message: str, tool_trace: list[dict]) -> tuple[str, dict] | None:
+    """
+    "Can I drive?" answered from her plan's restrictions, word for word, with no model:
+    only when the question names one activity, asks nothing else, and exactly one
+    restriction mentions it. Never says she can; only quotes. None: the model answers.
+    """
+
+    words = set(re.findall(r"[a-z']+", message.lower()))
+    named = [name for name, (asked, _) in _ACTIVITIES.items() if words & asked]
+
+    if len(named) != 1 or not words <= (_PERMISSION_WORDS | _ACTIVITIES[named[0]][0]):
+        return None
+
+    try:
+        plan = get_structured_tool_result(await call_mcp_tool("get_recovery_plan", {}))
+    except Exception:
+        return None
+    ok = isinstance(plan, dict) and plan.get("ok") is True
+    tool_trace.append({"tool": "get_recovery_plan", "arguments": {}, "ok": ok})
+    if not ok:
+        return None
+
+    data = plan.get("data") or {}
+    letter_words = _ACTIVITIES[named[0]][1]
+    matches = [
+        r for r in data.get("restrictions") or []
+        if isinstance(r, dict) and (r.get("source") or {}).get("snippet")
+        and set(re.findall(r"[a-z]+", str(r["source"]["snippet"]).lower())) & letter_words
+    ]
+    if len(matches) != 1:
+        return None
+
+    letter = matches[0]["source"]
+    snippet = " ".join(str(letter["snippet"]).split())
+    source = {
+        "document_id": letter.get("document_id"), "page": letter.get("page"), "chunk_id": None,
+        "section": "Restrictions", "text": snippet, "highlight": snippet, "passage": snippet,
+        "highlighted_line": snippet,
+    }
+    reply = f"Your letter says: {snippet}"
+
+    # "...until your consultant has reviewed you": the date of that appointment, from her plan,
+    # unless the plan says the date needs confirmation.
+    linked = {str(line.get("text") or "") for line in related_appointment_lines(source, data.get("appointments"))}
+    for appointment in data.get("appointments") or []:
+        if not isinstance(appointment, dict) or str((appointment.get("source") or {}).get("snippet") or "").strip() not in linked:
+            continue
+        when = None if appointment.get("needs_confirmation") else _date_words(appointment.get("date"))
+        if when:
+            reply += f" Your {str(appointment.get('title') or 'appointment').lower()} is on {when}."
+        break
+
+    return reply, source
+
+
 # Where a question starts inside a report: "...both the tablets, how long do I need to take this for".
 _QUESTION_START = re.compile(
     r"\b(?:how (?:long|many|much|often|soon)|when (?:do|can|should|will|is|are|am|does|did)|"
@@ -2225,6 +2310,16 @@ async def _chat_turn(
             "source": resolved_source,
             "completed": True,
         }
+
+    # "Can I drive?" when one restriction in her plan answers it: the letter's words, no model.
+    if not answer_only and today is not None and is_permission_question(cleaned_message):
+        permission = await _permission_in_code(cleaned_message, tool_trace)
+        if permission is not None:
+            permission_reply, permission_source = permission
+            add_message(session_id, "user", cleaned_message)
+            add_message(session_id, "assistant", permission_reply)
+            return {"response": permission_reply, "tool_trace": tool_trace, "source": permission_source,
+                    "completed": True}
 
     # Her plan's appointments are read now, alongside the tool list, and given to the model
     # up front. An answer that names a date ("your review on 23 November") is then checked
