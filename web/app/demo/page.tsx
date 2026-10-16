@@ -101,6 +101,7 @@ export default function DemoPage() {
   const [speaking, setSpeaking] = useState(false);
   const [typing, setTyping] = useState(false);
   const [dev, setDev] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [micOk, setMicOk] = useState(false);
   // The id of the reminder currently shown on screen, or null.
   const shownCheckin = useRef<string | null>(null);
@@ -231,6 +232,32 @@ export default function DemoPage() {
     }
   }
 
+  // ---------- Reset demo ----------
+  // Resets the demo patient on the server (today's completions and any waiting reminder) and
+  // forgets this session's conversation there, then clears it here and reloads Today.
+  async function resetDemo() {
+    if (resetting || busy) return;
+    window.speechSynthesis?.cancel();
+    setResetting(true); setError('');
+    try {
+      const response = await fetch('/api/reset', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+        body: JSON.stringify({ session_id: sessionId() }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Could not reset the demo.');
+      setTurns([]); setCalls([]); setChips([]); setRequestId(null); setSource(null);
+      setHelp(null); setHelpCompact(false); setFocus([]); setNextHint(null);
+      setJustDone(null); setReminderNote(false); setHead('AfterWard');
+      shownCheckin.current = null;
+      await loadToday();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not reset the demo.');
+    } finally {
+      setResetting(false);
+    }
+  }
+
   // ---------- Talking to AfterWard ----------
   async function send(message: string) {
     if (busy || !message.trim()) return;
@@ -348,7 +375,8 @@ export default function DemoPage() {
   if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;
   else if (view === 'build') screen = <BuildScreen step={buildStep} plan={plan} onOpen={openToday} />;
   else screen = <Screen id="app">
-    <TopBar clock={today.clockLabel} patient={today.firstName} dev={dev} onDev={() => setDev(d => !d)} />
+    <TopBar clock={today.clockLabel} patient={today.firstName} dev={dev} onDev={() => setDev(d => !d)}
+      onReset={resetDemo} resetting={resetting} />
     <div className="stage">
       {dev && <ConversationLog turns={turns} />}
       {leftPanel}

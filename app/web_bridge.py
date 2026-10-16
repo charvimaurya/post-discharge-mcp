@@ -7,6 +7,7 @@ caller sends can choose the patient, date or time.
 """
 
 import asyncio
+import hmac
 import os
 import re
 import uuid
@@ -19,10 +20,12 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from app.agent.evidence import related_appointment_lines
+from app.agent.session import clear_session
 from app.agent.service import chat, get_structured_tool_result
 from app.agent.next_up import build_opening_message, timing
 from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime, system_now_utc
 from app.database.event_history import delete_events
+from app.demo_reset import NoPlanToReset, reset_demo_patient
 from app.database.recovery_state import (
     add_scheduled_checkin,
     clear_pending_checkin,
@@ -310,6 +313,56 @@ async def document_uploaded(request: Request) -> JSONResponse:
     return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
 
 
+# The "Reset demo" button on /demo. The web server sends BRIDGE_KEY as
+# X-AfterWard-Key; this route refuses without it, and in production.
+BRIDGE_KEY_HEADER = "x-afterward-key"
+RESET_ERROR = "Could not reset the demo. Please try again."
+
+
+async def reset_demo(request: Request) -> JSONResponse:
+    """
+    Reset demo_patient_001 and forget this session's conversation.
+
+    Uses the same reset as scripts/reset_demo_patient.py, which also clears
+    any pending check-in. The patient is fixed on the server; the body may
+    only carry the session_id whose chat memory is cleared.
+    """
+
+    expected = os.getenv("BRIDGE_KEY", "")
+    if not expected:
+        return JSONResponse({"error": "Reset is not set up: BRIDGE_KEY is missing."}, status_code=503)
+
+    given = request.headers.get(BRIDGE_KEY_HEADER, "")
+    if not hmac.compare_digest(given.encode(), expected.encode()):
+        return JSONResponse({"error": "Not allowed."}, status_code=401)
+
+    if not allows_test_hooks():
+        return JSONResponse({"error": "Reset is not available in production."}, status_code=403)
+
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+
+    session_id = body.get("session_id") if isinstance(body, dict) else None
+
+    try:
+        result = await asyncio.to_thread(reset_demo_patient)
+    except NoPlanToReset:
+        return JSONResponse({"error": "No plan to reset. Upload a letter first."}, status_code=409)
+    except Exception as exc:
+        log("demo_reset_failed", level="error", error=exc, route="/reset")
+        return JSONResponse({"error": RESET_ERROR}, status_code=502)
+
+    if isinstance(session_id, str) and session_id.strip():
+        clear_session(session_id)
+
+    deleted = result["events_deleted"]
+    log("demo_reset", item_count=deleted)
+
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+
 # Local stand-in for the EventBridge schedule: with LOCAL_REMINDER_LOOP=1
 # the bridge runs the same reminder handler every few seconds, so a demo
 # reminder appears without invoking anything by hand.
@@ -458,6 +511,7 @@ app = Starlette(
         Route("/today", today, methods=["GET"]),
         Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
+        Route("/reset", reset_demo, methods=["POST"]),
     ],
     lifespan=lifespan,
     middleware=[Middleware(RequestLogMiddleware)],

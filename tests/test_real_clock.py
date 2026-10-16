@@ -129,12 +129,13 @@ def test_medication_end_date_boundary(real_plan):
 
 @pytest.mark.parametrize('mode,day', [('real', '2026-11-02'), ('demo', '2026-10-23')])
 def test_reset_only_current_date_completions(real_plan, monkeypatch, mode, day):
+    from app import demo_reset
     from scripts import reset_demo_patient as reset
     monkeypatch.setenv('CLOCK_MODE', mode)
     monkeypatch.setenv('DEMO_FIXED_NOW', clock.DEFAULT_DEMO_NOW)
     state = real_plan[0]
-    monkeypatch.setattr(reset, 'get_recovery_state', lambda patient_id: state)
-    monkeypatch.setattr(reset, 'save_recovery_state', lambda state: None)
+    monkeypatch.setattr(demo_reset, 'get_recovery_state', lambda patient_id: state)
+    monkeypatch.setattr(demo_reset, 'save_recovery_state', lambda state: None)
     deleted = []
     rows = [
         {'patient_id': reset.PATIENT_ID, 'timestamp': 'today', 'event_type': 'task_completed',
@@ -153,7 +154,7 @@ def test_reset_only_current_date_completions(real_plan, monkeypatch, mode, day):
                 return {'Items': rows[1:]}
             return {'Items': rows[:1], 'LastEvaluatedKey': {'timestamp': 'today'}}
         def delete_item(self, Key): deleted.append(Key['timestamp'])
-    monkeypatch.setattr(reset, 'event_table', Table())
+    monkeypatch.setattr(demo_reset, 'event_table', Table())
     monkeypatch.setattr('sys.argv', ['reset_demo_patient.py', '--confirm'])
     reset.main()
     assert deleted == ['today']
