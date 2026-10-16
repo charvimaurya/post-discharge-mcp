@@ -9,6 +9,7 @@ loop, so it is sent there with run_coroutine_threadsafe and waited for here.
 
 import asyncio
 import contextvars
+import os
 from concurrent.futures import TimeoutError as FutureTimeout
 
 from ask_sdk_core.dispatch_components import AbstractExceptionHandler, AbstractRequestHandler
@@ -34,14 +35,32 @@ NOT_REACHED = "Sorry, I couldn't reach the assistant. Please try again."
 TOO_SLOW = "Sorry, that took too long. Please say it again."
 COMING_SOON = "That part is coming soon. You can tell me what you've done, or ask what's next."
 
-# Alexa says only which intent and slot matched, not which sample, so each intent
-# has one opening: "my walk" becomes "I've done my walk".
-TASK_DONE_OPENING = "I've done"
-MEDICINE_TAKEN_OPENING = "I've taken"
+# Alexa says only which intent and slot matched, not which sample, so each opening
+# phrase is its own intent: "I've had" + "my breakfast and I've taken my medicine"
+# reaches the agent as she said it. Kept in step with skill-package's en-GB.json.
+OPENINGS = {
+    "BackFromIntent": "I'm back from",
+    "DoneIntent": "I've done",
+    "DidIntent": "I did",
+    "FinishedIntent": "I've finished",
+    "BeenForIntent": "I've been for",
+    "DoneWithIntent": "I'm done with",
+    "TakenIntent": "I've taken",
+    "HadIntent": "I've had",
+    "YesIntent": "yes",
+    "BothIntent": "both",
+    "JustTheIntent": "just the",
+    "OnlyTheIntent": "only the",
+}
 
 
-def _turn(message: str, session_id: str) -> str:
+def _turn(message: str, session_id: str, handler_input=None) -> str:
     """Run one turn on the bridge's loop and wait for it here; always returns something to say."""
+
+    # Local testing only: ALEXA_ECHO_SENTENCE=true returns the sentence sent to the agent in the
+    # response's session attributes. Never logged: logs hold no patient words.
+    if handler_input is not None and os.getenv("ALEXA_ECHO_SENTENCE", "").strip().lower() == "true":
+        handler_input.attributes_manager.session_attributes["sent_to_run_turn"] = message
 
     future = asyncio.run_coroutine_threadsafe(run_turn(message, session_id), BRIDGE_LOOP.get())
     try:
@@ -88,30 +107,31 @@ class LaunchHandler(AbstractRequestHandler):
 
         name = state.get("first_name")
         hello = f"Hello, {name}." if name else "Hello."
-        return _say(handler_input, f"{hello} {_turn('What is next?', _session_id(handler_input))}")
+        return _say(handler_input, f"{hello} {_turn('What is next?', _session_id(handler_input), handler_input)}")
 
 
-class TaskDoneHandler(AbstractRequestHandler):
+class OpeningHandler(AbstractRequestHandler):
+    """Every "<opening words> {query}" intent: the opening words plus what followed, as one sentence."""
+
     def can_handle(self, handler_input):
-        return is_intent_name("TaskDoneIntent")(handler_input)
+        return any(is_intent_name(name)(handler_input) for name in OPENINGS)
 
     def handle(self, handler_input):
-        message = f"{TASK_DONE_OPENING} {_query(handler_input)}".strip()
-        return _say(handler_input, _turn(message, _session_id(handler_input)))
+        opening = OPENINGS[handler_input.request_envelope.request.intent.name]
+        message = f"{opening} {_query(handler_input)}".strip()
+        return _say(handler_input, _turn(message, _session_id(handler_input), handler_input))
 
 
-class MedicineTakenHandler(AbstractRequestHandler):
+class MedicineAnswerHandler(AbstractRequestHandler):
+    """A bare medicine name answering "...or both?": "both" (or "boat"), "the paracetamol"."""
+
     def can_handle(self, handler_input):
-        return is_intent_name("MedicineTakenIntent")(handler_input)
+        return is_intent_name("MedicineAnswerIntent")(handler_input)
 
     def handle(self, handler_input):
-        # "both" (or "boat") answering "...or both?" is sent as said; anything else is a sentence.
         medicine = get_slot(handler_input, "medicine")
-        if medicine and medicine.value:
-            message = medicine.value
-        else:
-            message = f"{MEDICINE_TAKEN_OPENING} {_query(handler_input)}".strip()
-        return _say(handler_input, _turn(message, _session_id(handler_input)))
+        message = str(medicine.value or "").strip() if medicine else ""
+        return _say(handler_input, _turn(message or "both", _session_id(handler_input), handler_input))
 
 
 class ComingSoonHandler(AbstractRequestHandler):

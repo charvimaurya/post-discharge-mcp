@@ -4,43 +4,69 @@
       "invocationName": "after ward",
       "intents": [
         {
-          "name": "TaskDoneIntent",
+          "name": "BackFromIntent",
           "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
-          "samples": [
-            "I'm back from {query}",
-            "back from {query}",
-            "I've done {query}",
-            "I've just done {query}",
-            "I did {query}",
-            "I just did {query}",
-            "I've finished {query}",
-            "I finished {query}",
-            "I've completed {query}",
-            "I've been for {query}",
-            "I went for {query}",
-            "I'm done with {query}"
-          ]
+          "samples": ["I'm back from {query}", "back from {query}"]
         },
         {
-          "name": "MedicineTakenIntent",
-          "slots": [
-            { "name": "query", "type": "AMAZON.SearchQuery" },
-            { "name": "medicine", "type": "MEDICINE" }
-          ],
-          "samples": [
-            "I've taken {query}",
-            "I've just taken {query}",
-            "I took {query}",
-            "I've had {query}",
-            "I had {query}",
-            "yes {query}",
-            "yes I've {query}",
-            "both {query}",
-            "just the {query}",
-            "only the {query}",
-            "{medicine}",
-            "the {medicine}"
-          ]
+          "name": "DoneIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I've done {query}", "I've just done {query}"]
+        },
+        {
+          "name": "DidIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I did {query}", "I just did {query}"]
+        },
+        {
+          "name": "FinishedIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I've finished {query}", "I finished {query}", "I've completed {query}"]
+        },
+        {
+          "name": "BeenForIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I've been for {query}", "I went for {query}"]
+        },
+        {
+          "name": "DoneWithIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I'm done with {query}"]
+        },
+        {
+          "name": "TakenIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I've taken {query}", "I've just taken {query}", "I took {query}"]
+        },
+        {
+          "name": "HadIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["I've had {query}", "I had {query}"]
+        },
+        {
+          "name": "YesIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["yes {query}"]
+        },
+        {
+          "name": "BothIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["both {query}"]
+        },
+        {
+          "name": "JustTheIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["just the {query}"]
+        },
+        {
+          "name": "OnlyTheIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": ["only the {query}"]
+        },
+        {
+          "name": "MedicineAnswerIntent",
+          "slots": [{ "name": "medicine", "type": "MEDICINE" }],
+          "samples": ["{medicine}", "the {medicine}"]
         },
         {
           "name": "AskLetterIntent",

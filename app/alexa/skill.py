@@ -33,7 +33,7 @@ def _flag(name: str) -> bool:
 
 def build_skill():
     builder = SkillBuilder()
-    for handler in (handlers.LaunchHandler(), handlers.TaskDoneHandler(), handlers.MedicineTakenHandler(),
+    for handler in (handlers.LaunchHandler(), handlers.OpeningHandler(), handlers.MedicineAnswerHandler(),
                     handlers.SessionEndedHandler(), handlers.ComingSoonHandler()):
         builder.add_request_handler(handler)
     builder.add_exception_handler(handlers.ErrorHandler())

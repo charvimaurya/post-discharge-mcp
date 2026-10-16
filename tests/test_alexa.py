@@ -73,22 +73,43 @@ def test_launch_without_a_reminder_greets_and_says_what_is_next(alexa):
     assert alexa.turns == [("What is next?", "amzn1.echo-api.session.s-1")]
 
 
-def test_task_done_rebuilds_the_sentence_and_keeps_the_session_open(alexa):
-    text, reprompt, ends = alexa.speech(alexa.send(_intent("TaskDoneIntent", query="my walk")))
+def test_back_from_rebuilds_her_sentence_and_keeps_the_session_open(alexa):
+    text, reprompt, ends = alexa.speech(alexa.send(_intent("BackFromIntent", query="my walk")))
 
-    assert alexa.turns == [("I've done my walk", "amzn1.echo-api.session.s-1")]
-    assert text == "Reply to: I've done my walk"
+    assert alexa.turns == [("I'm back from my walk", "amzn1.echo-api.session.s-1")]
+    assert text == "Reply to: I'm back from my walk"
     assert reprompt["outputSpeech"]["text"] == handlers.REPROMPT and not ends
 
 
-@pytest.mark.parametrize("slots, message", [
-    ({"query": "both how long do I take them for"}, "I've taken both how long do I take them for"),
-    ({"medicine": "both"}, "both"),
+@pytest.mark.parametrize("intent, slots, message", [
+    ("HadIntent", {"query": "my breakfast and i've taken my medicine"}, "I've had my breakfast and i've taken my medicine"),
+    ("TakenIntent", {"query": "both how long do I take them for"}, "I've taken both how long do I take them for"),
+    ("YesIntent", {"query": "both tablets taken and how long those for"}, "yes both tablets taken and how long those for"),
+    ("MedicineAnswerIntent", {"medicine": "both"}, "both"),
 ])
-def test_medicine_taken(alexa, slots, message):
-    alexa.send(_intent("MedicineTakenIntent", **slots))
+def test_each_opening_reaches_the_agent_as_she_said_it(alexa, intent, slots, message):
+    alexa.send(_intent(intent, **slots))
 
     assert alexa.turns[0][0] == message
+
+
+def test_every_opening_intent_in_the_model_has_its_opening_words():
+    model = json.load(open("skill-package/interactionModels/custom/en-GB.json", encoding="utf-8"))
+    for intent in model["interactionModel"]["languageModel"]["intents"]:
+        if any("{query}" in sample for sample in intent["samples"]) and intent["name"] in handlers.OPENINGS:
+            opening = handlers.OPENINGS[intent["name"]].lower()
+            assert any(sample.lower().startswith(opening) for sample in intent["samples"]), intent["name"]
+    names = {intent["name"] for intent in model["interactionModel"]["languageModel"]["intents"]}
+    assert set(handlers.OPENINGS) <= names
+
+
+def test_the_sentence_is_echoed_only_when_asked(alexa, monkeypatch):
+    plain = alexa.send(_intent("BackFromIntent", query="my walk")).json()
+    assert "sent_to_run_turn" not in (plain.get("sessionAttributes") or {})
+
+    monkeypatch.setenv("ALEXA_ECHO_SENTENCE", "true")
+    echoed = alexa.send(_intent("BackFromIntent", query="my walk")).json()
+    assert echoed["sessionAttributes"]["sent_to_run_turn"] == "I'm back from my walk"
 
 
 def test_other_intents_say_coming_soon(alexa):
@@ -98,7 +119,7 @@ def test_other_intents_say_coming_soon(alexa):
 
 
 def test_another_skill_is_refused_and_logged(alexa, capsys):
-    response = alexa.send(_intent("TaskDoneIntent", query="my walk"), skill="amzn1.ask.skill.someone-else")
+    response = alexa.send(_intent("BackFromIntent", query="my walk"), skill="amzn1.ask.skill.someone-else")
 
     assert response.status_code == 403 and alexa.turns == []
     rejected = [line for line in log_lines(capsys.readouterr().out) if line["event"] == "alexa_rejected"]
