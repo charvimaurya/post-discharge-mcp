@@ -1,0 +1,119 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "after ward",
+      "intents": [
+        {
+          "name": "TaskDoneIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "I'm back from {query}",
+            "back from {query}",
+            "I've done {query}",
+            "I've just done {query}",
+            "I did {query}",
+            "I just did {query}",
+            "I've finished {query}",
+            "I finished {query}",
+            "I've completed {query}",
+            "I've been for {query}",
+            "I went for {query}",
+            "I'm done with {query}"
+          ]
+        },
+        {
+          "name": "MedicineTakenIntent",
+          "slots": [
+            { "name": "query", "type": "AMAZON.SearchQuery" },
+            { "name": "medicine", "type": "MEDICINE" }
+          ],
+          "samples": [
+            "I've taken {query}",
+            "I've just taken {query}",
+            "I took {query}",
+            "I've had {query}",
+            "I had {query}",
+            "yes {query}",
+            "yes I've {query}",
+            "both {query}",
+            "just the {query}",
+            "only the {query}",
+            "{medicine}",
+            "the {medicine}"
+          ]
+        },
+        {
+          "name": "AskLetterIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "when can I {query}",
+            "can I {query}",
+            "how long {query}",
+            "how often {query}",
+            "is it ok to {query}",
+            "is it safe to {query}",
+            "am I allowed to {query}",
+            "should I {query}",
+            "do I need to {query}",
+            "what does my letter say about {query}",
+            "what about {query}",
+            "why do I {query}"
+          ]
+        },
+        {
+          "name": "UnwellIntent",
+          "slots": [{ "name": "query", "type": "AMAZON.SearchQuery" }],
+          "samples": [
+            "I feel {query}",
+            "I'm feeling {query}",
+            "my {query}",
+            "I've got {query}",
+            "I have {query}",
+            "I think I {query}",
+            "there's {query}",
+            "I can't {query}",
+            "I need help",
+            "help me",
+            "I'm not well",
+            "I don't feel well",
+            "I'm in pain"
+          ]
+        },
+        {
+          "name": "WhatsNextIntent",
+          "slots": [],
+          "samples": [
+            "what's next",
+            "what next",
+            "what comes next",
+            "what do I do now",
+            "what do I have to do",
+            "what's my plan for today",
+            "what is the plan for today",
+            "what's left today",
+            "what else do I have today",
+            "what's on today",
+            "and after that",
+            "then what"
+          ]
+        },
+        { "name": "AMAZON.HelpIntent", "samples": [] },
+        { "name": "AMAZON.StopIntent", "samples": [] },
+        { "name": "AMAZON.CancelIntent", "samples": [] },
+        { "name": "AMAZON.FallbackIntent", "samples": [] },
+        { "name": "AMAZON.NavigateHomeIntent", "samples": [] }
+      ],
+      "types": [
+        {
+          "name": "MEDICINE",
+          "values": [
+            { "name": { "value": "paracetamol" } },
+            { "name": { "value": "apixaban", "synonyms": ["blood thinner"] } },
+            { "name": { "value": "codeine" } },
+            { "name": { "value": "both", "synonyms": ["boat", "bolt"] } }
+          ]
+        }
+      ]
+    }
+  }
+}

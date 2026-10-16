@@ -1,0 +1,39 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "en-GB": {
+          "name": "AfterWard",
+          "summary": "A living recovery plan from your hospital discharge letter.",
+          "description": "AfterWard turns a discharge letter into a daily plan. Say what you've done, ask about your letter, or say if you feel unwell. Synthetic demo data only; not medical advice.",
+          "examplePhrases": [
+            "Alexa, open after ward",
+            "I'm back from my walk",
+            "what's next"
+          ],
+          "keywords": ["recovery", "discharge", "medicines"]
+        }
+      },
+      "isAvailableWorldwide": false,
+      "distributionCountries": ["GB"],
+      "testingInstructions": "Hackathon demo with a synthetic patient. Not for real patients.",
+      "category": "HEALTH_AND_FITNESS"
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    },
+    "apis": {
+      "custom": {
+        "endpoint": {
+          "uri": "https://example.com/alexa",
+          "sslCertificateType": "Wildcard"
+        }
+      }
+    }
+  }
+}
