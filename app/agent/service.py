@@ -93,6 +93,7 @@ from app.agent.occurrence_resolver import (
 )
 from app.agent.prompts import QUESTION_IN_REPORT_RULES, SYSTEM_PROMPT
 from app.agent.safety import (
+    _ASKS_HOW_LONG,
     is_reminder_request,
     sounds_like_both,
     asked_about_completion,
@@ -1708,6 +1709,80 @@ def _saved_names(tool_trace: list[dict], today: dict[str, list] | None) -> list[
     return names
 
 
+# Words a plain "how long do I take them for?" is made of. Any other word (but the name
+# of a medicine she just reported) means she asked something else too: the model answers.
+_HOW_LONG_WORDS = {
+    "how", "long", "do", "does", "should", "must", "will", "can", "i", "take", "taking", "keep", "need",
+    "needs", "to", "have", "has", "continue", "continuing", "them", "it", "this", "these", "those", "both",
+    "for", "my", "the", "until", "when", "stop", "stopping", "end", "date", "what", "what's", "whats", "is",
+    "of", "many", "days", "weeks", "months", "tablet", "tablets", "medicine", "medicines", "medication",
+    "medications", "pill", "pills",
+}
+# A letter sentence that says how long, or who decides: "...will tell you how long to continue at your review."
+_HOW_LONG_SENTENCE = re.compile(r"\b(how long|until|stop|review|end date|course)\b", re.IGNORECASE)
+
+
+def _how_long_in_code(question: str, tool_trace: list[dict], today: dict[str, list] | None) -> tuple[str, dict | None] | None:
+    """
+    "How long do I take them for?" about the medicines saved this turn, from her plan and
+    letter only: no model. None when the question asks anything else, names anything but
+    those medicines, or nothing was saved: then the model answers as before.
+    """
+
+    if not _ASKS_HOW_LONG.search(question):
+        return None
+
+    by_occurrence = {str(m.get("occurrence_id")): m for m in (today or {}).get("medications") or []}
+    saved: list[dict] = []
+    for step in tool_trace:
+        medicine = by_occurrence.get(str((step.get("arguments") or {}).get("occurrence_id")))
+        if (step["tool"] == "report_medication_taken" and step.get("ok") and medicine
+                and all(m.get("medication_id") != medicine.get("medication_id") for m in saved)):
+            saved.append(medicine)
+
+    if not saved:
+        return None
+
+    allowed = set(_HOW_LONG_WORDS)
+    for medicine in saved:
+        allowed |= set(re.findall(r"[a-z']+", f"{item_name(medicine)} {medicine_name(item_name(medicine))}".lower()))
+
+    if not set(re.findall(r"[a-z']+", question.lower())) <= allowed:
+        return None
+
+    sentences = []
+    open_ended = None
+    for medicine in saved:
+        name = medicine_name(item_name(medicine))
+        duration = " ".join(str(medicine.get("duration_text") or "").split()).rstrip(".")
+        if duration.lower().startswith("for "):
+            sentences.append(f"Your {name} is {duration}.")
+            continue
+        if duration:
+            sentences.append(f"For your {name}, the letter says: {duration}.")
+            continue
+        open_ended = open_ended or medicine
+        letter = str((medicine.get("source") or {}).get("snippet") or medicine.get("instructions") or "")
+        said = next((s.strip() for s in re.split(r"(?<=[.!?])\s+", letter) if _HOW_LONG_SENTENCE.search(s)), None)
+        if said and re.match(r"(Your|You)\b", said):
+            sentences.append(f"For your {name}, the letter says {said[0].lower()}{said[1:]}")
+        elif said:
+            sentences.append(f"For your {name}, the letter says: {said}")
+        else:
+            sentences.append(f"Your letter doesn't give an end date for your {name}, and I won't guess.")
+
+    # The letter line shown beside the answer: the medicine with no end, else the first.
+    shown = open_ended or saved[0]
+    snippet = (shown.get("source") or {}).get("snippet")
+    source = {
+        "document_id": (shown.get("source") or {}).get("document_id"), "page": (shown.get("source") or {}).get("page"),
+        "chunk_id": None, "section": None, "text": snippet, "highlight": snippet,
+        "passage": snippet, "highlighted_line": snippet,
+    } if snippet else None
+
+    return " ".join(sentences), source
+
+
 async def _answer_question_too(
     question: str,
     about: list[str],
@@ -1719,7 +1794,12 @@ async def _answer_question_too(
     tool_trace: list[dict],
 ) -> tuple[str, dict | None]:
     """Answer the question as its own turn (letter, plan, model as usual), told what she means
-    by "this". Its own session, so the report's waiting questions are not touched."""
+    by "this". Its own session, so the report's waiting questions are not touched.
+    "How long do I take them for?" about what she just took is answered in code instead."""
+
+    in_code = _how_long_in_code(question, tool_trace, today)
+    if in_code is not None:
+        return in_code
 
     named = " and ".join(about)
     asked = f"About my {named}: {question}" if named else question

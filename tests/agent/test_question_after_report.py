@@ -87,12 +87,14 @@ def test_the_answer_goes_before_what_is_next():
 
 
 # ---------- The demo moment: "...or both?" is waiting ----------
+# These ask something besides "how long" ("what are they for?"), so the model still answers;
+# a plain "how long" about what she just took is answered in code (tests below).
 
 def test_both_and_a_question_saves_answers_then_next(with_model):
     question, _ = with_model.say("I have taken my medicine", fresh=True)
     assert question["response"] == "Your paracetamol, your blood thinner, or both?"
 
-    result, writes = with_model.say("I've taken both. How long do I take them for?")
+    result, writes = with_model.say("I've taken both. How long do I take them for, and what are they for?")
     reply = result["response"]
 
     assert writes == BOTH_SAVED
@@ -101,7 +103,7 @@ def test_both_and_a_question_saves_answers_then_next(with_model):
     # (2) Then the answer, (3) then what is next, once.
     assert reply.index("marked") < reply.index(ANSWER) < reply.index("Next ")
     assert reply.count("Next ") == 1
-    assert with_model.asked_model == ["About my paracetamol and blood thinner: How long do I take them for?"]
+    assert with_model.asked_model == ["About my paracetamol and blood thinner: How long do I take them for, and what are they for?"]
 
 
 @pytest.mark.parametrize("first", ["I have taken my medicine", "I ate pizza for breakfast"])
@@ -110,7 +112,7 @@ def test_both_the_medicines_and_a_question_saves_both(with_model, first):
     with_model.say(first, fresh=True)
 
     result, writes = with_model.say(
-        "I have taken both the medicines and how long do I need to take this medicines for")
+        "I have taken both the medicines and how long do I need to take this medicines for, what are they for")
     reply = result["response"]
 
     assert writes == BOTH_SAVED, reply
@@ -120,7 +122,7 @@ def test_both_the_medicines_and_a_question_saves_both(with_model, first):
 
 def test_the_question_turn_gets_the_short_honest_rules(with_model):
     with_model.say("I have taken my medicine", fresh=True)
-    with_model.say("I've taken both. How long do I take them for?")
+    with_model.say("I've taken both. How long do I take them for, and what are they for?")
 
     rules = with_model.system[0]
     assert "at most two short sentences" in rules and "I won't guess" in rules
@@ -142,7 +144,7 @@ def test_the_question_turn_never_writes(with_model, monkeypatch):
 
     monkeypatch.setattr(service.bedrock, "converse", converse)
     with_model.say("I have taken my medicine", fresh=True)
-    _, writes = with_model.say("I've taken both. How long do I take them for?")
+    _, writes = with_model.say("I've taken both. How long do I take them for, and what are they for?")
 
     assert writes == BOTH_SAVED  # the two morning doses only; never the midday one
 
@@ -166,7 +168,7 @@ def test_the_question_reuses_todays_plan_instead_of_reading_it_again(with_model,
         return await real(name, arguments)
 
     monkeypatch.setattr(service, "call_mcp_tool", counting)
-    with_model.say("I've taken both. How long do I take them for?")
+    with_model.say("I've taken both. How long do I take them for, and what are they for?")
 
     assert sorted(reads) == ["get_medications", "get_today_tasks"]  # once for the whole turn, not twice
 
@@ -200,7 +202,7 @@ def test_an_answer_with_a_date_is_not_redone_when_the_plan_was_read_up_front(wit
 
     monkeypatch.setattr(service.bedrock, "converse", converse)
     with_model.say("I have taken my medicine", fresh=True)
-    result, _ = with_model.say("I've taken both. How long do I take them for?")
+    result, _ = with_model.say("I've taken both. How long do I take them for, and what are they for?")
 
     assert len(calls) == 1, "one model call, not three"
     assert "APPOINTMENTS FROM HER PLAN" in calls[0]
