@@ -264,3 +264,8 @@ test('a related line keeps its own heading, such as the emergency number', () =>
     related: [{ text: 'Emergency services number: 555-555-0199 (fictional number)', page: 2, label: 'Emergency number' }] } });
   assert.deepEqual(r.source?.related, [{ text: 'Emergency services number: 555-555-0199 (fictional number)', page: 2, label: 'Emergency number' }]);
 });
+
+test('readChat marks a reply refused under the demo chat limit', () => {
+  assert.equal(readChat({ response: 'Limit.', tool_trace: [], rate_limited: true }).rateLimited, true);
+  assert.equal(readChat({ response: 'Hello', tool_trace: [] }).rateLimited, false);
+});

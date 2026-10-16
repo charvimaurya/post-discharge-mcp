@@ -31,6 +31,19 @@ def empty_caches():
     client._tool_list_cache.clear()
 
 
+@pytest.fixture(autouse=True)
+def empty_chat_limits():
+    """Every test starts with no chat messages counted against the demo limits."""
+
+    from app import web_bridge
+
+    web_bridge.CHAT_SESSION_LIMIT.clear()
+    web_bridge.CHAT_IP_LIMIT.clear()
+    yield
+    web_bridge.CHAT_SESSION_LIMIT.clear()
+    web_bridge.CHAT_IP_LIMIT.clear()
+
+
 def log_lines(text: str) -> list[dict]:
     """The structured log lines in captured stdout, oldest first."""
 

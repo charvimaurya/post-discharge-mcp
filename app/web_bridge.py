@@ -26,6 +26,7 @@ from app.agent.next_up import build_opening_message, timing
 from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime, system_now_utc
 from app.database.event_history import delete_events
 from app.demo_reset import NoPlanToReset, reset_demo_patient
+from app.rate_limit import RateLimiter
 from app.database.recovery_state import (
     add_scheduled_checkin,
     clear_pending_checkin,
@@ -50,6 +51,45 @@ log = service_log("bridge")
 
 TODAY_ERROR = "Could not load today's plan. Please try again."
 CHAT_ERROR = "Sorry, I couldn't reach the assistant. Please try again."
+
+# Demo chat limits, per bridge process: 30 messages per session and 100 per
+# visitor IP address in any hour. Over either, the reply is CHAT_LIMIT_REPLY.
+CHAT_LIMIT_REPLY = "You've reached the demo limit for now. Please try again in a little while."
+CHAT_SESSION_LIMIT = RateLimiter(limit=30, window_seconds=3600)
+CHAT_IP_LIMIT = RateLimiter(limit=100, window_seconds=3600)
+
+# The visitor's address, worked out by the web server from the trusted proxy's
+# headers (web/lib/client-ip.ts) and passed on in this header.
+CLIENT_IP_HEADER = "x-afterward-client-ip"
+
+
+def _client_ip(request: Request) -> str:
+    """
+    The visitor IP address used for the per-IP chat limit.
+
+    X-AfterWard-Client-IP is trusted only because the web server sets it and the
+    bridge listens on 127.0.0.1, so nothing else can reach it. When the bridge key
+    is added in step 9a, trust this header only on requests that pass the key
+    check; otherwise fall back to the peer address.
+    """
+
+    forwarded = request.headers.get(CLIENT_IP_HEADER, "").strip()
+    if forwarded:
+        return forwarded
+
+    return request.client.host if request.client else "unknown"
+
+
+def _chat_limit_hit(session_id: str, client_ip: str) -> str | None:
+    """Which limit this message would break ("session" or "ip"), or None."""
+
+    if not CHAT_SESSION_LIMIT.allowed(session_id):
+        return "session"
+
+    if not CHAT_IP_LIMIT.allowed(client_ip):
+        return "ip"
+
+    return None
 
 
 # A question about how long a medicine goes on for: "how long", "when do I stop", "end date".
@@ -116,6 +156,29 @@ async def chat_message(request: Request) -> JSONResponse:
 
     if not isinstance(session_id, str) or not session_id.strip():
         session_id = uuid.uuid4().hex
+
+    # Checked before anything else: over the limit, no DynamoDB write or read,
+    # no agent turn and no MCP call.
+    client_ip = _client_ip(request)
+    limit_hit = _chat_limit_hit(session_id, client_ip)
+
+    if limit_hit:
+        log("chat_rate_limited", reason=limit_hit)
+        return JSONResponse(
+            {
+                "response": CHAT_LIMIT_REPLY,
+                "tool_trace": [],
+                "source": None,
+                "help": None,
+                "session_id": session_id,
+                "request_id": get_request_id(),
+                "rate_limited": True,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    CHAT_SESSION_LIMIT.record(session_id)
+    CHAT_IP_LIMIT.record(client_ip)
 
     patient = get_demo_patient_context()
 

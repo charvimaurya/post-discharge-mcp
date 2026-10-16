@@ -210,7 +210,7 @@ export default function DemoPage() {
   async function upload(file: File) {
     setUploading(true); setError('');
     try {
-      const form = new FormData(); form.set('file', file);
+      const form = new FormData(); form.set('file', file); form.set('session_id', sessionId());
       const response = await fetch('/api/upload', { method: 'POST', body: form });
       const uploaded = await response.json();
       if (!response.ok) throw new Error(uploaded.error || 'Upload failed.');
@@ -288,6 +288,8 @@ export default function DemoPage() {
       setTurns(t => [...t, { who: 'aw', text: reply.text || 'Sorry, I could not answer that.' }]);
       setBusy(false);
       const speaking = say(reply.text);
+      // Over the demo limit nothing changed, so Today is not reloaded (that would call MCP tools).
+      if (reply.rateLimited) { await speaking; return; }
       const after = await loadToday();
       const named = after ? itemsMentioned(reply.text, after.items) : [];
       setFocus(named);

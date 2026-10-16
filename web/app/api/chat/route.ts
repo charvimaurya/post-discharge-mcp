@@ -1,5 +1,6 @@
 // Pass a chat message through to the Python bridge; only message and session_id are forwarded.
 import { bridgeHeaders, bridgeUrl } from '../../../lib/bridge';
+import { clientIp } from '../../../lib/client-ip';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../lib/request-id';
 
 export const runtime = 'nodejs';
@@ -12,11 +13,16 @@ export async function POST(request: Request) {
   catch { return Response.json({ error: 'Expected JSON with a message.' }, { status: 400 }); }
 
   const { message, session_id } = (body ?? {}) as { message?: unknown; session_id?: unknown };
+  // For the bridge's per-IP demo limit; taken from the trusted proxy's headers (lib/client-ip.ts).
+  const visitor = clientIp(request.headers);
 
   try {
     const response = await fetch(`${bridgeUrl}/chat`, {
       method: 'POST',
-      headers: bridgeHeaders({ 'Content-Type': 'application/json', [REQUEST_ID_HEADER]: requestId }),
+      headers: bridgeHeaders({
+        'Content-Type': 'application/json', [REQUEST_ID_HEADER]: requestId,
+        ...(visitor ? { 'X-AfterWard-Client-IP': visitor } : {}),
+      }),
       body: JSON.stringify({ message, session_id }),
       cache: 'no-store',
     });
