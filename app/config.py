@@ -35,10 +35,8 @@ AGENT_MODEL_ID = os.environ.get("AGENT_MODEL_ID", "")
 # ---------------------------------------------------------
 # S3 VECTORS / RAG
 # ---------------------------------------------------------
-S3_VECTOR_BUCKET = os.getenv(
-    "S3_VECTOR_BUCKET",
-    "afterward-vectors-992617582533-london",
-)
+# No default: set it in .env (vector_store says so clearly if it is missing).
+S3_VECTOR_BUCKET = os.getenv("S3_VECTOR_BUCKET", "")
 S3_VECTOR_INDEX = os.getenv(
     "S3_VECTOR_INDEX",
     "afterward-discharge-index",

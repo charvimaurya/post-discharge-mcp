@@ -2,7 +2,7 @@
 
 ## Current status
 
-Live resources were inspected in account `992617582533`, region `eu-west-2`, on 13 October 2026. The migration is complete. Active uploads and MCP search use the AfterWard replacements in [deployment/name-migration](../deployment/name-migration/resource-names.json). The original resources are retained for rollback.
+Live resources were inspected in account `<ACCOUNT_ID>`, region `eu-west-2`, on 13 October 2026. The migration is complete. Active uploads and MCP search use the AfterWard replacements in [deployment/name-migration](../deployment/name-migration/resource-names.json). The original resources are retained for rollback.
 
 The initial inventory used the IAM user `CareLoop`, subsequently renamed to `AfterWard`. IAM permission simulation reports `implicitDeny` for `s3:CreateBucket`. Actual inventory calls also returned access denied for `ecs:ListServices` and `sqs:ListQueueTags`. The scoped permissions were subsequently granted through the managed policy `AfterWardNameMigration`. A fresh inventory succeeded for ECS services and queue tags, and simulation confirmed permission to create the proposed London bucket. The [additional-access policy](../deployment/name-migration/required-additional-access.json) scopes bucket creation to the proposed London bucket; it does not grant permission to delete resources. Permission simulation is a preflight check, not a guarantee that every API call will succeed.
 
@@ -37,8 +37,8 @@ Private snapshots are saved under the ignored directory `infra/security/backup/n
 
 | Existing | Replacement |
 | --- | --- |
-| `careloop-documents-992617582533-london` | `afterward-documents-992617582533-london` |
-| `careloop-vectors-992617582533-london` | `afterward-vectors-992617582533-london` |
+| `careloop-documents-<ACCOUNT_ID>-london` | `afterward-documents-<ACCOUNT_ID>-london` |
+| `careloop-vectors-<ACCOUNT_ID>-london` | `afterward-vectors-<ACCOUNT_ID>-london` |
 | `careloop-discharge-index` | `afterward-discharge-index` |
 | `CareLoopDocumentProcessing` | `AfterWardDocumentProcessing` |
 | `CareLoopDocumentProcessingDLQ` | `AfterWardDocumentProcessingDLQ` |

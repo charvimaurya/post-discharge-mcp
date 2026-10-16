@@ -1,7 +1,7 @@
 // Upload a PDF; the existing S3 notification starts asynchronous processing.
 import { randomBytes } from 'node:crypto';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { bucket, patientId, s3 } from '../../../lib/aws';
+import { documentBucket, missingBucketMessage, patientId, s3 } from '../../../lib/aws';
 import { bridgeHeaders, bridgeUrl } from '../../../lib/bridge';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../lib/request-id';
 import {
@@ -16,6 +16,13 @@ const uploads = createUploadLimiter();
 
 export async function POST(request: Request) {
   const requestId = requestIdFrom(request.headers);
+  // Checked first, before anything is sent to the bridge or S3.
+  let bucket: string;
+  try { bucket = documentBucket(); }
+  catch {
+    console.error('Upload refused: DOCUMENT_BUCKET is not set', requestId);
+    return Response.json({ error: missingBucketMessage }, { status: 500 });
+  }
   let form: FormData;
   try { form = await request.formData(); }
   catch { return Response.json({ error: 'Expected a multipart PDF upload.' }, { status: 400 }); }
