@@ -2,7 +2,7 @@
 import { randomBytes } from 'node:crypto';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { bucket, patientId, s3 } from '../../../lib/aws';
-import { bridgeUrl } from '../../../lib/bridge';
+import { bridgeHeaders, bridgeUrl } from '../../../lib/bridge';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../lib/request-id';
 import { clearPreviousHistory, validateUpload, wrongDocumentMessage } from '../../../lib/upload-validation';
 
@@ -24,7 +24,7 @@ export async function POST(request: Request) {
   if (!bytes.subarray(0, 1024).includes(Buffer.from('%PDF-'))) {
     return Response.json({ error: wrongDocumentMessage }, { status: 400 });
   }
-  const validation = await validateUpload(bytes, bridgeUrl, fetch, requestId);
+  const validation = await validateUpload(bytes, bridgeUrl, fetch, requestId, bridgeHeaders());
   if (!validation.accepted) {
     return Response.json({ error: validation.error }, { status: validation.status });
   }
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
   }
   // The new letter replaces the plan, so what was recorded against the old one is deleted. Done
   // only once the letter is safely stored; if it fails, the upload itself has still succeeded.
-  const historyCleared = await clearPreviousHistory(bridgeUrl, fetch, requestId);
+  const historyCleared = await clearPreviousHistory(bridgeUrl, fetch, requestId, bridgeHeaders());
   if (!historyCleared) console.error('Previous history was not cleared after upload', requestId);
   return Response.json({ patient_id: patientId, document_id: documentId, status: 'uploaded', history_cleared: historyCleared },
     { headers: { [REQUEST_ID_HEADER]: requestId } });

@@ -1,5 +1,5 @@
 // Pass a chat message through to the Python bridge; only message and session_id are forwarded.
-import { bridgeUrl } from '../../../lib/bridge';
+import { bridgeHeaders, bridgeUrl } from '../../../lib/bridge';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../lib/request-id';
 
 export const runtime = 'nodejs';
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   try {
     const response = await fetch(`${bridgeUrl}/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', [REQUEST_ID_HEADER]: requestId },
+      headers: bridgeHeaders({ 'Content-Type': 'application/json', [REQUEST_ID_HEADER]: requestId }),
       body: JSON.stringify({ message, session_id }),
       cache: 'no-store',
     });

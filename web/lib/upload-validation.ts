@@ -7,11 +7,12 @@ export async function validateUpload(
   bridgeUrl: string,
   request: typeof fetch = fetch,
   requestId?: string,
+  extraHeaders: Record<string, string> = {},
 ): Promise<UploadValidation> {
   try {
     const response = await request(`${bridgeUrl}/documents/validate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/pdf', ...(requestId ? { 'X-Request-ID': requestId } : {}) },
+      headers: { ...extraHeaders, 'Content-Type': 'application/pdf', ...(requestId ? { 'X-Request-ID': requestId } : {}) },
       body: new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), cache: 'no-store',
     });
     const result = await response.json();
@@ -32,10 +33,11 @@ export async function clearPreviousHistory(
   bridgeUrl: string,
   request: typeof fetch = fetch,
   requestId?: string,
+  extraHeaders: Record<string, string> = {},
 ): Promise<boolean> {
   try {
     const response = await request(`${bridgeUrl}/documents/uploaded`, {
-      method: 'POST', headers: requestId ? { 'X-Request-ID': requestId } : {}, cache: 'no-store',
+      method: 'POST', headers: { ...extraHeaders, ...(requestId ? { 'X-Request-ID': requestId } : {}) }, cache: 'no-store',
     });
     return response.ok;
   } catch {

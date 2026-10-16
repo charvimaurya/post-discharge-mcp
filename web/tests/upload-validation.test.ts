@@ -46,3 +46,19 @@ test('reports when the previous history could not be cleared', async () => {
   assert.equal(await clearPreviousHistory('http://bridge', failing), false);
   assert.equal(await clearPreviousHistory('http://bridge', offline), false);
 });
+
+test('sends the bridge key header it is given on both bridge calls', async () => {
+  const seen: Record<string, string>[] = [];
+  const request = (async (_url, init) => {
+    seen.push(init?.headers as Record<string, string>);
+    return Response.json({ accepted: true });
+  }) as typeof fetch;
+  const key = { 'X-AfterWard-Key': 'test-key' };
+  await validateUpload(bytes, 'http://bridge', request, 'req-1', key);
+  await clearPreviousHistory('http://bridge', request, 'req-1', key);
+  assert.equal(seen.length, 2);
+  for (const headers of seen) {
+    assert.equal(headers['X-AfterWard-Key'], 'test-key');
+    assert.equal(headers['X-Request-ID'], 'req-1');
+  }
+});

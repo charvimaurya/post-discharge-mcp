@@ -1,7 +1,7 @@
 // Ask the Python bridge to run the reminder check once. On AWS the EventBridge schedule does this;
 // locally the /demo page asks when it opens. Only the test-only force_next=true flag is passed on
 // (the bridge refuses it in production); nothing else from the browser is forwarded.
-import { bridgeUrl } from '../../../../lib/bridge';
+import { bridgeHeaders, bridgeUrl } from '../../../../lib/bridge';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../../lib/request-id';
 
 export const runtime = 'nodejs';
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   try {
     const response = await fetch(`${bridgeUrl}/reminders/check${force ? '?force_next=true' : ''}`, {
       method: 'POST',
-      headers: { [REQUEST_ID_HEADER]: requestId },
+      headers: bridgeHeaders({ [REQUEST_ID_HEADER]: requestId }),
       cache: 'no-store',
     });
     return Response.json(await response.json(), {
