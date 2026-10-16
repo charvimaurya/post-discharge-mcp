@@ -16,7 +16,7 @@ from starlette.testclient import TestClient
 from app import web_bridge
 from app.reminders.engine import choose_checkin, pending_is_valid
 from lambdas.reminder_checker import handler as checker
-from scripts import reset_demo_patient as reset
+from app import demo_reset as reset
 
 
 LONDON = ZoneInfo("Europe/London")

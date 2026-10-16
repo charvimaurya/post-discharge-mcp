@@ -7,6 +7,7 @@ caller sends can choose the patient, date or time.
 """
 
 import asyncio
+import hmac
 import os
 import uuid
 from contextlib import asynccontextmanager, suppress
@@ -17,10 +18,13 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
 
+from app.agent.session import clear_session
 from app.agent.service import get_structured_tool_result
 from app.agent.next_up import build_opening_message, timing
 from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime
 from app.database.event_history import delete_events
+from app.demo_reset import NoPlanToReset, reset_demo_patient
+from app.rate_limit import RateLimiter
 from app.database.recovery_state import (
     get_recovery_state,
     record_greeting,
@@ -44,6 +48,45 @@ log = service_log("bridge")
 TODAY_ERROR = "Could not load today's plan. Please try again."
 CHAT_ERROR = "Sorry, I couldn't reach the assistant. Please try again."
 
+# Demo chat limits, per bridge process: 30 messages per session and 100 per
+# visitor IP address in any hour. Over either, the reply is CHAT_LIMIT_REPLY.
+CHAT_LIMIT_REPLY = "You've reached the demo limit for now. Please try again in a little while."
+CHAT_SESSION_LIMIT = RateLimiter(limit=30, window_seconds=3600)
+CHAT_IP_LIMIT = RateLimiter(limit=100, window_seconds=3600)
+
+# The visitor's address, worked out by the web server from the trusted proxy's
+# headers (web/lib/client-ip.ts) and passed on in this header.
+CLIENT_IP_HEADER = "x-afterward-client-ip"
+
+
+def _client_ip(request: Request) -> str:
+    """
+    The visitor IP address used for the per-IP chat limit.
+
+    X-AfterWard-Client-IP is trusted only because the web server sets it and the
+    bridge listens on 127.0.0.1, so nothing else can reach it. When the bridge key
+    is added in step 9a, trust this header only on requests that pass the key
+    check; otherwise fall back to the peer address.
+    """
+
+    forwarded = request.headers.get(CLIENT_IP_HEADER, "").strip()
+    if forwarded:
+        return forwarded
+
+    return request.client.host if request.client else "unknown"
+
+
+def _chat_limit_hit(session_id: str, client_ip: str) -> str | None:
+    """Which limit this message would break ("session" or "ip"), or None."""
+
+    if not CHAT_SESSION_LIMIT.allowed(session_id):
+        return "session"
+
+    if not CHAT_IP_LIMIT.allowed(client_ip):
+        return "ip"
+
+    return None
+
 
 async def chat_message(request: Request) -> JSONResponse:
     """Run one agent turn for the server-side patient (see app.turn.run_turn)."""
@@ -62,6 +105,29 @@ async def chat_message(request: Request) -> JSONResponse:
 
     if not isinstance(session_id, str) or not session_id.strip():
         session_id = uuid.uuid4().hex
+
+    # Checked before anything else: over the limit, no DynamoDB write or read,
+    # no agent turn and no MCP call.
+    client_ip = _client_ip(request)
+    limit_hit = _chat_limit_hit(session_id, client_ip)
+
+    if limit_hit:
+        log("chat_rate_limited", reason=limit_hit)
+        return JSONResponse(
+            {
+                "response": CHAT_LIMIT_REPLY,
+                "tool_trace": [],
+                "source": None,
+                "help": None,
+                "session_id": session_id,
+                "request_id": get_request_id(),
+                "rate_limited": True,
+            },
+            headers={"Cache-Control": "no-store"},
+        )
+
+    CHAT_SESSION_LIMIT.record(session_id)
+    CHAT_IP_LIMIT.record(client_ip)
 
     try:
         turn = await run_turn(message, session_id)
@@ -203,6 +269,56 @@ async def document_uploaded(request: Request) -> JSONResponse:
     log("history_cleared", item_count=deleted)
 
     return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
+
+
+# The "Reset demo" button on /demo. The web server sends BRIDGE_KEY as
+# X-AfterWard-Key; this route refuses without it, and in production.
+BRIDGE_KEY_HEADER = "x-afterward-key"
+RESET_ERROR = "Could not reset the demo. Please try again."
+
+
+async def reset_demo(request: Request) -> JSONResponse:
+    """
+    Reset demo_patient_001 and forget this session's conversation.
+
+    Uses the same reset as scripts/reset_demo_patient.py, which also clears
+    any pending check-in. The patient is fixed on the server; the body may
+    only carry the session_id whose chat memory is cleared.
+    """
+
+    expected = os.getenv("BRIDGE_KEY", "")
+    if not expected:
+        return JSONResponse({"error": "Reset is not set up: BRIDGE_KEY is missing."}, status_code=503)
+
+    given = request.headers.get(BRIDGE_KEY_HEADER, "")
+    if not hmac.compare_digest(given.encode(), expected.encode()):
+        return JSONResponse({"error": "Not allowed."}, status_code=401)
+
+    if not allows_test_hooks():
+        return JSONResponse({"error": "Reset is not available in production."}, status_code=403)
+
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+
+    session_id = body.get("session_id") if isinstance(body, dict) else None
+
+    try:
+        result = await asyncio.to_thread(reset_demo_patient)
+    except NoPlanToReset:
+        return JSONResponse({"error": "No plan to reset. Upload a letter first."}, status_code=409)
+    except Exception as exc:
+        log("demo_reset_failed", level="error", error=exc, route="/reset")
+        return JSONResponse({"error": RESET_ERROR}, status_code=502)
+
+    if isinstance(session_id, str) and session_id.strip():
+        clear_session(session_id)
+
+    deleted = result["events_deleted"]
+    log("demo_reset", item_count=deleted)
+
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 
 # Local stand-in for the EventBridge schedule: with LOCAL_REMINDER_LOOP=1
@@ -355,6 +471,7 @@ app = Starlette(
         Route("/today", today, methods=["GET"]),
         Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
+        Route("/reset", reset_demo, methods=["POST"]),
     ],
     lifespan=lifespan,
     middleware=[Middleware(RequestLogMiddleware)],

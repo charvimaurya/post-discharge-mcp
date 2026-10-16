@@ -54,7 +54,8 @@ export function emergencyNumber(actions: HelpAction[]): string | null {
   }
   return null;
 }
-export type ChatReply = { text: string; tools: ToolCall[]; source: Source; completed: boolean; saved: boolean; requestId: string | null; help: HelpAction[] | null };
+// rateLimited: the bridge refused the turn under the demo chat limit; nothing was read or saved.
+export type ChatReply = { text: string; tools: ToolCall[]; source: Source; completed: boolean; saved: boolean; requestId: string | null; help: HelpAction[] | null; rateLimited: boolean };
 
 type Obj = Record<string, unknown>;
 export const isObj = (v: unknown): v is Obj => !!v && typeof v === 'object' && !Array.isArray(v);
@@ -258,6 +259,7 @@ export function readChat(json: unknown): ChatReply {
     completed: o.completed !== false,
     saved: tools.some(t => t.kind === 'write' && t.ok),
     requestId: str(o.request_id) || null,
+    rateLimited: o.rate_limited === true,
     help: isObj(o.help) && Array.isArray(o.help.actions)
       ? o.help.actions.filter(isObj).map(a => ({ urgency: str(a.urgency), action: str(a.action) })).filter(a => a.action)
       : null,

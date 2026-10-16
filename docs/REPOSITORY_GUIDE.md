@@ -19,7 +19,7 @@ You do not need to run every file. Most files are supporting code used by other 
 | Check the automated tests | `pytest -v` |
 | Read the sample PDF as plain text | `python -m scripts.ingestion.test_extraction` |
 | Get structured JSON from the sample PDF | `python -m scripts.ingestion.test_phase3` |
-| Get a normalized and validated recovery plan | `python run_ingestion.py` |
+| Get a normalized and validated recovery plan | `python -m scripts.ingestion.run_ingestion` |
 | Split the PDF into searchable pieces | `python -m scripts.rag.test_real_chunking` |
 | Store those pieces in the vector index | `python -m scripts.rag.test_real_vector_indexing` |
 | Search the stored text | `python -m scripts.rag.test_rag_search` |
@@ -97,14 +97,13 @@ use a named profile:
 ```bash
 export AWS_PROFILE=your-profile
 aws sts get-caller-identity
-python check_setup.py
 ```
 
 Use the actual profile name instead of `your-profile`. Omit the export when
 using your default profile. The AWS CLI must be installed separately.
 
-`check_setup.py` checks the account and creates AWS clients. It does **not** prove
-that every model, bucket, or table is accessible.
+`aws sts get-caller-identity` shows which AWS account you are using. It does **not**
+prove that every model, bucket, or table is accessible; Step C checks the models.
 
 ## 2. Run tests in this order
 
@@ -142,7 +141,7 @@ the sample currently still extracts successfully.
 ### Step C : Check Bedrock extraction
 
 ```bash
-python verify_models.py
+python -m scripts.aws.verify_models
 python -m scripts.ingestion.test_phase3
 ```
 
@@ -155,7 +154,7 @@ appear in the source? Successful execution does not prove extraction accuracy.
 To also normalize and validate the result:
 
 ```bash
-python run_ingestion.py
+python -m scripts.ingestion.run_ingestion
 ```
 
 This prints a `RecoveryState`, the Python object representing the patient's
@@ -464,8 +463,7 @@ Afterward/
 ├── pytest.ini                         # Test discovery and default integration exclusions
 ├── .env                               # Local settings; excluded from Git
 ├── .env.example                       # Incomplete configuration template
-├── .gitignore                         # Keep secrets, caches, and builds out of Git
-└── output.txt                         # Index pointing to maintained documentation
+└── .gitignore                         # Keep secrets, caches, and builds out of Git
 ```
 
 The MCP folder contains preliminary helpers, but the **MCP server is not

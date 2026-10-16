@@ -7,7 +7,10 @@ import { answerChoices, emergencyNumber, replyPoints, letterBlocks, letterTitle,
 // ---------- Frame: top bar and footer ----------
 
 // patient: the first name from the current plan, so every screen shows whose plan it is.
-export function TopBar({ clock, dev, onDev, patient }: { clock?: string; dev?: boolean; onDev?: () => void; patient?: string | null }) {
+// onReset: the "Reset demo" button, shown only when given; resetting disables it while it runs.
+export function TopBar({ clock, dev, onDev, patient, onReset, resetting }: {
+  clock?: string; dev?: boolean; onDev?: () => void; patient?: string | null; onReset?: () => void; resetting?: boolean;
+}) {
   const { day, time } = splitClock(clock || '');
   return <header className="top">
     <Logo /><span className="name">AfterWard</span>
@@ -15,7 +18,8 @@ export function TopBar({ clock, dev, onDev, patient }: { clock?: string; dev?: b
     {/* The demo runs on a fixed clock; the label says so. */}
     {clock && <span className="clock" title="The demo always runs at this time"><span className="demo-time">Demo time</span>{day} &nbsp;<b>{time}</b></span>}
     <span className="spacer" />
-    {onDev && <button type="button" className={`dev${dev ? ' on' : ''}`} onClick={onDev} aria-pressed={dev}>Developer view <i /></button>}
+    {onReset && <button type="button" className="reset" onClick={onReset} disabled={resetting}>{resetting ? 'Resetting...' : 'Reset demo'}</button>}
+    {onDev &&<button type="button" className={`dev${dev ? ' on' : ''}`} onClick={onDev} aria-pressed={dev}>Developer view <i /></button>}
     <span className="sim">Simulated Alexa+</span>
   </header>;
 }

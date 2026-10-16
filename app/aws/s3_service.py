@@ -13,11 +13,21 @@ import boto3
 from app import config
 
 # Read settings through the shared config so local scripts and Lambda use the
-# same bucket and region. Fail at import time if no bucket has been configured.
-if not config.DOCUMENT_BUCKET:
-    raise RuntimeError(
-        "DOCUMENT_BUCKET (or AFTERWARD_BUCKET) environment variable is not set."
-    )
+# same bucket and region. The bucket is checked when S3 is used, not at import,
+# so code and tests that never touch S3 still load without it.
+MISSING_BUCKET_MESSAGE = (
+    "DOCUMENT_BUCKET (or AFTERWARD_BUCKET) environment variable is not set."
+)
+
+
+def document_bucket() -> str:
+    """The configured upload bucket. Raises a clear error naming the setting if it is missing."""
+
+    if not config.DOCUMENT_BUCKET:
+        raise RuntimeError(MISSING_BUCKET_MESSAGE)
+
+    return config.DOCUMENT_BUCKET
+
 
 # Reuse one client across calls. Boto3 obtains credentials from its normal
 # credential chain (for example, a local AWS profile or Lambda execution role).
@@ -80,9 +90,11 @@ def upload_document(
 
     # upload_file transfers the local file. AES256 requests S3-managed
     # server-side encryption (SSE-S3) for the stored object.
+    bucket = document_bucket()
+
     s3.upload_file(
         Filename=str(path),
-        Bucket=config.DOCUMENT_BUCKET,
+        Bucket=bucket,
         Key=key,
         ExtraArgs={
             "ContentType": content_type,
@@ -92,7 +104,7 @@ def upload_document(
 
     # Return metadata for callers to log or pass on; source_type omits the dot.
     return {
-        "bucket": config.DOCUMENT_BUCKET,
+        "bucket": bucket,
         "key": key,
         "patient_id": patient_id,
         "document_id": document_id,
@@ -107,8 +119,9 @@ def download_document(
     Supply an object key, not an s3:// URL. The bytes can be passed directly to
     the PDF/image pipeline; missing-object and permission errors propagate.
     """
+    bucket = document_bucket()
     response = s3.get_object(
-        Bucket=config.DOCUMENT_BUCKET,
+        Bucket=bucket,
         Key=key,
     )
     # S3 returns a streaming body. Reading it here loads the whole file in memory.

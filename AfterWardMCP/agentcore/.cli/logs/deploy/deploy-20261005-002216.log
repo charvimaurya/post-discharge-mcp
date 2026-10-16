@@ -1,0 +1,16 @@
+================================================================================
+AGENTCORE DEPLOY LOG
+Command: deploy
+Started: 2026-10-04T22:22:16.782Z
+================================================================================
+
+
+[00:22:16] STEP: Validate project
+[00:22:16] Error: No resources defined in project. Add at least one resource (agent, memory, knowledge base, evaluator, or gateway) before deploying.
+[00:22:16] Status: FAILED
+[00:22:16] Duration: 9ms
+
+================================================================================
+FAILED
+Total Duration: 27ms
+================================================================================

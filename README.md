@@ -60,6 +60,8 @@ The quickest way to try AfterWard is the public demo: [TODO: add public demo lin
 
 For a local demo, follow the setup below, then open [http://127.0.0.1:3000/demo](http://127.0.0.1:3000/demo).
 
+Before you start, set `CLOCK_MODE=demo` in the root `.env` and restart both Python services. Margaret's plan depends on dates, so on the real clock Today can be empty.
+
 1. Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`. Wait for the new plan to be ready.
 2. Open Today. Press **Mark as done** on a medicine or task. Each button saves that item as done.
 3. Check the Done-first display. Completed items appear above Next up. The item just completed appears beside the next action.
@@ -67,6 +69,7 @@ For a local demo, follow the setup below, then open [http://127.0.0.1:3000/demo]
 5. Check the highlighted wording for the discussed item. When the passage refers to an appointment, its wording appears with the evidence too. Use **Back to today** to return.
 6. Open **Developer view** to inspect the conversation and MCP tool calls.
 7. Upload `test_data/letter3_kevin_asthma_age30_SYNTHETIC.pdf`. AfterWard builds a new plan from it.
+8. Use **Reset demo** in the top bar to clear today's progress and the conversation, then start again. It needs `BRIDGE_KEY` set in both env files (see Settings).
 
 Voice input depends on browser support and microphone permission. Text input is available too.
 
@@ -192,20 +195,24 @@ Root `.env.example`, copied to `.env`:
 | `CLOCK_MODE` | `real` uses current patient-local time; `demo` fixes time; `production` disables test hooks. |
 | `DEMO_FIXED_NOW` | ISO timestamp used only in demo clock mode. |
 | `MCP_URL` | Address the Python bridge uses to reach the MCP server. Keep `http://127.0.0.1:8001/mcp` for local setup. |
+| `BRIDGE_KEY` | Shared key the web server sends to the bridge; must match `web/.env.local`. Needed for **Reset demo**. |
 
 Web `web/.env.example`, copied to `web/.env.local`:
 
 | Setting | Meaning |
 | --- | --- |
 | `AWS_REGION` | AWS region for the web server's S3 and DynamoDB clients. |
-| `DOCUMENT_BUCKET` | Upload bucket; replace `<ACCOUNT_ID>` and match the Python configuration. |
+| `DOCUMENT_BUCKET` | Upload bucket name; must match the root `.env`. Uploads stop with a message naming this setting if it is missing. |
 | `RECOVERY_STATE_TABLE` | Recovery table; match the Python configuration. |
 | `TEST_PATIENT_ID` | Synthetic demo patient ID; keep `demo_patient_001` for the supplied demo. |
 | `AGENT_API_URL` | Optional. Python bridge address; defaults to `http://127.0.0.1:8002`. |
+| `BRIDGE_KEY` | Same value as the root `.env`. Server-only; never prefix it with `NEXT_PUBLIC_`. |
+
+To make a `BRIDGE_KEY`, run `python -c "import secrets; print(secrets.token_urlsafe(32))"` and paste the output into both files.
 
 ## Load and reset the demo patient
 
-Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf` through `/demo` first. This creates the recovery plan for `demo_patient_001`. The reset script does not upload or extract a letter and fails if no plan exists.
+Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf` through `/demo` first. This creates the recovery plan for `demo_patient_001`. The reset script does not upload or extract a letter and fails if no plan exists. Or use **Reset demo** on `/demo`, which runs the same reset.
 
 For a repeatable recording, set `CLOCK_MODE=demo` in the root `.env`. The supplied `DEMO_FIXED_NOW` is `2026-10-23T07:00:00+01:00`. Restart both Python services after changing settings.
 

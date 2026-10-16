@@ -16,6 +16,18 @@ s3vectors = boto3.client(
 )
 
 
+MISSING_VECTOR_BUCKET_MESSAGE = "S3_VECTOR_BUCKET is not set. Add it to the root .env."
+
+
+def _vector_bucket() -> str:
+    """The configured vector bucket. Raises a clear error naming the setting if it is missing."""
+
+    if not config.S3_VECTOR_BUCKET:
+        raise RuntimeError(MISSING_VECTOR_BUCKET_MESSAGE)
+
+    return config.S3_VECTOR_BUCKET
+
+
 def put_chunks(
     *,
     patient_id: str,
@@ -98,9 +110,11 @@ def put_chunks(
     if not vectors:
         return
 
+    bucket = _vector_bucket()
+
     s3vectors.put_vectors(
         vectorBucketName=
-            config.S3_VECTOR_BUCKET,
+            bucket,
 
         indexName=
             config.S3_VECTOR_INDEX,
@@ -140,10 +154,12 @@ def query_chunks(
         )
 
 
+    bucket = _vector_bucket()
+
     response = (
         s3vectors.query_vectors(
             vectorBucketName=
-                config.S3_VECTOR_BUCKET,
+                bucket,
 
             indexName=
                 config.S3_VECTOR_INDEX,

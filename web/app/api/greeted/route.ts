@@ -1,6 +1,6 @@
 // Tell the Python bridge the page has shown today's greeting, so the next visit today says
 // "Welcome back" instead of "Good morning". Nothing from the browser is forwarded.
-import { bridgeUrl } from '../../../lib/bridge';
+import { bridgeHeaders, bridgeUrl } from '../../../lib/bridge';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../lib/request-id';
 
 export const runtime = 'nodejs';
@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   try {
     const response = await fetch(`${bridgeUrl}/greeted`, {
       method: 'POST',
-      headers: { [REQUEST_ID_HEADER]: requestId },
+      headers: bridgeHeaders({ [REQUEST_ID_HEADER]: requestId }),
       cache: 'no-store',
     });
     return Response.json(await response.json(), {

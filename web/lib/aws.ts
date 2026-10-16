@@ -5,7 +5,13 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 
 const region = process.env.AWS_REGION || 'eu-west-2';
-export const bucket = process.env.DOCUMENT_BUCKET || 'afterward-documents-992617582533-london';
+// No default bucket: uploads stop with a message naming the setting if it is missing.
+export const missingBucketMessage = 'DOCUMENT_BUCKET is not set. Add it to web/.env.local.';
+export function documentBucket(): string {
+  const name = (process.env.DOCUMENT_BUCKET || '').trim();
+  if (!name) throw new Error(missingBucketMessage);
+  return name;
+}
 export const table = process.env.RECOVERY_STATE_TABLE || 'PostDischargeRecoveryState';
 export const patientId = process.env.TEST_PATIENT_ID || 'demo_patient_001';
 export const s3 = new S3Client({ region });

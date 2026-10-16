@@ -11,6 +11,10 @@ dist/
 .DS_Store
 build/
 
+# Packaged Lambda code and archives; build them with scripts/deployment/build_document_lambda.py.
+lambda_package/
+*.zip
+
 # Local snapshots of live AWS settings (for undo); not committed.
 infra/security/backup/
 
