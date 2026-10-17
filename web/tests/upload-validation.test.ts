@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_UPLOAD_BYTES, UPLOADS_PER_SESSION, checkUploadFile, clearPreviousHistory, createUploadLimiter, tooLargeMessage,
-  uploadLimitMessage, validateUpload, wrongDocumentMessage,
+  uploadLimitMessage, uploadsPerSession, validateUpload, wrongDocumentMessage,
 } from '../lib/upload-validation.ts';
 
 const bytes = new Uint8Array([37, 80, 68, 70]);
@@ -66,8 +66,17 @@ test('sends the bridge key header it is given on both bridge calls', async () =>
   }
 });
 
+test('the upload limit comes from DEMO_UPLOADS_PER_SESSION, else 3', () => {
+  assert.equal(uploadsPerSession('10'), 10);
+  assert.equal(uploadsPerSession(undefined), 3);
+  for (const bad of ['', ' ', '0', '-2', '2.5', 'lots']) assert.equal(uploadsPerSession(bad), 3, bad);
+  const uploads = createUploadLimiter(uploadsPerSession('1'));
+  uploads.recordUpload('demo-one');
+  assert.equal(uploads.canUpload('demo-one'), false);
+});
+
 test('the 4th upload in one session is refused; another session is still allowed', () => {
-  const uploads = createUploadLimiter();
+  const uploads = createUploadLimiter(3);
   for (let n = 1; n <= 3; n += 1) {
     assert.equal(uploads.canUpload('demo-one'), true, `upload ${n}`);
     uploads.recordUpload('demo-one');

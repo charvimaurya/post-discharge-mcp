@@ -11,7 +11,7 @@ import {
 
 export const runtime = 'nodejs';
 
-// Demo limit: 3 stored letters per browser session, kept in this server's memory.
+// Demo limit: DEMO_UPLOADS_PER_SESSION (default 3) stored letters per browser session, kept in this server's memory.
 const uploads = createUploadLimiter();
 
 export async function POST(request: Request) {
