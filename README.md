@@ -54,6 +54,8 @@ See [architecture details](docs/architecture.md).
 | | `aws-iam` | [infra/security/](infra/security/), [deployment/reminder-policy.json](deployment/reminder-policy.json) | Limits what each part can access |
 | | `amazon-cloudwatch` | [app/observability/log.py](app/observability/log.py), [infra/observability/template.yaml](infra/observability/template.yaml) | Logs and measurements from each part |
 
+| mcp-apps | [app/mcp/ui/today.html](app/mcp/ui/today.html) |
+
 ## How judges can test
 
 The quickest way to try AfterWard is the public demo: [TODO: add public demo link]. Running it locally needs your own AWS resources (see Local setup below).
@@ -209,6 +211,71 @@ Web `web/.env.example`, copied to `web/.env.local`:
 | `BRIDGE_KEY` | Same value as the root `.env`. Server-only; never prefix it with `NEXT_PUBLIC_`. |
 
 To make a `BRIDGE_KEY`, run `python -c "import secrets; print(secrets.token_urlsafe(32))"` and paste the output into both files.
+
+### MCP Prompts and MCP App
+
+The server exposes two prompts alongside its seven tools. Retrieving a prompt
+returns instructions for the client; it does not execute tools.
+
+- `ask_my_letter(question)` requires the patient's question and instructs the
+  agent to call `search_discharge_instructions` first, using that question.
+  Answers must use relevant returned letter passages, cite page numbers when
+  available, and acknowledge anything that could not be verified. It prohibits
+  invented medical instructions or medication changes.
+- `morning_checkin()` takes no arguments. It references `get_today_tasks` and
+  `get_medications`, then requests one short, spoken-friendly summary of what
+  is complete and what comes next. It requires confirmed data and performs no
+  medication-taking actions.
+
+Margaret's Today card renders actual task results with a completed/total count,
+progress bar, completed ticks and available completion times, a highlighted next
+actionable pending task, and **Needs confirmation** labels where flagged.
+Its count covers tasks, not medications. It handles empty or unavailable results
+and initially displays **Waiting for today's plan**.
+
+The `get_today_tasks` tool links to `ui://afterward/today.html` through
+`_meta.ui.resourceUri`. The resource serves
+[`app/mcp/ui/today.html`](app/mcp/ui/today.html) with MIME type
+`text/html;profile=mcp-app`. The standalone page receives tool results through
+the MCP Apps host protocol. Run the tool again to fetch changed backend state;
+a previously rendered response is not a live subscription.
+
+After completing the local setup above, start the server on the S4 port:
+
+```bash
+source .venv/bin/activate
+python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001
+```
+
+The server loads the repository-root `.env`. Configure `MCP_AUTH_TOKEN` locally
+without committing it; deployed token configuration can use Secrets Manager.
+Start the local MCPJam version used for S4:
+
+```bash
+npx --yes @mcpjam/inspector@3.16.1
+```
+
+Open its private local access link and add an HTTP/Streamable HTTP connection:
+
+- URL: `http://127.0.0.1:8001/mcp`
+- Header format: `Authorization: Bearer <MCP_AUTH_TOKEN>`
+- In MCPJam, select **Bearer Token** authentication and enter only the configured
+  token value in the masked field. The header above is a placeholder.
+
+Confirm seven tools and the two prompts are discovered. In MCPJam 3.16.1, the
+Tools response pane shows JSON and directs you to Chat. Open **Chat/Playground**,
+select `get_today_tasks`, and click **Run** to display the Today card. Select the
+intended host timezone before recording completion times. Keep authentication
+settings and private access links out of screenshots and recordings.
+
+A host must support MCP Apps to render the HTML. Ordinary MCP clients may expose
+only the tool result and resource. Local MCPJam 3.16.1 discovery and actual card
+rendering were observed in S4, including a captured change from one to two
+completed tasks. Later backend reads returned one again, with the cause
+unidentified. Stable repeatability on the shared synthetic patient and a final
+recording in the intended timezone remain pending. Confirmation labels were
+verified with automated fixtures, not flagged live data. Other hosts and the
+currently deployed server have not been validated for these new features.
 
 ## Load and reset the demo patient
 
