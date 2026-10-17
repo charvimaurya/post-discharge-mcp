@@ -105,6 +105,7 @@ def test_tasks_medications_and_clock_pass_through_unchanged(bridge):
         "tasks": [dict(TASKS[0], timing="due now")],
         "medications": [dict(MEDICATIONS[0], timing="due now")],
         "pending_checkin": None,
+        "demo_reset_at": None,
     }
     assert bridge.calls["tools"] == TOOLS_CALLED
 

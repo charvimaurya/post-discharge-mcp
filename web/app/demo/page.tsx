@@ -18,7 +18,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './afterward.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
-import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str,
+import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str, wasReset,
   type ChatReply, type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
 import { feedBubbles, feedReply, speakable, startAlexaFeed } from '../../lib/alexa-feed';
@@ -76,7 +76,7 @@ export default function DemoPage() {
   const [dischargeDate, setDischargeDate] = useState<string | null>(null);
 
   // Today and the conversation
-  const [today, setToday] = useState<Today>({ clockLabel: '', firstName: null, openingGreeting: '', date: null, dischargeDate: null, items: [], pendingCheckin: null });
+  const [today, setToday] = useState<Today>({ clockLabel: '', firstName: null, openingGreeting: '', date: null, dischargeDate: null, items: [], pendingCheckin: null, resetAt: null });
   const [todayLoaded, setTodayLoaded] = useState(false);
   const [openingCheckComplete, setOpeningCheckComplete] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -113,6 +113,10 @@ export default function DemoPage() {
   // The conversation as last drawn: the Alexa feed checks the latest message before adding a greeting.
   const turnsRef = useRef(turns);
   turnsRef.current = turns;
+  // The last reset time /today reported; undefined until the first read.
+  const seenResetAt = useRef<string | null | undefined>(undefined);
+  // Bumped after a reset, so the greeting effect runs again even if /today looks the same.
+  const [resets, setResets] = useState(0);
 
   useEffect(() => setMicOk(canListen()), []);
 
@@ -122,12 +126,29 @@ export default function DemoPage() {
     setSpeaking(false);
   }, []);
 
+  // Empty the chat panel (web and "via Alexa" bubbles) and everything that hangs off the last reply.
+  // withGreeting: let the greeting (or a waiting reminder) be shown again from the next /today.
+  const clearChat = useCallback((withGreeting: boolean) => {
+    turnsRef.current = [];
+    setTurns([]); setCalls([]); setChips([]); setRequestId(null); setSource(null);
+    setHelp(null); setHelpCompact(false); setFocus([]); setNextHint(null);
+    setJustDone(null); setReminderNote(false); setHead('AfterWard');
+    shownCheckin.current = null;
+    if (withGreeting) {
+      openingGreetingShown.current = false;
+      setResets(n => n + 1);
+    }
+  }, []);
+
   const loadToday = useCallback(async (): Promise<Today | null> => {
     try {
       const response = await fetch('/api/today', { cache: 'no-store' });
       const data = await response.json();
       if (!response.ok) throw new Error(str(isObj(data) ? data.error : '') || 'Could not load today\'s plan.');
       const next = readToday(data);
+      // Reset elsewhere (the script, the button, or after a long idle): start the chat afresh.
+      if (wasReset(seenResetAt.current, next.resetAt)) clearChat(true);
+      seenResetAt.current = next.resetAt;
       setToday(next);
       setTodayLoaded(true);
       setError('');
@@ -136,7 +157,7 @@ export default function DemoPage() {
       setError(e instanceof Error ? e.message : 'Could not load today\'s plan.');
       return null;
     }
-  }, []);
+  }, [clearChat]);
 
   // Poll /api/today every 5 seconds while the Today screen is open. One read at a time.
   useEffect(() => {
@@ -202,7 +223,7 @@ export default function DemoPage() {
       markSpoken(tabStore(), checkin.id);
       say(checkin.text);
     }
-  }, [today.pendingCheckin, today.openingGreeting, today.clockLabel, todayLoaded, openingCheckComplete, view, say]);
+  }, [today.pendingCheckin, today.openingGreeting, today.clockLabel, todayLoaded, openingCheckComplete, view, say, resets]);
 
   // The caption under a reminder stays for a while, then clears so the plan is not covered.
   useEffect(() => {
@@ -239,11 +260,14 @@ export default function DemoPage() {
 
   // ---------- Reset demo ----------
   // Resets the demo patient on the server (today's completions and any waiting reminder) and
-  // forgets this session's conversation there, then clears it here and reloads Today.
+  // forgets this session's conversation there. The panel clears at once; the next /today sees the
+  // new reset time and shows only the greeting.
   async function resetDemo() {
     if (resetting || busy) return;
     window.speechSynthesis?.cancel();
     setResetting(true); setError('');
+    // Not the greeting yet: that waits for the reset plan, so the old one does not flash up.
+    clearChat(false);
     try {
       const response = await fetch('/api/reset', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
@@ -251,10 +275,6 @@ export default function DemoPage() {
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not reset the demo.');
-      setTurns([]); setCalls([]); setChips([]); setRequestId(null); setSource(null);
-      setHelp(null); setHelpCompact(false); setFocus([]); setNextHint(null);
-      setJustDone(null); setReminderNote(false); setHead('AfterWard');
-      shownCheckin.current = null;
       await loadToday();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reset the demo.');

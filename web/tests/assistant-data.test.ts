@@ -3,7 +3,7 @@
 // app/agent/service.py (tool_trace) and app/agent/evidence.py (source).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerChoices, daysAtHome, emergencyNumber, replyPoints, reprompt, letterBlocks, readChat, readToday, shortTaskLabel, splitClock, prettyTime } from '../lib/assistant-data.ts';
+import { answerChoices, daysAtHome, emergencyNumber, replyPoints, reprompt, letterBlocks, readChat, readToday, shortTaskLabel, splitClock, prettyTime, wasReset } from '../lib/assistant-data.ts';
 
 const WALK_1 = 'task_walk#2026-10-23#1';
 
@@ -268,4 +268,15 @@ test('a related line keeps its own heading, such as the emergency number', () =>
 test('readChat marks a reply refused under the demo chat limit', () => {
   assert.equal(readChat({ response: 'Limit.', tool_trace: [], rate_limited: true }).rateLimited, true);
   assert.equal(readChat({ response: 'Hello', tool_trace: [] }).rateLimited, false);
+});
+
+test('reads when the demo was last reset, and spots a new reset', () => {
+  assert.equal(readToday({ demo_reset_at: '2026-10-17T15:00:00+00:00' }).resetAt, '2026-10-17T15:00:00+00:00');
+  assert.equal(readToday({}).resetAt, null);
+  // Opening the page is not a reset; a new time after that is.
+  assert.equal(wasReset(undefined, '2026-10-17T15:00:00+00:00'), false);
+  assert.equal(wasReset('2026-10-17T15:00:00+00:00', '2026-10-17T15:00:00+00:00'), false);
+  assert.equal(wasReset('2026-10-17T15:00:00+00:00', '2026-10-17T16:00:00+00:00'), true);
+  assert.equal(wasReset(null, '2026-10-17T16:00:00+00:00'), true);
+  assert.equal(wasReset('2026-10-17T15:00:00+00:00', null), false);
 });

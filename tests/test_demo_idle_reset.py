@@ -133,3 +133,10 @@ def test_a_failed_idle_check_does_not_break_today(today, monkeypatch):
     monkeypatch.setattr(web_bridge, "reset_if_idle", broken)
 
     assert today.client.get("/today").status_code == 200
+
+
+def test_today_reports_when_the_demo_was_last_reset(today):
+    # /demo clears its chat when this changes.
+    today.state["demo_reset_at"] = "2026-10-17T15:00:00+00:00"
+
+    assert today.client.get("/today").json()["demo_reset_at"] == "2026-10-17T15:00:00+00:00"

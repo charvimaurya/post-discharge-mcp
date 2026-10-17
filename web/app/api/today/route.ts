@@ -11,7 +11,7 @@ async function handleGET(request: Request, demoSession: string) {
   const requestId = requestIdFrom(request.headers);
   try {
     const payload = await bridgeJson('/today', requestId,
-      ['clock_label', 'first_name', 'opening_greeting', 'date', 'discharge_date', 'tasks', 'medications', 'pending_checkin']);
+      ['clock_label', 'first_name', 'opening_greeting', 'date', 'discharge_date', 'tasks', 'medications', 'pending_checkin', 'demo_reset_at']);
     return Response.json(payload, {
       headers: { 'Cache-Control': 'no-store', [REQUEST_ID_HEADER]: requestId },
     });

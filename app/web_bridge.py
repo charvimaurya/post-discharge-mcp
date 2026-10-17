@@ -234,6 +234,8 @@ async def today(request: Request) -> JSONResponse:
             "tasks": tasks,
             "medications": medications,
             "pending_checkin": pending if pending and pending_is_valid(pending, tasks, medications, now) else None,
+            # Changes on every reset (script, button or idle), so /demo knows to clear its chat.
+            "demo_reset_at": state.get("demo_reset_at"),
         },
         headers={"Cache-Control": "no-store"},
     )

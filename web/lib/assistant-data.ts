@@ -28,6 +28,7 @@ export type Today = {
   dischargeDate: string | null;  // "2026-10-16"
   items: PlanItem[];
   pendingCheckin: Checkin | null;
+  resetAt: string | null;        // when the demo was last reset; a change means "start the chat afresh"
 };
 export type ToolCall = { name: string; kind: 'read' | 'write'; args: string; result: string; ok: boolean };
 // text: the letter passage; highlight: the one line the reply relied on.
@@ -214,7 +215,14 @@ export function readToday(json: unknown): Today {
     pendingCheckin: p && str(p.checkin_id) && str(p.text)
       ? { id: str(p.checkin_id), text: str(p.text), itemId: str(p.occurrence_id) || null }
       : null,
+    resetAt: str(o.demo_reset_at) || null,
   };
+}
+
+// Whether the demo was reset since the last /today read. `seen` is undefined before the first
+// read, so opening the page never counts as a reset.
+export function wasReset(seen: string | null | undefined, next: string | null): boolean {
+  return seen !== undefined && !!next && next !== seen;
 }
 
 function short(v: unknown, max = 110): string {
