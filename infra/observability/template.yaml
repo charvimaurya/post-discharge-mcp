@@ -1,10 +1,18 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >
   AfterWard observability: alarms on the metrics the app writes in its log lines
-  (CloudWatch Embedded Metric Format), a log group with 30-day retention, and saved
-  Logs Insights queries. NOT DEPLOYED. See docs/observability.md.
+  (CloudWatch Embedded Metric Format), SNS notifications, and saved Logs Insights
+  queries. Log groups are administrator-managed. Deployment unverified. See docs/observability.md.
 
 Parameters:
+  McpLoadBalancerFullName:
+    Type: String
+    AllowedPattern: '^app/[A-Za-z0-9-]+/[a-f0-9]+$'
+    Description: Existing MCP ALB full name (app/name/id), not its ARN or DNS name.
+  McpTargetGroupFullName:
+    Type: String
+    AllowedPattern: '^targetgroup/[A-Za-z0-9-]+/[a-f0-9]+$'
+    Description: Existing MCP target group full name (targetgroup/name/id), not its ARN.
   ToolErrorThreshold:
     Type: Number
     Default: 3
@@ -17,12 +25,16 @@ Parameters:
     Type: String
     Default: ''
     Description: Optional. An address to email when an alarm fires.
+  McpLogGroupName:
+    Type: String
+    Default: /ecs/afterward-mcp
+    Description: Existing administrator-created MCP log group with 30-day retention.
   QueryLogGroups:
     Type: CommaDelimitedList
     Default: /aws/lambda/AfterWardDocumentProcessor,/aws/lambda/AfterwardReminderChecker
     Description: >
-      Existing log groups the saved queries search. Add the MCP server's ECS log group
-      here; the bridge log group below is added automatically.
+      Additional existing log groups the saved queries search. The MCP log group
+      is added automatically. Include the bridge group only if it already exists.
 
 Conditions:
   HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, '']]
@@ -41,14 +53,27 @@ Resources:
       Protocol: email
       Endpoint: !Ref AlarmEmail
 
-  # New log group for the web bridge when it runs on AWS. 30 days, like the others.
-  BridgeLogGroup:
-    Type: AWS::Logs::LogGroup
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
+  AlarmTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
     Properties:
-      LogGroupName: /afterward/bridge
-      RetentionInDays: 30
+      Topics: [!Ref AlarmTopic]
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowAfterWardCloudWatchAlarms
+            Effect: Allow
+            Principal:
+              Service: cloudwatch.amazonaws.com
+            Action: sns:Publish
+            Resource: !Ref AlarmTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+              ArnEquals:
+                aws:SourceArn:
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:afterward-tool-errors'
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:afterward-document-dlq-not-empty'
+                  - !Sub 'arn:${AWS::Partition}:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:afterward-mcp-no-healthy-targets'
 
   # tool_errors is written by app/mcp/server.py: 1 when a tool raises, 0 otherwise.
   # An expected "no" from a tool (nothing to undo, no evidence) is not an error.
@@ -89,11 +114,34 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions: [!Ref AlarmTopic]
 
+  # Unlike UnHealthyHostCount, this also alarms when every target is deregistered
+  # and health metrics stop. This does not require Container Insights or a canary.
+  McpAvailabilityAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: afterward-mcp-no-healthy-targets
+      AlarmDescription: MCP ALB has fewer than one healthy target or missing health metrics. Check ECS and target health; this is not an end-to-end MCP probe.
+      Namespace: AWS/ApplicationELB
+      MetricName: HealthyHostCount
+      Dimensions:
+        - Name: LoadBalancer
+          Value: !Ref McpLoadBalancerFullName
+        - Name: TargetGroup
+          Value: !Ref McpTargetGroupFullName
+      Statistic: Minimum
+      Period: 60
+      EvaluationPeriods: 3
+      DatapointsToAlarm: 3
+      Threshold: 1
+      ComparisonOperator: LessThanThreshold
+      TreatMissingData: breaching
+      AlarmActions: [!Ref AlarmTopic]
+
   TraceOneRequestQuery:
     Type: AWS::Logs::QueryDefinition
     Properties:
       Name: AfterWard/Trace one request
-      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref BridgeLogGroup]]]
+      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref McpLogGroupName]]]
       QueryString: |
         fields @timestamp, service, event, route, tool, kind, status, ms, reason, error_type, error_code
         | filter request_id = "PASTE_REQUEST_ID_HERE"
@@ -103,7 +151,7 @@ Resources:
     Type: AWS::Logs::QueryDefinition
     Properties:
       Name: AfterWard/Chat time p50 and p90
-      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref BridgeLogGroup]]]
+      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref McpLogGroupName]]]
       QueryString: |
         filter event = "agent_turn"
         | stats count() as turns, pct(ms, 50) as p50_ms, pct(ms, 90) as p90_ms by bin(1h), kind
@@ -112,7 +160,7 @@ Resources:
     Type: AWS::Logs::QueryDefinition
     Properties:
       Name: AfterWard/Upload to ready time
-      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref BridgeLogGroup]]]
+      LogGroupNames: !Split [',', !Join [',', [!Join [',', !Ref QueryLogGroups], !Ref McpLogGroupName]]]
       QueryString: |
         filter event = "ingest_ready"
         | stats count() as uploads, pct(upload_to_ready_ms, 50) as p50_ms, pct(upload_to_ready_ms, 90) as p90_ms, max(upload_to_ready_ms) as slowest_ms by bin(1d)
@@ -120,5 +168,5 @@ Resources:
 Outputs:
   AlarmTopicArn:
     Value: !Ref AlarmTopic
-  BridgeLogGroupName:
-    Value: !Ref BridgeLogGroup
+  McpLogGroupName:
+    Value: !Ref McpLogGroupName

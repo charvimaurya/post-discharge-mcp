@@ -91,3 +91,21 @@ test('upload validation never returns upstream error text', async () => {
     (async () => Response.json({ error: secret }, { status: 422 })) as typeof fetch);
   assert.equal(response.error, wrongDocumentMessage);
 });
+
+
+test('development accepts only same-port loopback aliases and keeps production strict', () => {
+  const request = (origin: string, site = 'same-origin') => new Request('http://localhost:3000/api/chat', {
+    headers: { Origin: origin, 'Sec-Fetch-Site': site },
+  });
+  const dev = { NODE_ENV: 'development' };
+  for (const origin of ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://[::1]:3000']) {
+    assert.equal(checkRequestOrigin(request(origin), dev), undefined);
+  }
+  for (const origin of ['http://127.0.0.1:3001', 'https://localhost:3000', 'https://attacker.example',
+    'http://localhost.attacker.example:3000', 'null', 'http://localhost:3000/path']) {
+    assert.equal(checkRequestOrigin(request(origin), dev)?.status, 403);
+  }
+  assert.equal(checkRequestOrigin(request('http://127.0.0.1:3000', 'cross-site'), dev)?.status, 403);
+  assert.equal(checkRequestOrigin(request('http://127.0.0.1:3000'), config)?.status, 403);
+  assert.equal(checkRequestOrigin(request('http://127.0.0.1:3000'), { NODE_ENV: 'production' })?.status, 503);
+});
