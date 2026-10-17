@@ -20,6 +20,7 @@ from app.database.recovery_state import (
     plan_end_date,
     record_chat_activity,
 )
+from app.demo_reset import reset_if_idle
 from app.mcp.context import get_demo_patient_context
 from app.observability.log import service_log
 
@@ -80,6 +81,14 @@ async def run_turn(message: str, session_id: str) -> dict:
 
     def schedule(entry: dict) -> None:
         add_scheduled_checkin(patient.patient_id, entry)
+
+    # The first message after a long gap starts from a fresh day (the demo clock never
+    # moves on). Checked before this message counts as activity.
+    try:
+        if await asyncio.to_thread(reset_if_idle):
+            log("demo_idle_reset")
+    except Exception as exc:
+        log("idle_reset_failed", level="error", error=exc)
 
     # Recording when she last spoke (real time, so no check-in interrupts a chat) and
     # reading her record are independent DynamoDB calls, so they run at the same time.

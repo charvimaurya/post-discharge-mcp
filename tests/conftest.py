@@ -15,6 +15,8 @@ import pytest
 @pytest.fixture(autouse=True)
 def demo_clock_by_default(monkeypatch):
     monkeypatch.setenv("CLOCK_MODE", "demo")
+    # Off unless a test turns it on, so no test reads DynamoDB through the idle check.
+    monkeypatch.setenv("DEMO_IDLE_RESET_HOURS", "0")
 
 
 @pytest.fixture(autouse=True)
