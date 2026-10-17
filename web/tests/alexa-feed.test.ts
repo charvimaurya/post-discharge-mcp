@@ -127,8 +127,26 @@ test('an Alexa greeting is AfterWard alone, via Alexa, and never added twice in 
   // First time: only AfterWard's bubble, labelled via Alexa.
   assert.deepEqual(feedBubbles(hello, { who: 'you', text: 'what is next' }), { said: false, reply: true });
   assert.deepEqual(replyView(feedReply(hello), 'alexa').turn.via, 'alexa');
-  // The same words already latest (the page's own greeting, or opening the skill again): not added.
-  assert.deepEqual(feedBubbles(hello, { who: 'aw', text: 'Good morning, Margaret. Your walk is next.' }), { said: false, reply: false });
+  // The same words already the latest Alexa message (she opened the skill again): not added.
+  assert.deepEqual(feedBubbles(hello, { who: 'aw', text: 'Good morning, Margaret. Your walk is next.', via: 'alexa' }), { said: false, reply: false });
+  // After the page's own greeting it is added: "AfterWard" and "AfterWard · via Alexa" are different.
+  assert.deepEqual(feedBubbles(hello, { who: 'aw', text: 'Good morning, Margaret. Your walk is next.' }), { said: false, reply: true });
   // An ordinary turn is always a pair.
   assert.deepEqual(feedBubbles(WALK, { who: 'aw', text: WALK.reply }), { said: true, reply: true });
+});
+
+test('the same AfterWard message is never shown twice in a row from the same source', async () => {
+  const { addTurn } = await import('../lib/alexa-feed.ts');
+  type T = { who: 'you' | 'aw'; text: string; via?: 'alexa' };
+  const hello: T = { who: 'aw', text: 'Good morning, Margaret. Your walk is next.' };
+
+  // The web greeting twice (the greeting re-armed, or React dev mode running it twice): once.
+  const once = addTurn<T>([], hello);
+  assert.deepEqual(addTurn(once, { ...hello, text: 'Good morning, Margaret.  Your walk is next.' }), once);
+  // The Alexa greeting after the web one: both, labelled differently.
+  assert.equal(addTurn<T>(once, { ...hello, via: 'alexa' }).length, 2);
+  // Her words are never dropped, and the same reply after she speaks again is shown again.
+  const asked = addTurn<T>(addTurn<T>(once, { who: 'you', text: "what's next" }), { who: 'you', text: "what's next" });
+  assert.equal(asked.length, 3);
+  assert.equal(addTurn<T>(asked, hello).length, 4);
 });

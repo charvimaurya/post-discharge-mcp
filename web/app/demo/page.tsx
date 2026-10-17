@@ -23,7 +23,7 @@ import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
 import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str, wasReset,
   type ChatReply, type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
-import { feedBubbles, feedReply, speakable, startAlexaFeed } from '../../lib/alexa-feed';
+import { addTurn, feedBubbles, feedReply, speakable, startAlexaFeed } from '../../lib/alexa-feed';
 import { replyView } from '../../lib/reply-view';
 import { canListen, finishListening, listenOnce, speak } from '../../lib/voice';
 import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
@@ -176,8 +176,9 @@ export default function DemoPage() {
       if (!response.ok) throw new Error(str(isObj(data) ? data.error : '') || 'Could not load today\'s plan.');
       const next = readToday(data);
       // Reset elsewhere (the script, the button, or after a long idle): start the chat afresh.
+      // Only a newer time counts: a slow read from before the reset must not clear the chat again.
       if (wasReset(seenResetAt.current, next.resetAt)) clearChat(true);
-      seenResetAt.current = next.resetAt;
+      if (seenResetAt.current === undefined || wasReset(seenResetAt.current, next.resetAt)) seenResetAt.current = next.resetAt;
       setToday(next);
       setTodayLoaded(true);
       setError('');
@@ -230,7 +231,7 @@ export default function DemoPage() {
       if (!openingGreetingShown.current && today.openingGreeting) {
         openingGreetingShown.current = true;
         setHead('AfterWard');
-        setTurns(t => [...t, { who: 'aw', text: today.openingGreeting }]);
+        setTurns(t => addTurn(t, { who: 'aw', text: today.openingGreeting }));
         // After a reload the greeting is shown again, but not spoken twice.
         if (shouldSpeakOpening(tabStore(), today.openingGreeting)) void say(today.openingGreeting);
         markGreeted();
@@ -245,7 +246,7 @@ export default function DemoPage() {
     const time = splitClock(today.clockLabel).time;
     setHead(`AfterWard speaks first${time ? ` · ${time}` : ''}`);
     setReminderNote(true);
-    setTurns(t => [...t, { who: 'aw', text: checkin.text, reminder: true }]);
+    setTurns(t => addTurn(t, { who: 'aw', text: checkin.text, reminder: true }));
     setChips([]); setJustDone(null); setSource(null);
     // Survives a page reload, so a reminder still waiting is shown again but not spoken twice.
     if (!alreadySpoken(tabStore(), checkin.id)) {
@@ -328,7 +329,7 @@ export default function DemoPage() {
     setHead(h => (h.startsWith('AfterWard speaks first') ? h.replace('speaks', 'spoke') : 'AfterWard'));
     // The answer is shown and spoken at once. Refreshing the plan (ticks, highlights, the
     // "Saved" chip) follows alongside, instead of holding the answer back for it.
-    setTurns(t => [...t, view.turn]);
+    setTurns(t => addTurn(t, view.turn));
     const speaking = view.speak ? say(reply.text) : Promise.resolve();
     // Over the demo limit nothing changed, so Today is not reloaded (that would call MCP tools).
     if (reply.rateLimited) { await speaking; return; }
@@ -437,7 +438,9 @@ export default function DemoPage() {
     // tab has said it before.
     forgetSpoken(tabStore());
     shownCheckin.current = null;
-    openingGreetingShown.current = false;
+    // The greeting comes once per page load or reset: coming back to Today with the chat
+    // already on screen does not add another.
+    if (!turnsRef.current.length) openingGreetingShown.current = false;
     setOpeningCheckComplete(false);
     setTodayLoaded(false);
     setView('today');

@@ -279,4 +279,6 @@ test('reads when the demo was last reset, and spots a new reset', () => {
   assert.equal(wasReset('2026-10-17T15:00:00+00:00', '2026-10-17T16:00:00+00:00'), true);
   assert.equal(wasReset(null, '2026-10-17T16:00:00+00:00'), true);
   assert.equal(wasReset('2026-10-17T15:00:00+00:00', null), false);
+  // A slow read from before the reset does not count as another one.
+  assert.equal(wasReset('2026-10-17T16:00:00+00:00', '2026-10-17T15:00:00+00:00'), false);
 });
