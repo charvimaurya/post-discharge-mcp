@@ -1,68 +1,78 @@
-"""Check prompt discovery and rendering over the MCP protocol without AWS calls."""
+"""Check public MCP prompt registration and rendered guidance without AWS calls."""
 
 import asyncio
-from contextlib import asynccontextmanager
 
-import anyio
-from mcp import ClientSession
-from mcp.shared.memory import create_client_server_memory_streams
+import pytest
 
 from app.mcp.server import mcp
 
 
-@asynccontextmanager
-async def prompt_client():
-    async with create_client_server_memory_streams() as (client_streams, server_streams):
-        async with anyio.create_task_group() as group:
-            server = mcp._lowlevel_server
-            group.start_soon(
-                server.run, *server_streams, server.create_initialization_options()
-            )
-            async with ClientSession(*client_streams) as client:
-                await client.initialize()
-                yield client
-            group.cancel_scope.cancel()
+def prompt_text(name, arguments=None):
+    result = asyncio.run(mcp.get_prompt(name, arguments))
+    assert result.messages
+    for message in result.messages:
+        assert message.role == "user"
+        assert message.content.type == "text"
+        assert message.content.text.strip()
+    return "\n".join(message.content.text for message in result.messages)
 
 
-def test_prompts_list_exposes_both_prompts_and_arguments():
-    async def check():
-        async with prompt_client() as client:
-            result = await client.list_prompts()
-            prompts = {prompt.name: prompt for prompt in result.prompts}
-            assert {"ask_my_letter", "morning_checkin"} <= prompts.keys()
-            arguments = prompts["ask_my_letter"].arguments
-            assert arguments is not None
-            assert [(arg.name, arg.required) for arg in arguments] == [("question", True)]
-            assert not prompts["morning_checkin"].arguments
-
-    asyncio.run(check())
+def test_prompts_list_exposes_both_prompts_and_their_arguments():
+    prompts = {prompt.name: prompt for prompt in asyncio.run(mcp.list_prompts())}
+    assert set(prompts) == {"ask_my_letter", "morning_checkin"}
+    arguments = prompts["ask_my_letter"].arguments
+    assert len(arguments) == 1
+    assert arguments[0].name == "question"
+    assert arguments[0].required is True
+    assert not prompts["morning_checkin"].arguments
 
 
-def test_ask_my_letter_requires_search_evidence_and_no_guessing():
-    async def check():
-        async with prompt_client() as client:
-            result = await client.get_prompt(
-                "ask_my_letter", arguments={"question": "What does my letter say about food?"}
-            )
-            text = "\n".join(message.content.text for message in result.messages)
-            assert "Call search_discharge_instructions first" in text
-            assert "only from the returned passages" in text
-            assert "page number" in text
-            assert "If nothing is found" in text
-            assert "I will not guess" in text
-            assert "What does my letter say about food?" in text
-
-    asyncio.run(check())
+def test_letter_prompt_searches_first_and_requires_page_evidence():
+    question = "What does my letter say about walking?"
+    text = prompt_text("ask_my_letter", {"question": question})
+    assert question in text
+    assert "Before answering, call search_discharge_instructions FIRST" in text
+    assert "patient's actual question below as the query" in text
+    assert "only from relevant returned passages" in text
+    assert "cite page numbers when present" in text
+    assert "does not perform a search" in text
+    assert "couldn't verify that from your discharge letter" in text
+    assert "Do not invent medical instructions, medication changes" in text
+    assert "won't guess" in text
+    assert "search fails" in text
 
 
-def test_morning_checkin_reads_tasks_and_medications_before_spoken_step():
-    async def check():
-        async with prompt_client() as client:
-            result = await client.get_prompt("morning_checkin")
-            text = "\n".join(message.content.text for message in result.messages)
-            assert "Call get_today_tasks and get_medications first" in text
-            assert "one short spoken step" in text
-            assert "what is done and what is next" in text
-            assert "Do not assume an item is done" in text
+@pytest.mark.parametrize("arguments", [None, {}, {"question": None}, {"question": 42}, {"question": []}])
+def test_letter_prompt_requires_a_string_question(arguments):
+    with pytest.raises(ValueError):
+        asyncio.run(mcp.get_prompt("ask_my_letter", arguments))
 
-    asyncio.run(check())
+
+def test_morning_prompt_reads_both_tools_and_keeps_checkin_read_only():
+    text = prompt_text("morning_checkin")
+    assert "calling both get_today_tasks and get_medications" in text
+    assert "what is done and what is next" in text
+    assert "one short spoken next step" in text
+    assert "needs confirmation" in text
+    assert "If data is missing or either call fails" in text
+    assert "actual current results, not example tasks" in text
+    assert "Do not claim an item is done unless its returned status confirms it" in text
+    assert "read-only: do not call" in text
+
+
+def test_morning_prompt_rejects_arguments():
+    with pytest.raises(ValueError):
+        asyncio.run(mcp.get_prompt("morning_checkin", {"question": "unexpected"}))
+
+
+def test_prompt_registration_preserves_the_seven_existing_tools():
+    tools = asyncio.run(mcp.list_tools())
+    assert {tool.name for tool in tools} == {
+        "get_recovery_plan",
+        "get_today_tasks",
+        "get_medications",
+        "search_discharge_instructions",
+        "report_task_completed",
+        "report_medication_taken",
+        "undo_report",
+    }
