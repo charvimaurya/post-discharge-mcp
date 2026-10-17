@@ -167,6 +167,16 @@ def test_a_symptom_reply_never_reprompts_whatever_intent_matched(alexa, monkeypa
     assert (reprompt is not None) == reprompts and ends is False
 
 
+def test_a_crisis_reply_through_a_normal_intent_never_reprompts(alexa, monkeypatch):
+    async def crisis_turn(message, session_id):
+        return {"response": "Please call 999 now.", "tool_trace": [], "source": None, "help": None, "crisis": True}
+
+    monkeypatch.setattr(handlers, "run_turn", crisis_turn)
+    _, reprompt, ends = alexa.speech(alexa.send(_intent("TakenIntent", query="all my tablets at once")))
+
+    assert reprompt is None and ends is False
+
+
 def test_the_sentence_is_echoed_only_when_asked(alexa, monkeypatch):
     plain = alexa.send(_intent("BackFromIntent", query="my walk")).json()
     assert "sent_to_run_turn" not in (plain.get("sessionAttributes") or {})

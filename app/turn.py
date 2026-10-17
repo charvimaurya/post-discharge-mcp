@@ -69,7 +69,7 @@ def open_ended_medicine_note(source: dict | None, conversation: str, state: dict
 
 async def run_turn(message: str, session_id: str) -> dict:
     """
-    Run one agent turn for the server-side patient: {"response", "tool_trace", "source", "help"}.
+    Run one agent turn for the server-side patient: {"response", "tool_trace", "source", "help", "crisis"}.
 
     A reminder waiting when the message arrived is cleared only
     after the turn finishes; replying never marks anything done.
@@ -141,4 +141,6 @@ async def run_turn(message: str, session_id: str) -> dict:
         "source": source,
         # Only on a symptom reply: who to call, from her letter.
         "help": result.get("help"),
+        # The fixed crisis reply: nothing may follow it (no "Anything else?").
+        "crisis": bool(result.get("crisis")),
     }

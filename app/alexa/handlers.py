@@ -159,8 +159,9 @@ def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict 
         log("alexa_turn_failed", level="error", error=failed.__cause__)
         return NOT_REACHED, None, False
 
-    # "help" is set only on a symptom reply (who to call): urgent, whatever intent matched.
-    return result["response"], result.get("source"), bool(result.get("help"))
+    # "help" is set only on a symptom reply (who to call), "crisis" on the fixed crisis
+    # reply: either is urgent, whatever intent matched.
+    return result["response"], result.get("source"), bool(result.get("help") or result.get("crisis"))
 
 
 def _session_id(handler_input) -> str:
