@@ -77,6 +77,12 @@ These components and their verification scope are listed in
 are preparations, not a verified hosted frontend. Browser speech is labelled
 **Simulated Alexa+**; native Alexa+, Polly and AgentCore hosting are unverified.
 
+## Run it locally
+
+To run AfterWard on Alexa from your own Windows machine, follow
+[Running the Alexa skill locally](docs/alexa-skill.md): setup, the five
+terminals, connecting the skill, a quick check and troubleshooting.
+
 ## Setup and local checks
 
 Use Python 3.11 for AfterWard and Node.js 24 for `web/`. The reusable package's
