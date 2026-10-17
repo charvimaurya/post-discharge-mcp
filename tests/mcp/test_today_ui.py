@@ -1,6 +1,7 @@
 """The MCP Apps Today card: served as a ui:// resource and linked from get_today_tasks."""
 
 import asyncio
+import re
 
 from app.mcp import server
 
@@ -24,14 +25,15 @@ def test_today_card_reads_back_as_a_self_contained_page():
     assert contents[0].mime_type == MIME
     html = contents[0].content
     assert "Waiting for today's plan" in html
-    assert '"ui/initialize"' in html
-    assert '"ui/notifications/tool-result"' in html
+    assert 'ui/initialize' in html
+    assert 'ui/notifications/tool-result' in html
     # Sandboxed hosts block outside requests, so the page loads nothing from elsewhere.
-    assert "http://" not in html and "https://" not in html
+    assert not re.search(r"(?:src|href)\s*=\s*[\"']https?://", html)
+    assert "connect-src 'none'" in html
     assert "innerHTML" not in html
 
 
-def test_get_today_tasks_carries_the_ui_link_and_no_other_tool_does():
+def test_today_and_week_tools_carry_the_ui_link():
     tools = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
 
     meta = tools["get_today_tasks"].model_dump(by_alias=True, exclude_none=True).get("_meta")
@@ -39,7 +41,7 @@ def test_get_today_tasks_carries_the_ui_link_and_no_other_tool_does():
 
     others = [name for name, tool in tools.items()
               if name != "get_today_tasks" and (tool.meta or {}).get("ui")]
-    assert others == []
+    assert others == ["get_week_summary"]
 
 
 def test_get_today_tasks_still_returns_exactly_what_it_did(mcp_hop, monkeypatch):

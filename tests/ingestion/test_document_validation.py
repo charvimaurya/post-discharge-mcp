@@ -2,7 +2,7 @@
 from unittest.mock import patch
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import web_bridge
 from app.ingestion import pipeline, document_service
@@ -41,7 +41,7 @@ def test_discharge_documents_accepted(text):
     ('', False),
 ])
 def test_bridge_preflight(text, accepted, monkeypatch):
-    monkeypatch.setattr(web_bridge, 'extract_pdf_text', lambda _: [{'page': 1, 'text': text}])
+    monkeypatch.setattr(web_bridge, 'extract_pdf_text', lambda _, **limits: [{'page': 1, 'text': text}])
     result = TestClient(web_bridge.app).post('/documents/validate', content=b'%PDF-test')
     assert result.status_code == (200 if accepted else 422)
     assert result.json() == ({'accepted': True} if accepted else {'error': WRONG_DOCUMENT_MESSAGE})

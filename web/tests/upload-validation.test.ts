@@ -2,8 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_UPLOAD_BYTES, UPLOADS_PER_SESSION, checkUploadFile, clearPreviousHistory, createUploadLimiter, tooLargeMessage,
-  uploadLimitMessage, uploadsPerSession, validateUpload, wrongDocumentMessage,
+  uploadLimitMessage, validateUpload, wrongDocumentMessage,
 } from '../lib/upload-validation.ts';
+import { demoCounters, uploadsPerSession } from '../lib/demo-limits.ts';
 
 const bytes = new Uint8Array([37, 80, 68, 70]);
 
@@ -70,9 +71,14 @@ test('the upload limit comes from DEMO_UPLOADS_PER_SESSION, else 3', () => {
   assert.equal(uploadsPerSession('10'), 10);
   assert.equal(uploadsPerSession(undefined), 3);
   for (const bad of ['', ' ', '0', '-2', '2.5', 'lots']) assert.equal(uploadsPerSession(bad), 3, bad);
-  const uploads = createUploadLimiter(uploadsPerSession('1'));
-  uploads.recordUpload('demo-one');
-  assert.equal(uploads.canUpload('demo-one'), false);
+  const saved = process.env.DEMO_UPLOADS_PER_SESSION;
+  process.env.DEMO_UPLOADS_PER_SESSION = '7';
+  try {
+    const rules = demoCounters('upload', 's', 1000, 'ip', 'key', 0);
+    assert.equal(rules.find(rule => rule.key === 'upload:s:s')?.limit, 7);
+  } finally {
+    if (saved === undefined) delete process.env.DEMO_UPLOADS_PER_SESSION; else process.env.DEMO_UPLOADS_PER_SESSION = saved;
+  }
 });
 
 test('the 4th upload in one session is refused; another session is still allowed', () => {

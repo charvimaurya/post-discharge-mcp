@@ -53,3 +53,17 @@ synthetic discharge letters. Where it says "fixed", the fix has automated tests 
 - **Safety replies built in code, not by the model:** symptoms are answered only with the letter's own warning signs, word for word, so the most important replies are predictable.
 - **Open source:** the letter validator became a standalone package, [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check), which AfterWard now uses.
 - **Automated tests** caught every regression while fixing the items above: each fix added a test with the patient's exact words.
+
+## MCP Apps integration
+
+Evidence-based integration notes. Recorded 17 October 2026.
+
+| Problem | Where it occurred | Observed evidence | Cause | Solution or workaround | Verification result |
+| --- | --- | --- | --- | --- | --- |
+| Running an App-linked tool in the Tools pane did not display its card. | Local MCPJam Inspector 3.16.1, `get_today_tasks`. | The pane returned JSON and explicitly stated that the tool renders UI with MCP Apps and to use Chat. | This version routes App rendering through Chat/Playground; no server metadata or protocol failure was observed. | Open Chat/Playground, select `get_today_tasks`, and click Run. No application change was required. | Actual tool output rendered inside the MCP Apps sandbox, including progress, completed ticks/times and the next task. A web completion followed by another Run showed 1 of 7 becoming 2 of 7. Later reads returned 1 again, so stable shared-patient repeatability remains unresolved; the cause of that state change was not established. |
+
+Registration, resource MIME type, tool metadata and malformed-input handling are
+covered by [MCP App tests](../tests/mcp/test_today_app.py). Confirmation labels
+were exercised with automated fixtures; the live data had no confirmation flags.
+The [README connection instructions](../README.md#mcp-prompts-and-mcp-app)
+describe the tested local setup and remaining host-validation limits.

@@ -1,0 +1,16 @@
+.git
+.env
+.env.*
+**/.env
+**/.env.*
+.venv*
+**/__pycache__
+**/node_modules
+web
+build
+*.zip
+infra/security/backup
+.aws
+.codex
+.agents
+tests

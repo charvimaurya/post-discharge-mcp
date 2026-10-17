@@ -1,25 +1,21 @@
-// Tell the Python bridge the page has shown today's greeting, so the next visit today says
-// "Welcome back" instead of "Good morning". Nothing from the browser is forwarded.
-import { bridgeHeaders, bridgeUrl } from '../../../lib/bridge';
+import { bridgeJson } from '../../../lib/bridge';
+import { checkRequestOrigin } from '../../../lib/api-security';
+import { withDemoLimits } from '../../../lib/demo-guard';
 import { REQUEST_ID_HEADER, requestIdFrom } from '../../../lib/request-id';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
-  const requestId = requestIdFrom(request.headers);
-  try {
-    const response = await fetch(`${bridgeUrl}/greeted`, {
-      method: 'POST',
-      headers: bridgeHeaders({ [REQUEST_ID_HEADER]: requestId }),
-      cache: 'no-store',
-    });
-    return Response.json(await response.json(), {
-      status: response.status,
-      headers: { 'Cache-Control': 'no-store', [REQUEST_ID_HEADER]: requestId },
-    });
-  } catch (error) {
-    console.error('Bridge /greeted failed:', error instanceof Error ? error.name : 'UnknownError', requestId);
-    return Response.json({ error: 'Could not reach the AfterWard service.' }, { status: 502 });
-  }
+  const rejected = checkRequestOrigin(request);
+  if (rejected) return rejected;
+  return withDemoLimits(request, 'read', async () => {
+    const requestId = requestIdFrom(request.headers);
+    try {
+      const result = await bridgeJson('/greeted', requestId, ['ok'], { method: 'POST' });
+      return Response.json(result, { headers: { 'Cache-Control': 'no-store', [REQUEST_ID_HEADER]: requestId } });
+    } catch {
+      return Response.json({ error: 'Could not save the greeting.' }, { status: 502 });
+    }
+  });
 }

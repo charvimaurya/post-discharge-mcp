@@ -1,13 +1,28 @@
-// Server-only address of the local Python web bridge (scripts/run_web_bridge.py).
+// Only server API routes may resolve the bridge endpoint and service key.
 import 'server-only';
+import { GetSecretValueCommand, SecretsManagerClient } from '@aws-sdk/client-secrets-manager';
+import { authenticatedBridgeHeaders } from './bridge-auth';
+import { createBridgeKeyProvider } from './bridge-key';
+import { bridgeEndpoint } from './runtime-config';
+import { protectedBridgeFetch, publicBridgePayload } from './bridge-response';
 
-export const bridgeUrl = process.env.AGENT_API_URL || 'http://127.0.0.1:8002';
+const getKey = createBridgeKeyProvider(async arn => {
+  // Default SDK credential chain resolves the Amplify compute role. No access keys.
+  const client = new SecretsManagerClient({ region: process.env.AFTERWARD_AWS_REGION || process.env.AWS_REGION, maxAttempts: 2 });
+  const result = await client.send(new GetSecretValueCommand({ SecretId: arn }), { abortSignal: AbortSignal.timeout(5_000) });
+  return result.SecretString || '';
+}, () => process.env);
 
-// Headers for every call to the bridge. BRIDGE_KEY is server-only: it is never
-// prefixed with NEXT_PUBLIC_, so Next.js never sends it to the browser.
-export const BRIDGE_KEY_HEADER = 'X-AfterWard-Key';
+export function bridgeUrl(): string { return bridgeEndpoint(process.env); }
 
-export function bridgeHeaders(extra: Record<string, string> = {}): Record<string, string> {
-  const key = process.env.BRIDGE_KEY;
-  return key ? { ...extra, [BRIDGE_KEY_HEADER]: key } : { ...extra };
+export async function bridgeHeaders(requestId?: string): Promise<Record<string, string>> {
+  return authenticatedBridgeHeaders(await getKey(), requestId);
+}
+
+export async function bridgeJson(path: string, requestId: string, fields: readonly string[], init?: RequestInit) {
+  const headers = await bridgeHeaders(requestId);
+  const response = await protectedBridgeFetch(`${bridgeUrl()}${path}`, {
+    ...init, headers: { ...Object.fromEntries(new Headers(init?.headers)), ...headers, ...(init?.body ? { 'Content-Type': 'application/json' } : {}) },
+  });
+  return publicBridgePayload(response, headers['X-Bridge-Key'], fields);
 }

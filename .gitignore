@@ -1,8 +1,7 @@
 .env
 .env.*
 !.env.example
-.venv/
-.venv-check/
+.venv*/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -23,3 +22,10 @@ infra/security/backup/
 
 # Local run logs (e.g. logs/bridge-timing.log); not committed.
 logs/
+
+# Retired snapshots and generated Lambda artifacts.
+/phase15/
+/lambda_package/
+/*.zip
+/lambda-smoke-response.json
+/output.txt

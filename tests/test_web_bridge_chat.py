@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import turn, web_bridge
 from app.agent import service

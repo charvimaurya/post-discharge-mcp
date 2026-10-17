@@ -18,7 +18,7 @@ def fresh_feed(monkeypatch):
 
 
 def get(query="", key=KEY):
-    headers = {"X-AfterWard-Key": key} if key is not None else {}
+    headers = {"X-Bridge-Key": key} if key is not None else {}
     return TestClient(web_bridge.app).get(f"/conversation{query}", headers=headers)
 
 

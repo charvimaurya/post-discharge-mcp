@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "UploadDemoDischargeLetters",
+      "Effect": "Allow",
+      "Action": "s3:PutObject",
+      "Resource": "arn:aws:s3:::<DOCUMENT_BUCKET>/patients/demo_patient_001/documents/ui_*.pdf"
+    },
+    {
+      "Sid": "ReadDemoRecoveryState",
+      "Effect": "Allow",
+      "Action": "dynamodb:GetItem",
+      "Resource": "arn:aws:dynamodb:<REGION>:<ACCOUNT_ID>:table/<RECOVERY_STATE_TABLE>",
+      "Condition": {
+        "ForAllValues:StringEquals": {
+          "dynamodb:LeadingKeys": [
+            "demo_patient_001"
+          ]
+        },
+        "Null": {
+          "dynamodb:LeadingKeys": "false"
+        }
+      }
+    },
+    {
+      "Sid": "ResolveBridgeCredential",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "<BRIDGE_KEY_SECRET_ARN>"
+    },
+    {
+      "Sid": "DemoQuotaTransactions",
+      "Effect": "Allow",
+      "Action": "dynamodb:UpdateItem",
+      "Resource": "arn:aws:dynamodb:<REGION>:<ACCOUNT_ID>:table/<DEMO_LIMIT_TABLE>",
+      "Condition": {
+        "StringEquals": {
+          "dynamodb:EnclosingOperation": "TransactWriteItems"
+        }
+      }
+    }
+  ]
+}

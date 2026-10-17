@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import datetime, time, timedelta
 from typing import Any
 
+from app.medication_safety import medication_withdrawn
+
 
 # The reminder window for an item with a clock time: from 30 minutes
 # before it until the time itself. Outside the window it is never a
@@ -166,7 +168,7 @@ def find_due_reminder(
         )
 
     for medication in medications:
-        if medication.get("status") != "pending":
+        if medication_withdrawn(medication) or medication.get("status") != "pending":
             continue
 
         if medication.get("needs_confirmation") is True:

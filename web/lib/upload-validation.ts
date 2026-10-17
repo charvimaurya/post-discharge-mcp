@@ -9,12 +9,6 @@ export const missingSessionMessage = 'This upload has no session. Please reload 
 export const uploadLimitMessage = "You've reached the upload limit for this demo. Please try again later.";
 export const UPLOADS_PER_SESSION = 3;
 
-// DEMO_UPLOADS_PER_SESSION, or 3 when it is missing or not a whole number of at least 1.
-export function uploadsPerSession(value = process.env.DEMO_UPLOADS_PER_SESSION): number {
-  const limit = Number(value);
-  return value?.trim() && Number.isInteger(limit) && limit >= 1 ? limit : UPLOADS_PER_SESSION;
-}
-
 // Checks made before anything is sent to the bridge or S3. Null means the file may go on.
 export function checkUploadFile(name: string, type: string, bytes: Uint8Array): { status: number; error: string } | null {
   if (!bytes.length) return { status: 400, error: 'Choose a PDF file.' };
@@ -27,7 +21,7 @@ export function checkUploadFile(name: string, type: string, bytes: Uint8Array): 
 
 // Counts letters stored per session, in this server's memory (a restart clears it). Each stored
 // letter starts a Bedrock extraction, so only stored uploads count, not rejected files.
-export function createUploadLimiter(limit = uploadsPerSession()) {
+export function createUploadLimiter(limit = UPLOADS_PER_SESSION) {
   const stored = new Map<string, number>();
   return {
     canUpload: (sessionId: string) => (stored.get(sessionId) ?? 0) < limit,
@@ -40,19 +34,19 @@ export async function validateUpload(
   bridgeUrl: string,
   request: typeof fetch = fetch,
   requestId?: string,
-  extraHeaders: Record<string, string> = {},
+  authHeaders: Record<string, string> = {},
 ): Promise<UploadValidation> {
   try {
     const response = await request(`${bridgeUrl}/documents/validate`, {
       method: 'POST',
-      headers: { ...extraHeaders, 'Content-Type': 'application/pdf', ...(requestId ? { 'X-Request-ID': requestId } : {}) },
+      headers: { ...authHeaders, 'Content-Type': 'application/pdf', ...(requestId ? { 'X-Request-ID': requestId } : {}) },
       body: new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), cache: 'no-store',
     });
     const result = await response.json();
     if (response.ok && result.accepted === true) return { accepted: true, status: 200 };
     return {
       accepted: false, status: response.status === 422 ? 422 : 502,
-      error: response.status === 422 ? result.error || wrongDocumentMessage
+      error: response.status === 422 ? wrongDocumentMessage
         : 'Could not check the document. Please try again.',
     };
   } catch {
@@ -66,11 +60,11 @@ export async function clearPreviousHistory(
   bridgeUrl: string,
   request: typeof fetch = fetch,
   requestId?: string,
-  extraHeaders: Record<string, string> = {},
+  authHeaders: Record<string, string> = {},
 ): Promise<boolean> {
   try {
     const response = await request(`${bridgeUrl}/documents/uploaded`, {
-      method: 'POST', headers: { ...extraHeaders, ...(requestId ? { 'X-Request-ID': requestId } : {}) }, cache: 'no-store',
+      method: 'POST', headers: { ...authHeaders, ...(requestId ? { 'X-Request-ID': requestId } : {}) }, cache: 'no-store',
     });
     return response.ok;
   } catch {

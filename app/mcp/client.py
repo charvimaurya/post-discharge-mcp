@@ -28,6 +28,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 
 from app.observability.log import get_request_id
+from app.auth.mcp_token import get_mcp_auth_token
 
 # How long the tools/list answer is reused. The tool list only changes when the MCP
 # server is redeployed, so this just bounds how long a new tool takes to appear.
@@ -38,10 +39,10 @@ def _get_mcp_headers() -> dict[str, str]:
     """
     Build the HTTP headers required by our secured MCP server.
 
-    MCP_AUTH_TOKEN is only available server-side.
+    Resolve the token server-side: local configuration or Secrets Manager.
     """
 
-    token = os.environ["MCP_AUTH_TOKEN"]
+    token = get_mcp_auth_token()
 
     origin = os.environ.get(
         "MCP_CLIENT_ORIGIN",

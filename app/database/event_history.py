@@ -148,3 +148,23 @@ def delete_events(
             query_kwargs["ExclusiveStartKey"] = last_key
 
     return deleted
+
+
+def get_complete_patient_events(patient_id: str) -> list[dict]:
+    """Read every patient event page strongly consistently, without any writes.
+
+    The hashed sort key cannot be used for a chronological range. Weekly callers
+    filter explicit local dates after this complete read. Multiple pages are not
+    an atomic snapshot if concurrent writers modify history during pagination.
+    """
+    if not patient_id or not patient_id.strip():
+        raise ValueError("patient_id must not be empty")
+    kwargs = {"KeyConditionExpression": Key("patient_id").eq(patient_id), "ConsistentRead": True}
+    items = []
+    while True:
+        response = event_table.query(**kwargs)
+        items.extend(item for item in response.get("Items", []) if item.get("patient_id") == patient_id)
+        last = response.get("LastEvaluatedKey")
+        if not last:
+            return items
+        kwargs["ExclusiveStartKey"] = last

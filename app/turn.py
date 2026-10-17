@@ -81,21 +81,9 @@ async def run_turn(message: str, session_id: str) -> dict:
     def schedule(entry: dict) -> None:
         add_scheduled_checkin(patient.patient_id, entry)
 
-    # Recording when she last spoke (real time, so no check-in interrupts a chat) and
-    # reading her record are independent DynamoDB calls, so they run at the same time.
-    activity, state = await asyncio.gather(
-        asyncio.to_thread(record_chat_activity, patient.patient_id, system_now_utc().isoformat()),
-        asyncio.to_thread(get_recovery_state, patient.patient_id),
-        return_exceptions=True,
-    )
-
-    if isinstance(activity, Exception):
-        log("chat_activity_failed", level="error", error=activity)
-
     try:
-        if isinstance(state, BaseException):
-            raise state
-        state = state or {}
+        # Read first; when she last spoke is recorded only after a non-crisis reply.
+        state = await asyncio.to_thread(get_recovery_state, patient.patient_id) or {}
         had_checkin = bool(state.get("pending_checkin"))
 
         # The agent gets the waiting reminder, name and time zone
@@ -110,6 +98,13 @@ async def run_turn(message: str, session_id: str) -> dict:
         )
     except Exception as exc:
         raise TurnFailed() from exc
+
+    if not result.get("crisis"):
+        # Real time, so no check-in interrupts a chat. A crisis turn writes no chat metadata.
+        try:
+            await asyncio.to_thread(record_chat_activity, patient.patient_id, system_now_utc().isoformat())
+        except Exception as exc:
+            log("chat_activity_failed", level="error", error=exc)
 
     # A crisis reply is not an answer to the reminder, so the reminder stays.
     if had_checkin and result.get("completed") and not result.get("crisis"):

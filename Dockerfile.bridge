@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
+    CLOCK_MODE=production LOCAL_REMINDER_LOOP=0
+WORKDIR /app
+COPY requirements.txt ./
+COPY deployment/requirements-bridge.txt ./deployment/requirements-bridge.txt
+RUN pip install --no-cache-dir -r deployment/requirements-bridge.txt \
+    && groupadd --gid 10001 afterward \
+    && useradd --uid 10001 --gid afterward --no-create-home afterward
+COPY app ./app
+COPY lambdas ./lambdas
+USER 10001:10001
+EXPOSE 8002
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/bridge/health', timeout=3)"
+CMD ["uvicorn", "app.web_bridge:app", "--host", "0.0.0.0", "--port", "8002", "--workers", "1", "--no-access-log", "--no-server-header"]

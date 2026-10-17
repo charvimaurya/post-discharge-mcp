@@ -1,4 +1,4 @@
-# Afterward: how to use this repository
+# AfterWard: how to use this repository
 
 Afterward reads discharge paperwork and turns it into:
 
@@ -9,6 +9,11 @@ Afterward reads discharge paperwork and turns it into:
 
 Active AWS storage, queues, and processing use **AfterWard** names.
 See [AWS integrations](aws-integrations.md) and the [migration record](aws-name-migration.md).
+
+> Status update, 17 October 2026: this is a setup/file reference, not deployment
+> certification. Use the [submission review](submission/readiness-review.md) and
+> [current test report](public-demo-final-test-report.md) for release status; some
+> historical commands below perform live writes.
 
 ## Start here
 
@@ -466,10 +471,9 @@ Afterward/
 └── .gitignore                         # Keep secrets, caches, and builds out of Git
 ```
 
-The MCP folder contains preliminary helpers, but the **MCP server is not
-implemented**. A running server with registered recovery-plan, retrieval, and
-patient-action tools still needs to be built. Root utility scripts are omitted
-from this tree, as requested earlier; their relevant run commands remain above.
+The MCP folder implements registered recovery-plan, retrieval and patient-action
+tools. Root utility scripts are omitted from this tree; their relevant run
+commands remain above.
 
 ## 5. File-by-file reference
 

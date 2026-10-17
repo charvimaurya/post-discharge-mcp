@@ -12,7 +12,7 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import turn, web_bridge
 from app.agent import service
@@ -204,7 +204,7 @@ def test_k7_the_bridge_keeps_a_waiting_reminder_and_saves_nothing(monkeypatch):
 
     monkeypatch.setattr(service, "call_mcp_tool", no_tool)
     monkeypatch.setattr(turn, "get_recovery_state", lambda patient_id: state)
-    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: None)
+    monkeypatch.setattr(turn, "record_chat_activity", lambda patient_id, at: (_ for _ in ()).throw(AssertionError("crisis must not write metadata")))
     monkeypatch.setattr(turn, "clear_pending_checkin", cleared.append)
 
     response = TestClient(web_bridge.app).post("/chat", json={"message": "I want to end my life", "session_id": "s-k7"})

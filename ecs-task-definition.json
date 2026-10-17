@@ -78,7 +78,15 @@
           "name": "MCP_AUTH_TOKEN",
           "valueFrom": "arn:aws:secretsmanager:eu-west-2:992617582533:secret:afterward/mcp/auth-token-EkG6Dm"
         }
-      ]
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/afterward-mcp",
+          "awslogs-region": "eu-west-2",
+          "awslogs-stream-prefix": "mcp"
+        }
+      }
     }
   ]
 }

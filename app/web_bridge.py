@@ -1,13 +1,12 @@
 """
-Local HTTP bridge between the Next.js server and the Python app.
+Authenticated HTTP bridge between the Next.js server and the Python app.
 
-Only the Next.js server calls this; the browser never does. The
+Only the Next.js server calls this using X-Bridge-Key; the browser never does. The
 patient comes from the server-side demo context, and nothing the
 caller sends can choose the patient, date or time.
 """
 
 import asyncio
-import hmac
 import os
 import uuid
 from contextlib import asynccontextmanager, suppress
@@ -17,6 +16,8 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+
+from app.auth.bridge_auth import BridgeAuthenticationMiddleware, is_production
 
 from app.agent.session import clear_session
 from app.agent.service import get_structured_tool_result
@@ -42,6 +43,7 @@ from app.alexa import feed as alexa_feed
 from app.alexa.skill import alexa_endpoint
 from app.turn import TurnFailed, run_turn
 from lambdas.reminder_checker.handler import handler as reminder_handler
+from app.reminders.engine import pending_is_valid
 
 
 log = service_log("bridge")
@@ -205,7 +207,7 @@ async def today(request: Request) -> JSONResponse:
             "discharge_date": state.get("discharge_date"),
             "tasks": tasks,
             "medications": medications,
-            "pending_checkin": state.get("pending_checkin"),
+            "pending_checkin": state.get("pending_checkin") if pending_is_valid(state.get("pending_checkin") or {}, tasks, medications, now) else None,
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -228,11 +230,18 @@ async def greeted(request: Request) -> JSONResponse:
 
 async def validate_document(request: Request) -> JSONResponse:
     """Read the PDF before the upload route sends it to S3 or changes a plan."""
-    data = await request.body()
+    chunks = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > 4 * 1024 * 1024:
+            return JSONResponse({"error": "PDF must be smaller than 4 MiB."}, status_code=413)
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if not data or b"%PDF-" not in data[:1024]:
         return JSONResponse({"error": WRONG_DOCUMENT_MESSAGE}, status_code=422)
     try:
-        pages = await asyncio.to_thread(extract_pdf_text, data)
+        pages = await asyncio.to_thread(extract_pdf_text, data, max_pages=20, max_text_chars=200_000)
         text = "\n".join(page.get("text") or "" for page in pages)
         validate_discharge_document(text)
     except WrongDocumentError:
@@ -272,9 +281,7 @@ async def document_uploaded(request: Request) -> JSONResponse:
     return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
 
 
-# The "Reset demo" button on /demo. The web server sends BRIDGE_KEY as
-# X-AfterWard-Key; this route refuses without it, and in production.
-BRIDGE_KEY_HEADER = "x-afterward-key"
+# The Reset demo route is protected by BridgeAuthenticationMiddleware.
 RESET_ERROR = "Could not reset the demo. Please try again."
 
 
@@ -286,14 +293,6 @@ async def reset_demo(request: Request) -> JSONResponse:
     any pending check-in. The patient is fixed on the server; the body may
     only carry the session_id whose chat memory is cleared.
     """
-
-    expected = os.getenv("BRIDGE_KEY", "")
-    if not expected:
-        return JSONResponse({"error": "Reset is not set up: BRIDGE_KEY is missing."}, status_code=503)
-
-    given = request.headers.get(BRIDGE_KEY_HEADER, "")
-    if not hmac.compare_digest(given.encode(), expected.encode()):
-        return JSONResponse({"error": "Not allowed."}, status_code=401)
 
     if not allows_test_hooks():
         return JSONResponse({"error": "Reset is not available in production."}, status_code=403)
@@ -326,17 +325,13 @@ async def conversation(request: Request) -> JSONResponse:
     """
     The Alexa turns newer than ?after=N, for the /demo screen, and the latest id.
 
-    Off unless ALEXA_FEED_ENABLED=true, and only with the bridge key: it holds her
-    words. With no `after`, no turns, only the latest id. Never logs the words.
+    Off unless ALEXA_FEED_ENABLED=true, and only with the bridge key (checked by
+    BridgeAuthenticationMiddleware): it holds her words. With no `after`, no turns,
+    only the latest id. Never logs the words.
     """
 
     if not alexa_feed.enabled():
         return JSONResponse({"error": "The Alexa feed is off."}, status_code=404)
-
-    expected = os.getenv("BRIDGE_KEY", "")
-    given = request.headers.get(BRIDGE_KEY_HEADER, "")
-    if not expected or not hmac.compare_digest(given.encode(), expected.encode()):
-        return JSONResponse({"error": "Not allowed."}, status_code=401)
 
     try:
         after = int(request.query_params["after"])
@@ -429,7 +424,7 @@ async def reminder_loop(interval: float) -> None:
 async def lifespan(app: Starlette):
     task = None
 
-    if os.getenv("LOCAL_REMINDER_LOOP") == "1":
+    if os.getenv("LOCAL_REMINDER_LOOP") == "1" and not is_production():
         interval = _reminder_loop_seconds()
         log("local_reminder_loop_on", ms=int(interval * 1000))
         task = asyncio.create_task(reminder_loop(interval))
@@ -487,8 +482,14 @@ class RequestLogMiddleware:
             reset_request_id(token)
 
 
+async def bridge_health(request: Request) -> JSONResponse:
+    """Public liveness only: no AWS calls or configuration/credential details."""
+    return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
+
+
 app = Starlette(
     routes=[
+        Route("/bridge/health", bridge_health, methods=["GET"]),
         Route("/documents/validate", validate_document, methods=["POST"]),
         Route("/documents/uploaded", document_uploaded, methods=["POST"]),
         Route("/chat", chat_message, methods=["POST"]),
@@ -501,5 +502,5 @@ app = Starlette(
         Route("/conversation", conversation, methods=["GET"]),
     ],
     lifespan=lifespan,
-    middleware=[Middleware(RequestLogMiddleware)],
+    middleware=[Middleware(RequestLogMiddleware), Middleware(BridgeAuthenticationMiddleware)],
 )

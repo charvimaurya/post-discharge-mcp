@@ -15,6 +15,8 @@ import pytest
 @pytest.fixture(autouse=True)
 def demo_clock_by_default(monkeypatch):
     monkeypatch.setenv("CLOCK_MODE", "demo")
+    from tests.bridge_client import BRIDGE_TEST_KEY
+    monkeypatch.setenv("BRIDGE_KEY", BRIDGE_TEST_KEY)
 
 
 @pytest.fixture(autouse=True)
@@ -79,6 +81,7 @@ def mcp_hop(monkeypatch):
             monkeypatch.setattr(server, name, lambda *args, **kwargs: {"ok": True, "data": {}})
 
     monkeypatch.setenv("MCP_AUTH_TOKEN", "test-token")
+    monkeypatch.setattr(client, "get_mcp_auth_token", lambda: "test-token")
     monkeypatch.setattr(mcp_auth, "get_expected_mcp_token", lambda: "test-token")
     monkeypatch.setattr("app.mcp.http_auth.get_expected_mcp_token", lambda: "test-token")
 
