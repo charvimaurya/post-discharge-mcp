@@ -18,6 +18,7 @@
     .icon{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;flex:none;background:#F4EFE6;font-size:22px}.done .icon{background:var(--blue);color:white}.next .icon{background:#FBE9EE;color:var(--accent)}
     .body{min-width:0;flex:1}h2{font-size:21px;line-height:1.3;margin:0;font-weight:600}.detail,.state{font-size:16px;color:var(--soft);margin:5px 0 0}.done .state{color:var(--blue);font-weight:600}
     .next-label{color:var(--accent);font-size:12px;text-transform:uppercase;font-weight:700;letter-spacing:1.2px;margin:0 0 6px}.confirmation{display:inline-block;border-radius:99px;padding:3px 11px;background:#FFF1CF;color:var(--amber);font-size:14px;font-weight:600;margin-top:8px}
+    #week{border-top:1px solid var(--line);margin-top:24px;padding-top:20px}#week h2{font-family:var(--serif);font-size:26px}#week-summary{margin:8px 0;color:var(--soft)}#week-days{grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;margin-top:14px}.day{border:1px solid var(--line);border-radius:10px;text-align:center;padding:8px 2px;font-size:12px}.day span{display:block}.day-symbol{font-size:22px;font-weight:700}.day.completed{background:#F5F9FC;color:var(--blue)}.day.missed{background:#FFF1CF;color:var(--amber)}.day.today{outline:2px solid var(--accent);outline-offset:2px}#week-synthetic{font-size:13px;color:var(--soft);margin-bottom:0}
     [hidden]{display:none!important}@media(max-width:440px){body{padding:10px}main{padding:18px}header{align-items:start}h1{font-size:34px}#count{font-size:20px}.item{padding:12px;gap:10px}h2{font-size:19px}}
   </style>
 </head>
@@ -27,6 +28,12 @@
   <progress id="progress" max="1" value="0" aria-label="Completed tasks" hidden></progress>
   <p id="message" role="status" aria-live="polite">Waiting for today's plan</p>
   <ul id="tasks" aria-label="Today's recovery tasks"></ul>
+  <section id="week" aria-labelledby="week-heading" hidden>
+    <h2 id="week-heading">This week</h2>
+    <p id="week-summary" role="status" aria-live="polite"></p>
+    <ul id="week-days" aria-label="Seven-day morning medicine history"></ul>
+    <p id="week-synthetic" hidden>Synthetic demo history</p>
+  </section>
 </main>
 <script>
 (() => {
@@ -41,6 +48,11 @@
   const list = document.getElementById('tasks');
   const count = document.getElementById('count');
   const progress = document.getElementById('progress');
+  const weekSection = document.getElementById('week');
+  const weekSummary = document.getElementById('week-summary');
+  const weekDays = document.getElementById('week-days');
+  const weekSynthetic = document.getElementById('week-synthetic');
+  let weekDate = null;
   let ready = false;
   let origin = '*'; // Sandbox origins are host-dependent; pin after the parent's handshake.
   let hostContext = {};
@@ -52,6 +64,7 @@
     if (ready) send({method: 'ui/notifications/size-changed', params: {width: document.documentElement.clientWidth, height: document.documentElement.scrollHeight}});
   }
   function unavailable() {
+    clearWeek();
     list.replaceChildren();
     count.hidden = progress.hidden = true;
     message.hidden = false;
@@ -92,12 +105,55 @@
     } catch { /* Invalid host timezone: show the supplied timestamp unchanged. */ }
     return stamp;
   }
+  function clearWeek() {
+    weekSection.hidden = true;
+    weekSynthetic.hidden = true;
+    weekDays.replaceChildren();
+    weekSummary.textContent = '';
+    weekDate = null;
+  }
+  const states = {completed: ['✓', 'All morning medicines recorded'], missed: ['-', 'Explicitly missed'], unknown: ['○', 'Unknown'], not_yet_due: ['◷', 'Not yet due'], no_scheduled_morning_doses: ['·', 'No morning doses scheduled']};
+  function validDay(day) {
+    return typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day) && Number.isFinite(new Date(day + 'T12:00:00Z').getTime()) && new Date(day + 'T12:00:00Z').toISOString().slice(0, 10) === day;
+  }
+  function validWeek(week, date) {
+    if (!object(week) || !validDay(date) || week.end_date !== date || !Array.isArray(week.days) || week.days.length !== 7) return false;
+    return week.days.every((day, index) => object(day) && validDay(day.date) && Object.hasOwn(states, day.status) &&
+      new Date(day.date + 'T12:00:00Z').getTime() === new Date(date + 'T12:00:00Z').getTime() - (6 - index) * 86400000 && day.is_today === (index === 6));
+  }
+  function renderWeek(week) {
+    weekDays.replaceChildren();
+    const completed = week.days.filter(day => day.status === 'completed').length;
+    weekSummary.textContent = `${completed} of 7 days: all morning medicines taken`;
+    for (const day of week.days) {
+      const row = append(weekDays, 'li', '', `day ${day.status}${day.is_today ? ' today' : ''}`);
+      const stamp = new Date(day.date + 'T12:00:00Z');
+      const label = new Intl.DateTimeFormat('en-GB', {weekday: 'short', day: 'numeric', timeZone: 'UTC'}).format(stamp);
+      row.setAttribute('aria-label', `${label}: ${states[day.status][1]}${day.is_today ? ', today' : ''}`);
+      if (day.is_today) row.setAttribute('aria-current', 'date');
+      append(row, 'span', label);
+      append(row, 'span', states[day.status][0], 'day-symbol').setAttribute('aria-hidden', 'true');
+    }
+    weekSynthetic.hidden = week.synthetic_demo_history !== true;
+    weekSection.hidden = false;
+    weekDate = week.end_date;
+    sizeChanged();
+  }
   function render(result) {
     const value = payload(result);
-    if (!object(value) || value.ok !== true || !object(value.data) || !Array.isArray(value.data.tasks) || value.data.tasks.some(task => !object(task))) {
-      unavailable(); return;
-    }
-    const tasks = [...value.data.tasks].sort((a, b) => sortTime(a) - sortTime(b));
+    if (!object(value) || value.ok !== true || !object(value.data)) { unavailable(); return; }
+    const data = value.data;
+    const weekly = data.kind === 'week_summary';
+    const today = weekly ? data.today : data;
+    if (!object(today) || !Array.isArray(today.tasks) || today.tasks.some(task => !object(task)) ||
+        (weekly && (data.schema_version !== 1 || !validWeek(data.week, today.date)))) { unavailable(); return; }
+    const date = validDay(today.date) ? today.date : null;
+    if (weekDate !== date) clearWeek();
+    renderToday(today);
+    if (weekly) renderWeek(data.week);
+  }
+  function renderToday(data) {
+    const tasks = [...data.tasks].sort((a, b) => sortTime(a) - sortTime(b));
     const done = tasks.filter(task => task.status === 'completed').length;
     const next = tasks.find(task => task.status === 'pending' && task.needs_confirmation !== true);
     count.textContent = `${done} of ${tasks.length} done`;

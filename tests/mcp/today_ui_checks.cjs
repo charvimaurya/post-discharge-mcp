@@ -18,9 +18,9 @@ class Element {
   setAttribute(key, value) { this.attributes[key] = value; }
 }
 function start(embedded = true) {
-  const elements = Object.fromEntries(['message', 'tasks', 'count', 'progress'].map(id => [id, new Element()]));
+  const elements = Object.fromEntries(['message', 'tasks', 'count', 'progress', 'week', 'week-summary', 'week-days', 'week-synthetic'].map(id => [id, new Element()]));
   elements.message.textContent = "Waiting for today's plan";
-  elements.count.hidden = elements.progress.hidden = true;
+  elements.count.hidden = elements.progress.hidden = elements.week.hidden = elements['week-synthetic'].hidden = true;
   const sent = [];
   let listener;
   const host = {postMessage: (data, origin) => sent.push({data, origin})};
@@ -138,5 +138,54 @@ check('supports ping, size reporting, and teardown without tool writes', () => {
   assert.ok(app.sent.every(item => item.data.method !== 'tools/call'));
   app.deliver(fixture);
   assert.equal(app.elements.tasks.children.length, 0);
+});
+const todayData = (fixture.structuredContent || JSON.parse(fixture.content[0].text)).data;
+const weekDays = Array.from({length: 7}, (_, i) => ({date: `2026-10-${17 + i}`, is_today: i === 6, status: i < 5 ? 'completed' : i === 5 ? 'missed' : 'not_yet_due'}));
+const weekly = {structuredContent: {ok: true, data: {kind: 'week_summary', schema_version: 1, today: {...todayData, date: '2026-10-23'}, week: {end_date: '2026-10-23', days: weekDays, synthetic_demo_history: true}}}};
+check('Today alone has no weekly strip', () => {
+  const app = start(); app.initialize(); app.deliver(fixture);
+  assert.equal(app.elements.week.hidden, true);
+});
+check('weekly first renders a complete independent App', () => {
+  const app = start(); app.initialize(); app.deliver(weekly);
+  assert.equal(app.elements.count.textContent, '1 of 4 done');
+  assert.equal(app.elements.week.hidden, false);
+  assert.equal(app.elements['week-summary'].textContent, '5 of 7 days: all morning medicines taken');
+  assert.equal(app.elements['week-days'].children.length, 7);
+  assert.match(app.elements['week-days'].children[5].textContent, /-/);
+  assert.equal(app.elements['week-days'].children[6].attributes['aria-current'], 'date');
+  assert.equal(app.elements['week-synthetic'].hidden, false);
+});
+check('Today then week and same-date Today updates preserve separate states', () => {
+  const app = start(); app.initialize(); app.deliver(fixture); app.deliver(weekly);
+  app.deliver({structuredContent: {ok: true, data: {date: '2026-10-23', tasks: []}}});
+  assert.equal(app.elements.count.textContent, '0 of 0 done');
+  assert.equal(app.elements.week.hidden, false);
+  app.deliver({structuredContent: {ok: true, data: {date: '2026-10-24', tasks: []}}});
+  assert.equal(app.elements.week.hidden, true);
+});
+check('neutral states and provenance are explicit', () => {
+  const data = JSON.parse(JSON.stringify(weekly));
+  data.structuredContent.data.week.synthetic_demo_history = false;
+  data.structuredContent.data.week.days[0].status = 'unknown';
+  data.structuredContent.data.week.days[1].status = 'no_scheduled_morning_doses';
+  const app = start(); app.initialize(); app.deliver(data);
+  assert.equal(app.elements['week-synthetic'].hidden, true);
+  assert.match(app.elements['week-days'].children[0].attributes['aria-label'], /Unknown/);
+  assert.equal(app.elements['week-summary'].textContent, '3 of 7 days: all morning medicines taken');
+});
+check('malformed weekly results cannot inject labels or retain stale content', () => {
+  for (const mutation of [d => d.week.days.pop(), d => d.week.days[0].status = '<img>', d => d.today = {}, d => d.week.days[0].date = '2026-02-31', d => d.schema_version = 999]) {
+    const broken = JSON.parse(JSON.stringify(weekly)); mutation(broken.structuredContent.data);
+    const app = start(); app.initialize(); app.deliver(weekly); app.deliver(broken);
+    assert.equal(app.elements.week.hidden, true);
+    assert.equal(app.elements['week-days'].children.length, 0);
+    assert.match(app.elements.message.textContent, /unavailable/);
+  }
+});
+check('weekly JSON text works in a new instance without retained Today data', () => {
+  const app = start(); app.initialize(); app.deliver({content: [{type: 'text', text: JSON.stringify(weekly.structuredContent)}]});
+  assert.equal(app.elements.week.hidden, false);
+  assert.equal(app.elements.count.textContent, '1 of 4 done');
 });
 console.log(`${checks.length} UI checks passed`);

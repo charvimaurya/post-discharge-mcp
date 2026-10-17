@@ -40,10 +40,10 @@ def test_today_resource_read_returns_standalone_html():
 
 def test_today_tool_has_ui_link_and_existing_prompts_remain():
     tools = {tool.name: tool for tool in asyncio.run(mcp.list_tools())}
-    assert len(tools) == 7
+    assert len(tools) == 8
     assert tools["get_today_tasks"].model_dump(by_alias=True)["_meta"]["ui"]["resourceUri"] == URI
     assert tools["get_today_tasks"].input_schema.get("properties", {}) == {}
-    assert all(tool.meta is None for name, tool in tools.items() if name != "get_today_tasks")
+    assert all(tool.meta is None for name, tool in tools.items() if name not in {"get_today_tasks", "get_week_summary"})
     assert {prompt.name for prompt in asyncio.run(mcp.list_prompts())} == {"ask_my_letter", "morning_checkin"}
 
 
@@ -81,4 +81,4 @@ def test_today_card_javascript_with_real_sdk_result(monkeypatch):
         text=True, capture_output=True, timeout=20,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert "14 UI checks passed" in completed.stdout
+    assert "20 UI checks passed" in completed.stdout

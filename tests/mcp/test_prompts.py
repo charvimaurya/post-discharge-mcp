@@ -65,7 +65,7 @@ def test_morning_prompt_rejects_arguments():
         asyncio.run(mcp.get_prompt("morning_checkin", {"question": "unexpected"}))
 
 
-def test_prompt_registration_preserves_the_seven_existing_tools():
+def test_prompt_registration_preserves_existing_tools_and_adds_week_summary():
     tools = asyncio.run(mcp.list_tools())
     assert {tool.name for tool in tools} == {
         "get_recovery_plan",
@@ -75,4 +75,5 @@ def test_prompt_registration_preserves_the_seven_existing_tools():
         "report_task_completed",
         "report_medication_taken",
         "undo_report",
+        "get_week_summary",
     }

@@ -214,7 +214,7 @@ To make a `BRIDGE_KEY`, run `python -c "import secrets; print(secrets.token_urls
 
 ### MCP Prompts and MCP App
 
-The server exposes two prompts alongside its seven tools. Retrieving a prompt
+The server exposes two prompts alongside its eight tools. Retrieving a prompt
 returns instructions for the client; it does not execute tools.
 
 - `ask_my_letter(question)` requires the patient's question and instructs the
@@ -262,7 +262,7 @@ Open its private local access link and add an HTTP/Streamable HTTP connection:
 - In MCPJam, select **Bearer Token** authentication and enter only the configured
   token value in the masked field. The header above is a placeholder.
 
-Confirm seven tools and the two prompts are discovered. In MCPJam 3.16.1, the
+Confirm eight tools and the two prompts are discovered. In MCPJam 3.16.1, the
 Tools response pane shows JSON and directs you to Chat. Open **Chat/Playground**,
 select `get_today_tasks`, and click **Run** to display the Today card. Select the
 intended host timezone before recording completion times. Keep authentication
@@ -276,6 +276,39 @@ unidentified. Stable repeatability on the shared synthetic patient and a final
 recording in the intended timezone remain pending. Confirmation labels were
 verified with automated fixtures, not flagged live data. Other hosts and the
 currently deployed server have not been validated for these new features.
+
+### This week recovery summary
+
+`get_week_summary()` adds an eighth read-only tool and links to the same Today
+resource. Its response includes a current Today task snapshot plus seven
+patient-local dates, so a fresh MCP App can render both sections independently.
+Call this tool in MCPJam Chat/Playground to display **This week**; calling only
+`get_today_tasks` still displays the Today card alone in a fresh App.
+
+The strip shows calculated completed days, completed ticks, explicit missed
+markers, neutral unknown/not-yet-due states and an outline for today. Missing
+medication events never imply missed doses. Historical schedules require explicit
+dated evidence; today's plan is not projected backwards. Existing history
+without that evidence is shown as unknown.
+
+Real MCPJam 3.16.1 rendering was verified with isolated in-memory synthetic data,
+including independent Today and weekly App instances. This is not DynamoDB or
+deployment verification. The **Synthetic demo history** label is restricted to
+recognized test identities with synthetic evidence. For memory-only testing:
+
+```bash
+python -m tests.mcp.isolated_host --token-file /private/tmp/afterward-week-token --with-week
+```
+
+Connect MCPJam to `http://127.0.0.1:18001/mcp` with the private test token. The
+launcher blocks AWS calls and supports only Today, task completion and the weekly
+tool; other registered tools are disabled in this test environment. Omitting
+`--with-week` produces no seeded history. This flag belongs to the isolated test
+launcher, not `reset_demo_patient.py`. Never use production credentials here.
+See the [S5 implementation report](docs/s5-implementation-report.md) for tests,
+evidence and limitations. Local captions can say **8 tools, 2 prompts**; deployed
+capability must be verified separately.
+
 
 ## Load and reset the demo patient
 

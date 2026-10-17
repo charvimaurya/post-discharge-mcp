@@ -34,6 +34,8 @@ from app.mcp.tools.recovery import (
     get_today_tasks_for_context,
 )
 
+from app.mcp.tools.week import get_week_summary_for_context
+
 
 mcp = MCPServer(
     "AfterWard"
@@ -188,6 +190,17 @@ async def get_today_tasks() -> dict:
         get_today_tasks_for_context,
         context
     )
+
+
+@mcp.tool(
+    name="get_week_summary",
+    description="Read seven patient-local days of evidenced morning medicine adherence. Missing history is unknown. Includes today tasks for the MCP App.",
+    meta={"ui": {"resourceUri": "ui://afterward/today.html"}},
+    annotations=ToolAnnotations(read_only_hint=True),
+)
+@logged_tool("read")
+async def get_week_summary() -> dict:
+    return get_week_summary_for_context(get_current_patient_context())
 
 
 @mcp.tool(
