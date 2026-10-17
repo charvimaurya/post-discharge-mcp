@@ -222,7 +222,52 @@ Tips:
 The full list of openings is in
 [`en-GB.json`](../skill-package/interactionModels/custom/en-GB.json).
 
-## 9. Troubleshooting
+## 9. Recording a demo
+
+### Before every take
+
+1. Restart the bridge (terminal 2) with the full one-line command. Restarting
+   the bridge clears chat memory, so old test lines can't leak into the take.
+2. Run the reset (terminal 5).
+3. Check `/demo` shows **Margaret**, **0 of 13**, at **7:00 am**.
+4. Warm up with `what's next`. Never warm up with a symptom line.
+5. Block the `/demo` microphone for Alexa scenes, so only Alexa hears you.
+6. Keep the laptop plugged in, with sleep turned off.
+
+### Tested Alexa lines
+
+Use these exact lines:
+
+1. `open after ward`
+2. `I'm back from my walk.`
+3. `I've had my breakfast, and I've taken my medicine.`
+4. `I've taken both. How long do I take them for?`
+
+   Exception to one-sentence-at-a-time: tested as a single turn.
+5. `can I drive`
+6. `my calf is swollen.`
+
+Lines 1 to 4 must be used in that order, because each one depends on the one
+before. Lines 5 and 6 can be used anywhere after line 1, but line 6 must be the
+last Alexa line: its emergency reply ends the session, so anything after it needs
+`open after ward` again.
+
+### If Alexa fails mid-take
+
+Say or type the same line on `/demo` instead, and caption that scene
+"Simulated Alexa+ (web)".
+
+### Captions
+
+- Alexa scenes: **Real Alexa skill · Alexa developer console**
+- Web scenes: **Simulated Alexa+ (web)**
+
+### Privacy
+
+Blur your name, email and account ID wherever the Alexa developer console shows
+them.
+
+## 10. Troubleshooting
 
 ### "The requested skill did not provide a valid response"
 
