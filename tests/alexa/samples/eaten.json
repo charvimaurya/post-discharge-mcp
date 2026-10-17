@@ -1,0 +1,45 @@
+{
+  "version": "1.0",
+  "session": {
+    "new": false,
+    "sessionId": "amzn1.echo-api.session.local-test",
+    "application": {
+      "applicationId": "amzn1.ask.skill.790f31c6-31b9-4271-8861-647c3848388a"
+    },
+    "user": {
+      "userId": "amzn1.ask.account.local-test"
+    }
+  },
+  "context": {
+    "System": {
+      "application": {
+        "applicationId": "amzn1.ask.skill.790f31c6-31b9-4271-8861-647c3848388a"
+      },
+      "user": {
+        "userId": "amzn1.ask.account.local-test"
+      },
+      "device": {
+        "deviceId": "local",
+        "supportedInterfaces": {}
+      },
+      "apiEndpoint": "https://api.amazonalexa.com"
+    }
+  },
+  "request": {
+    "requestId": "amzn1.echo-api.request.local-test",
+    "timestamp": "2026-10-23T06:00:00Z",
+    "locale": "en-GB",
+    "type": "IntentRequest",
+    "intent": {
+      "name": "EatenIntent",
+      "confirmationStatus": "NONE",
+      "slots": {
+        "query": {
+          "name": "query",
+          "value": "my lunch",
+          "confirmationStatus": "NONE"
+        }
+      }
+    }
+  }
+}

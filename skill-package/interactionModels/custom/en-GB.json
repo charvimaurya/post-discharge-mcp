@@ -109,6 +109,138 @@
           ]
         },
         {
+          "name": "HaveTakenIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have taken {query}"
+          ]
+        },
+        {
+          "name": "HaveHadIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have had {query}"
+          ]
+        },
+        {
+          "name": "HaveDoneIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have done {query}"
+          ]
+        },
+        {
+          "name": "HaveFinishedIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have finished {query}"
+          ]
+        },
+        {
+          "name": "JustHadIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I just had {query}"
+          ]
+        },
+        {
+          "name": "IveJustHadIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've just had {query}"
+          ]
+        },
+        {
+          "name": "AteIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I ate {query}"
+          ]
+        },
+        {
+          "name": "EatenIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've eaten {query}"
+          ]
+        },
+        {
+          "name": "GotBackFromIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I got back from {query}"
+          ]
+        },
+        {
+          "name": "AlreadyIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I already {query}"
+          ]
+        },
+        {
+          "name": "IveAlreadyIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've already {query}"
+          ]
+        },
+        {
           "name": "YesIntent",
           "slots": [
             {
@@ -314,6 +446,90 @@
           ]
         },
         {
+          "name": "AskIsItAlrightIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "is it alright to {query}"
+          ]
+        },
+        {
+          "name": "AskIsItOkayIfIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "is it okay if I {query}"
+          ]
+        },
+        {
+          "name": "AskWhenShouldIIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "when should I {query}"
+          ]
+        },
+        {
+          "name": "AskWhenDoIIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "when do I {query}"
+          ]
+        },
+        {
+          "name": "AskHaveToIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "do I have to {query}"
+          ]
+        },
+        {
+          "name": "AskWhatShouldIIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "what should I {query}"
+          ]
+        },
+        {
+          "name": "AskHowMuchIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "how much {query}"
+          ]
+        },
+        {
           "name": "UnwellFeelIntent",
           "slots": [
             {
@@ -410,6 +626,66 @@
           ]
         },
         {
+          "name": "UnwellFellIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I fell {query}"
+          ]
+        },
+        {
+          "name": "UnwellWorriedIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I'm worried {query}"
+          ]
+        },
+        {
+          "name": "UnwellHurtsIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "it hurts {query}"
+          ]
+        },
+        {
+          "name": "UnwellHavingIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I'm having {query}"
+          ]
+        },
+        {
+          "name": "UnwellNoticedIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've noticed {query}"
+          ]
+        },
+        {
           "name": "NeedHelpIntent",
           "slots": [],
           "samples": [
@@ -468,6 +744,14 @@
           "samples": [
             "and after that",
             "then what"
+          ]
+        },
+        {
+          "name": "BackIntent",
+          "slots": [],
+          "samples": [
+            "I'm back",
+            "I am back"
           ]
         },
         {

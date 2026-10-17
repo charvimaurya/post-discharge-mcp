@@ -116,6 +116,57 @@ def test_every_opening_intent_in_the_model_has_its_opening_words():
     assert len(samples) == len(set(samples)), "a sample is in two intents"
 
 
+@pytest.mark.parametrize("sample, message, reprompts", [
+    ("have_taken", "I have taken my paracetamol", True),
+    ("have_had", "I have had my breakfast", True),
+    ("have_done", "I have done my exercises", True),
+    ("have_finished", "I have finished my walk", True),
+    ("just_had", "I just had lunch", True),
+    ("ive_just_had", "I've just had a cup of tea", True),
+    ("ate", "I ate my breakfast", True),
+    ("eaten", "I've eaten my lunch", True),
+    ("got_back_from", "I got back from my walk", True),
+    ("already", "I already took my tablets", True),
+    ("ive_already", "I've already had my medicine", True),
+    ("back", "I'm back", True),
+    ("ask_is_it_alright", "is it alright to have a bath", True),
+    ("ask_is_it_okay_if", "is it okay if I go upstairs", True),
+    ("ask_when_should_i", "when should I take my apixaban", True),
+    ("ask_when_do_i", "when do I see my consultant", True),
+    ("ask_have_to", "do I have to wear the stockings", True),
+    ("ask_what_should_i", "what should I eat", True),
+    ("ask_how_much", "how much paracetamol can I take", True),
+    ("unwell_fell", "I fell over in the bathroom", False),
+    ("unwell_worried", "I'm worried about my leg", False),
+    ("unwell_hurts", "it hurts when I breathe", False),
+    ("unwell_having", "I'm having chest pain", False),
+    ("unwell_noticed", "I've noticed blood in my urine", False),
+])
+def test_each_new_opening_sample_rebuilds_her_sentence(alexa, sample, message, reprompts):
+    request = json.load(open(f"tests/alexa/samples/{sample}.json", encoding="utf-8"))["request"]
+    text, reprompt, ends = alexa.speech(alexa.send(request))
+
+    assert alexa.turns[0][0] == message and text == f"Reply to: {message}"
+    assert (reprompt is not None) == reprompts and ends is False
+
+
+@pytest.mark.parametrize("intent, query, reprompts", [
+    ("HaveHadIntent", "chest pain", False),
+    ("HadIntent", "chest pain", False),
+    ("HaveTakenIntent", "my paracetamol", True),
+])
+def test_a_symptom_reply_never_reprompts_whatever_intent_matched(alexa, monkeypatch, intent, query, reprompts):
+    async def triaged_turn(message, session_id):
+        symptom = "chest pain" in message
+        return {"response": "Call 999 now." if symptom else "Well done.", "tool_trace": [], "source": None,
+                "help": {"actions": ["Call 999"]} if symptom else None}
+
+    monkeypatch.setattr(handlers, "run_turn", triaged_turn)
+    _, reprompt, ends = alexa.speech(alexa.send(_intent(intent, query=query)))
+
+    assert (reprompt is not None) == reprompts and ends is False
+
+
 def test_the_sentence_is_echoed_only_when_asked(alexa, monkeypatch):
     plain = alexa.send(_intent("BackFromIntent", query="my walk")).json()
     assert "sent_to_run_turn" not in (plain.get("sessionAttributes") or {})

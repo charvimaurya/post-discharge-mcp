@@ -69,6 +69,17 @@ OPENINGS = {
     "DoneWithIntent": "I'm done with",
     "TakenIntent": "I've taken",
     "HadIntent": "I've had",
+    "HaveTakenIntent": "I have taken",
+    "HaveHadIntent": "I have had",
+    "HaveDoneIntent": "I have done",
+    "HaveFinishedIntent": "I have finished",
+    "JustHadIntent": "I just had",
+    "IveJustHadIntent": "I've just had",
+    "AteIntent": "I ate",
+    "EatenIntent": "I've eaten",
+    "GotBackFromIntent": "I got back from",
+    "AlreadyIntent": "I already",
+    "IveAlreadyIntent": "I've already",
     "YesIntent": "yes",
     "BothIntent": "both",
     "JustTheIntent": "just the",
@@ -86,6 +97,13 @@ OPENINGS = {
     "AskLetterSayIntent": "what does my letter say about",
     "AskWhatAboutIntent": "what about",
     "AskWhyIntent": "why do I",
+    "AskIsItAlrightIntent": "is it alright to",
+    "AskIsItOkayIfIntent": "is it okay if I",
+    "AskWhenShouldIIntent": "when should I",
+    "AskWhenDoIIntent": "when do I",
+    "AskHaveToIntent": "do I have to",
+    "AskWhatShouldIIntent": "what should I",
+    "AskHowMuchIntent": "how much",
     # Feeling unwell.
     "UnwellFeelIntent": "I feel",
     "UnwellFeelingIntent": "I'm feeling",
@@ -95,6 +113,11 @@ OPENINGS = {
     "UnwellThinkIntent": "I think I",
     "UnwellTheresIntent": "there's",
     "UnwellCantIntent": "I can't",
+    "UnwellFellIntent": "I fell",
+    "UnwellWorriedIntent": "I'm worried",
+    "UnwellHurtsIntent": "it hurts",
+    "UnwellHavingIntent": "I'm having",
+    "UnwellNoticedIntent": "I've noticed",
 }
 
 # Intents whose samples are whole phrases with no slot: the sentence sent for each.
@@ -106,6 +129,7 @@ FIXED = {
     "WhatsNextIntent": "What's next?",
     "PlanTodayIntent": "What's left today?",
     "AfterThatIntent": "And after that?",
+    "BackIntent": "I'm back",
 }
 
 # Her saying she is unwell: the reply is spoken as it is, and never followed by "Anything else?".
@@ -114,8 +138,8 @@ UNWELL = {name for name in [*OPENINGS, *FIXED] if name.startswith("Unwell")} | {
 }
 
 
-def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict | None]:
-    """Run one turn on the bridge's loop and wait for it here: (what to say, the letter source)."""
+def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict | None, bool]:
+    """Run one turn on the bridge's loop and wait for it here: (what to say, the letter source, urgent)."""
 
     # Local testing only: ALEXA_ECHO_SENTENCE=true returns the sentence sent to the agent in the
     # response's session attributes. Never logged: logs hold no patient words.
@@ -130,12 +154,13 @@ def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict 
         info = REQUEST_INFO.get(None)
         if info is not None:
             info["timed_out"] = True
-        return TOO_SLOW, None
+        return TOO_SLOW, None, False
     except TurnFailed as failed:
         log("alexa_turn_failed", level="error", error=failed.__cause__)
-        return NOT_REACHED, None
+        return NOT_REACHED, None, False
 
-    return result["response"], result.get("source")
+    # "help" is set only on a symptom reply (who to call): urgent, whatever intent matched.
+    return result["response"], result.get("source"), bool(result.get("help"))
 
 
 def _session_id(handler_input) -> str:
@@ -184,8 +209,8 @@ class LaunchHandler(AbstractRequestHandler):
 
         name = state.get("first_name")
         hello = f"Hello, {name}." if name else "Hello."
-        reply, _ = _turn("What is next?", _session_id(handler_input), handler_input)
-        return _say(handler_input, f"{hello} {reply}")
+        reply, _, urgent = _turn("What is next?", _session_id(handler_input), handler_input)
+        return _say(handler_input, f"{hello} {reply}", reprompt=not urgent)
 
 
 class OpeningHandler(AbstractRequestHandler):
@@ -200,8 +225,8 @@ class OpeningHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         name = handler_input.request_envelope.request.intent.name
         message = FIXED[name] if name in FIXED else f"{OPENINGS[name]} {_query(handler_input)}".strip()
-        reply, source = _turn(message, _session_id(handler_input), handler_input)
-        return _say(handler_input, reply, reprompt=name not in UNWELL, source=source)
+        reply, source, urgent = _turn(message, _session_id(handler_input), handler_input)
+        return _say(handler_input, reply, reprompt=name not in UNWELL and not urgent, source=source)
 
 
 class MedicineAnswerHandler(AbstractRequestHandler):
@@ -213,8 +238,8 @@ class MedicineAnswerHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         medicine = get_slot(handler_input, "medicine")
         message = str(medicine.value or "").strip() if medicine else ""
-        reply, source = _turn(message or "both", _session_id(handler_input), handler_input)
-        return _say(handler_input, reply, source=source)
+        reply, source, urgent = _turn(message or "both", _session_id(handler_input), handler_input)
+        return _say(handler_input, reply, reprompt=not urgent, source=source)
 
 
 class HelpHandler(AbstractRequestHandler):
