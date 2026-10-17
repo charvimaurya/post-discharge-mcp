@@ -17,6 +17,8 @@ def demo_clock_by_default(monkeypatch):
     monkeypatch.setenv("CLOCK_MODE", "demo")
     from tests.bridge_client import BRIDGE_TEST_KEY
     monkeypatch.setenv("BRIDGE_KEY", BRIDGE_TEST_KEY)
+    # Off unless a test turns it on, so no test reads DynamoDB through the idle check.
+    monkeypatch.setenv("DEMO_IDLE_RESET_HOURS", "0")
 
 
 @pytest.fixture(autouse=True)

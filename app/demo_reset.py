@@ -24,10 +24,15 @@ What this does NOT do:
 - set DEMO_FIXED_NOW
 """
 
+import os
+from datetime import datetime, timedelta, timezone
+
 from boto3.dynamodb.conditions import Key
 
 from app.alexa import feed as alexa_feed
-from app.clock import DEFAULT_TIMEZONE, get_current_date, get_current_datetime
+from app.clock import (
+    DEFAULT_TIMEZONE, allows_test_hooks, get_current_date, get_current_datetime, system_now_utc,
+)
 from app.database.event_history import event_table
 from app.database.recovery_state import (
     get_recovery_state,
@@ -133,6 +138,8 @@ def reset_recovery_state(patient_id: str) -> tuple[int, int]:
     state["first_name"] = state.get("first_name") or DEMO_FIRST_NAME
 
     state["last_updated"] = get_current_datetime().isoformat()
+    # Real time, so the idle reset below knows this is a fresh start.
+    state["demo_reset_at"] = system_now_utc().isoformat()
 
     save_recovery_state(state)
 
@@ -162,3 +169,61 @@ def reset_demo_patient() -> dict:
         "tasks_reset": tasks_reset,
         "medications_reset": medications_reset,
     }
+
+
+# The demo clock is frozen (always 07:00 on the same day), so yesterday's ticks
+# and reminders would still look like "today". After this many real hours with
+# no chat and no reset, the next visit starts fresh. 0 turns it off.
+IDLE_RESET_HOURS = 2
+
+
+def idle_reset_hours() -> float:
+    """DEMO_IDLE_RESET_HOURS, or 2 when it is missing or not a number."""
+
+    try:
+        return float(os.getenv("DEMO_IDLE_RESET_HOURS", IDLE_RESET_HOURS))
+    except ValueError:
+        return IDLE_RESET_HOURS
+
+
+def last_active_at(state: dict) -> datetime | None:
+    """The later of her last chat and the last reset (both real time), or None."""
+
+    times = []
+
+    for field in ("last_chat_at", "demo_reset_at"):
+        try:
+            at = datetime.fromisoformat(str(state[field]))
+        except (KeyError, ValueError):
+            continue
+        times.append(at if at.tzinfo else at.replace(tzinfo=timezone.utc))
+
+    return max(times, default=None)
+
+
+def reset_if_idle(now_utc: datetime | None = None) -> bool:
+    """
+    Reset the demo patient if nobody has used the demo for idle_reset_hours().
+
+    Never in production, and never when there is no plan. A record with no
+    chat or reset time yet counts as idle. Returns True if it reset.
+    """
+
+    hours = idle_reset_hours()
+
+    if hours <= 0 or not allows_test_hooks():
+        return False
+
+    state = get_recovery_state(PATIENT_ID)
+
+    if not state:
+        return False
+
+    last = last_active_at(state)
+    now = now_utc or system_now_utc()
+
+    if last is not None and now - last < timedelta(hours=hours):
+        return False
+
+    reset_demo_patient()
+    return True

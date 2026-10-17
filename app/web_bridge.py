@@ -24,9 +24,10 @@ from app.agent.service import get_structured_tool_result
 from app.agent.next_up import build_opening_message, timing
 from app.clock import allows_test_hooks, demo_now_text, get_clock_label, get_patient_datetime
 from app.database.event_history import delete_events
-from app.demo_reset import NoPlanToReset, reset_demo_patient
+from app.demo_reset import NoPlanToReset, reset_demo_patient, reset_if_idle
 from app.rate_limit import RateLimiter
 from app.database.recovery_state import (
+    clear_pending_checkin,
     get_recovery_state,
     record_greeting,
 )
@@ -153,10 +154,24 @@ async def chat_message(request: Request) -> JSONResponse:
     )
 
 
+async def idle_reset(route: str) -> bool:
+    """reset_if_idle off the event loop. A failure is logged and the visit goes on."""
+
+    try:
+        return await asyncio.to_thread(reset_if_idle)
+    except Exception as exc:
+        log("idle_reset_failed", level="error", error=exc, route=route)
+        return False
+
+
 async def today(request: Request) -> JSONResponse:
     """Today's clock label, task and medicine occurrences, and waiting reminder."""
 
     patient = get_demo_patient_context()
+
+    # A visit after a long gap starts fresh (the demo clock never moves on).
+    if await idle_reset("/today"):
+        log("demo_idle_reset", route="/today")
 
     try:
         # Tasks and medicines come from the MCP tools, which own the plan rules.
@@ -190,6 +205,17 @@ async def today(request: Request) -> JSONResponse:
 
     first_name = state.get("first_name") or str(state.get("patient_name") or "").split(" ")[0] or None
 
+    # A reminder about something already done is never shown, and is cleared.
+    pending = state.get("pending_checkin")
+    done = {item.get("occurrence_id") for item in [*tasks, *medications] if item.get("status") == "completed"}
+
+    if pending and pending.get("occurrence_id") in done:
+        pending = None
+        try:
+            await asyncio.to_thread(clear_pending_checkin, patient.patient_id)
+        except Exception as exc:
+            log("clear_checkin_failed", level="error", error=exc, route="/today")
+
     return JSONResponse(
         {
             "clock_label": get_clock_label(zone, now),
@@ -207,7 +233,7 @@ async def today(request: Request) -> JSONResponse:
             "discharge_date": state.get("discharge_date"),
             "tasks": tasks,
             "medications": medications,
-            "pending_checkin": state.get("pending_checkin") if pending_is_valid(state.get("pending_checkin") or {}, tasks, medications, now) else None,
+            "pending_checkin": pending if pending and pending_is_valid(pending, tasks, medications, now) else None,
         },
         headers={"Cache-Control": "no-store"},
     )
