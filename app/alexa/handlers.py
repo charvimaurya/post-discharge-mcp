@@ -55,7 +55,8 @@ def plain_speech(text: str) -> str:
     return " ".join(text.split())
 HELP = ("You can tell me what you've done, like: I'm back from my walk. You can ask about your letter, "
         "like: can I have a bath? Or ask: what's next? If something is wrong right now, say: I need help.")
-FALLBACK = "Sorry, I didn't catch that. You can say what you've done, or ask about your letter."
+FALLBACK = ("Sorry, I didn't catch that. You can say what you've done, or ask about your letter. "
+            "If something is wrong right now, say: I need help.")
 
 # Alexa says only which intent and slot matched, not which sample, so each opening
 # phrase is its own intent: "I've had" + "my breakfast and I've taken my medicine"
@@ -80,6 +81,10 @@ OPENINGS = {
     "GotBackFromIntent": "I got back from",
     "AlreadyIntent": "I already",
     "IveAlreadyIntent": "I've already",
+    # Catch-alls ("tell it ...", "say ..."): only her words after them are sent.
+    "TellItIntent": "",
+    "TellAfterWardIntent": "",
+    "SayIntent": "",
     "YesIntent": "yes",
     "BothIntent": "both",
     "JustTheIntent": "just the",
@@ -118,6 +123,11 @@ OPENINGS = {
     "UnwellHurtsIntent": "it hurts",
     "UnwellHavingIntent": "I'm having",
     "UnwellNoticedIntent": "I've noticed",
+    "UnwellFellDownIntent": "I fell down",
+    "UnwellFallenIntent": "I've fallen",
+    "UnwellHaveFallenIntent": "I have fallen",
+    "UnwellHadAFallIntent": "I had a fall",
+    "UnwellIveHadAFallIntent": "I've had a fall",
 }
 
 # Intents whose samples are whole phrases with no slot: the sentence sent for each.
@@ -130,6 +140,8 @@ FIXED = {
     "PlanTodayIntent": "What's left today?",
     "AfterThatIntent": "And after that?",
     "BackIntent": "I'm back",
+    "UnwellFellOnlyIntent": "I fell",
+    "UnwellFellOverIntent": "I fell over",
 }
 
 # Her saying she is unwell: the reply is spoken as it is, and never followed by "Anything else?".

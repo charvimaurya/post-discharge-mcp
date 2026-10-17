@@ -16,7 +16,9 @@ from app.agent import service
 from app.agent.intent import Intent, classify_intent
 from app.agent.safety import NOTHING_MORE_TO_SAY, remove_unasked_prompts
 from app.agent.session import clear_session
-from app.agent.symptoms import find_symptom, match_warning_sign
+from app.agent.symptoms import (
+    find_symptom, letter_sentence_reply, match_warning_sign, no_match_reply, warning_sign_reply,
+)
 from tests.conftest import log_lines
 
 
@@ -392,3 +394,27 @@ def test_a_symptom_found_elsewhere_in_the_letter_is_quoted_with_the_fixed_ending
     assert reply["response"].endswith("Otherwise, please call NHS 111 or your care team.")
     assert reply["source"]["page"] == 1
     assert agent.saved == [] and agent.model_calls == 0
+
+
+@pytest.mark.parametrize("message", ["I fell in the bathroom", "I've fallen over", "I've had a fall this morning"])
+def test_a_fall_opens_with_sorry_you_have_had_a_fall(message):
+    symptom = find_symptom(message)
+
+    assert symptom.fall
+    assert no_match_reply(symptom, "Margaret") == f"I'm sorry you've had a fall, Margaret. {NO_MATCH}"
+
+
+@pytest.mark.parametrize("message", ["I feel dizzy", "I've been sick"])
+def test_any_other_symptom_opens_with_sorry_to_hear_that(message):
+    assert no_match_reply(find_symptom(message), "Margaret") == f"I'm sorry to hear that, Margaret. {NO_MATCH}"
+
+
+def test_the_fall_opening_keeps_the_rest_of_a_letter_reply():
+    sentence = "If you fall, call the ward."
+
+    assert letter_sentence_reply(sentence, "Margaret", fall=True) == (
+        "I'm sorry you've had a fall, Margaret. Your letter says: If you fall, call the ward. "
+        "I can't give medical advice. If it's severe or sudden, call 999. "
+        "Otherwise, please call NHS 111 or your care team."
+    )
+    assert warning_sign_reply({"text": "Chest pain"}, "Margaret").startswith("I'm sorry to hear that, Margaret.")

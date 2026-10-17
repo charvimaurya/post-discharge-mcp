@@ -43,6 +43,12 @@ SAFETY AND DATA RULES
 7. If search_discharge_instructions does not return enough
    evidence, use get_recovery_plan as the fallback.
 
+7a. If the patient describes a symptom or an injury, such as
+    a fall, the only emergency number you may give is the
+    one in her letter: search it with
+    search_discharge_instructions ("emergency services phone
+    number"). Never give an emergency number of your own.
+
 8. If the discharge paperwork is unclear:
    - say what the letter actually says
    - say which information is missing

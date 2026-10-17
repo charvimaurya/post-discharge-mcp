@@ -153,6 +153,8 @@ from app.agent.symptoms import (
     letter_contacts,
     warning_signs_source,
     with_emergency_line,
+    says_999,
+    with_letter_emergency_number,
 )
 from app.mcp.client import (
     call_mcp_tool,
@@ -1226,7 +1228,7 @@ async def _symptom_turn(
         # The letter's whole box with this sign marked, then its other numbers, each once.
         source = (warning_signs_source(warning_signs, sign, contact, other_contacts)
                   or with_emergency_line(sign_source(sign), contact))
-        return warning_sign_reply(sign, first_name, number), source, help_lines
+        return warning_sign_reply(sign, first_name, number, symptom.fall), source, help_lines
 
     # Not among the warning signs: look in the rest of the letter for the same symptom.
     arguments = {"query": message}
@@ -1245,7 +1247,7 @@ async def _symptom_turn(
         if sentence:
             log("symptom", reason="letter_passage", kind="letter")
             source = with_emergency_line(evidence_source(match, sentence), contact)
-            return letter_sentence_reply(sentence, first_name, number), source, help_lines
+            return letter_sentence_reply(sentence, first_name, number, symptom.fall), source, help_lines
 
     log("symptom", reason="none", kind="template")
 
@@ -2652,6 +2654,12 @@ async def _chat_turn(
         )
 
     response_text = strip_markdown_emphasis(response_text)
+
+    # A free reply about a symptom the safety code did not catch may say "999" from the
+    # model's own knowledge: in code, it becomes the emergency number her letter gives.
+    if says_999(response_text):
+        contact, _ = await _letter_emergency_contact(tool_trace)
+        response_text = with_letter_emergency_number(response_text, contact["number"] if contact else None)
 
     # Attach the letter evidence the reply actually used, not
     # the nearest-ranked chunk. None if no evidence was used.

@@ -270,6 +270,29 @@ def test_fallback(alexa, intent):
     text, _, ends = alexa.speech(alexa.send(_intent(intent)))
 
     assert text == handlers.FALLBACK and not ends and alexa.turns == []
+    assert text.endswith("If something is wrong right now, say: I need help.")
+
+
+@pytest.mark.parametrize("intent, slots, message", [
+    ("UnwellFellOnlyIntent", {}, "I fell"),
+    ("UnwellFellOverIntent", {}, "I fell over"),
+    ("UnwellFellDownIntent", {"query": "the stairs"}, "I fell down the stairs"),
+    ("UnwellFallenIntent", {"query": "in the bathroom"}, "I've fallen in the bathroom"),
+    ("UnwellHaveFallenIntent", {"query": "in the kitchen"}, "I have fallen in the kitchen"),
+    ("UnwellHadAFallIntent", {"query": "this morning"}, "I had a fall this morning"),
+    ("UnwellIveHadAFallIntent", {"query": "in the garden"}, "I've had a fall in the garden"),
+])
+def test_a_fall_reaches_the_agent_with_no_reprompt(alexa, intent, slots, message):
+    _, reprompt, ends = alexa.speech(alexa.send(_intent(intent, **slots)))
+
+    assert alexa.turns[0][0] == message and reprompt is None and ends is False
+
+
+@pytest.mark.parametrize("intent", ["TellItIntent", "TellAfterWardIntent", "SayIntent"])
+def test_a_catch_all_sends_only_her_words_and_reprompts(alexa, intent):
+    _, reprompt, ends = alexa.speech(alexa.send(_intent(intent, query="I've done my walk")))
+
+    assert alexa.turns[0][0] == "I've done my walk" and reprompt is not None and ends is False
 
 
 def test_another_skill_is_refused_and_logged(alexa, capsys):

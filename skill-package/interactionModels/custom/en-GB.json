@@ -686,6 +686,80 @@
           ]
         },
         {
+          "name": "UnwellFellOnlyIntent",
+          "slots": [],
+          "samples": [
+            "I fell"
+          ]
+        },
+        {
+          "name": "UnwellFellOverIntent",
+          "slots": [],
+          "samples": [
+            "I fell over"
+          ]
+        },
+        {
+          "name": "UnwellFellDownIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I fell down {query}"
+          ]
+        },
+        {
+          "name": "UnwellFallenIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've fallen {query}"
+          ]
+        },
+        {
+          "name": "UnwellHaveFallenIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I have fallen {query}"
+          ]
+        },
+        {
+          "name": "UnwellHadAFallIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I had a fall {query}"
+          ]
+        },
+        {
+          "name": "UnwellIveHadAFallIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "I've had a fall {query}"
+          ]
+        },
+        {
           "name": "NeedHelpIntent",
           "slots": [],
           "samples": [
@@ -752,6 +826,42 @@
           "samples": [
             "I'm back",
             "I am back"
+          ]
+        },
+        {
+          "name": "TellItIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "tell it {query}"
+          ]
+        },
+        {
+          "name": "TellAfterWardIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "tell after ward {query}"
+          ]
+        },
+        {
+          "name": "SayIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "say {query}"
           ]
         },
         {

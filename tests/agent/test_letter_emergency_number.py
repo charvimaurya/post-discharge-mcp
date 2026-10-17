@@ -145,3 +145,33 @@ def test_the_panel_shows_the_whole_warning_signs_box_with_the_sign_marked():
     assert source["highlight"] == "Pain or heat in your calf."
     # A sign that is a sentence of its own is marked whole.
     assert sign_source(chest, [calf, fever, chest])["highlight"] == chest["source"]["snippet"]
+
+
+def test_a_free_reply_says_the_letters_emergency_number_not_999():
+    from app.agent.symptoms import says_999, with_letter_emergency_number
+
+    reply = "That sounds painful. If you can't get up, call 999 straight away."
+
+    assert says_999(reply)
+    assert with_letter_emergency_number(reply, "555-555-0199") == (
+        "That sounds painful. If you can't get up, call 555-555-0199 straight away."
+    )
+    # No number in the letter: 999 stays.
+    assert with_letter_emergency_number(reply, None) == reply
+    # A number that only contains 999 is left alone.
+    assert not says_999("Call the ward on 0999 123 456 or 555-999-0000.")
+
+
+@pytest.mark.parametrize("message", ["I feel in the bathroom", "I feel on the floor", "I feel down the stairs"])
+def test_i_feel_in_the_bathroom_is_heard_as_a_fall(message):
+    symptom = find_symptom(message)
+
+    assert symptom is not None and "fall" in symptom.groups and symptom.fall
+    assert no_match_reply(symptom, "Margaret").startswith("I'm sorry you've had a fall, Margaret.")
+
+
+@pytest.mark.parametrize("message", ["I feel down", "I feel in pain"])
+def test_other_feelings_are_not_a_fall(message):
+    symptom = find_symptom(message)
+
+    assert symptom is None or "fall" not in symptom.groups

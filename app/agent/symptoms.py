@@ -18,6 +18,10 @@ from dataclasses import dataclass
 from typing import Any
 
 
+# "I fell in the bathroom", misheard as "I feel in the bathroom": a fall, never a feeling.
+_MISHEARD_FALL = (r"feel (in the (bathroom|kitchen|garden|shower|bath|toilet|hall|bedroom|street)|"
+                  r"on the (floor|stairs|ground)|down the stairs|off the \w+)")
+
 # What she feels. A sign in the letter and a message "match" when they share one of these.
 _SYMPTOMS = {
     "pain": r"\b(pain(?!\s?(relief|killers?|medication|medicines?|tablets?))|painful|hurts?|hurting|aches?|aching|"
@@ -32,7 +36,7 @@ _SYMPTOMS = {
                   r"trouble breathing|struggling to breathe|wheez\w*)\b",
     "dizzy": r"\b(dizz\w*|faint\w*|light.?headed|passed out|blacked out)\b",
     "sick": r"\b(feel(ing)? sick|been sick|being sick|was sick|vomit\w*|throwing up|threw up|nause\w*)\b",
-    "fall": r"\b(fell|fallen|had a fall|have had a fall|tripped over|collapsed)\b",
+    "fall": rf"\b(fell|fallen|had a fall|have had a fall|tripped over|collapsed|{_MISHEARD_FALL})\b",
     "unwell": r"\b(unwell|poorly|feel(ing)? (awful|terrible|ill|rough|weak|worse|strange|funny)|"
               r"(don'?t|not) feel(ing)? (well|right|good))\b",
     "function": r"\b(can(?:'?t|not) (move|feel|walk|stand|bend|sleep|put (any )?weight|stop)|numb\w*|tingl\w*)\b",
@@ -68,6 +72,8 @@ _BETTER = re.compile(r"^[^.?!,;]{0,24}\b(gone|better|fine|eased|easing|improved|
 _PERSISTS = re.compile(r"\b(not|isn'?t|won'?t|doesn'?t|hasn'?t) (going away|go away|gone away|stop\w*|eas\w*|settl\w*|improv\w*|help\w*|work\w*|control\w*)\b")
 # "I took my tablets for the pain" is a report, not a new symptom.
 _PURPOSE = re.compile(r"\bfor (the |my |her )?(\w+ )?pain\b")
+_MENTIONS_FALL = re.compile(rf"\b(fell|fallen|a fall|{_MISHEARD_FALL})\b")
+_999 = re.compile(r"(?<![\d-])999(?![\d-])")
 
 NO_MATCH_TEMPLATE = (
     "{sorry}. Your letter doesn't mention this, and I can't give medical advice. "
@@ -81,6 +87,8 @@ class Symptom:
     parts: frozenset[str]
     # Her own word for where it hurts ("head"), for the fixed sentence.
     part_word: str | None = None
+    # She says she fell ("fell", "fallen", "a fall"): the reply opens about the fall.
+    fall: bool = False
 
 
 def _plain(text: str) -> str:
@@ -125,7 +133,7 @@ def find_symptom(message: str, is_report: bool = False) -> Symptom | None:
     if not groups:
         return None
 
-    return Symptom(frozenset(groups), frozenset(parts), part_word)
+    return Symptom(frozenset(groups), frozenset(parts), part_word, bool(_MENTIONS_FALL.search(plain)))
 
 
 def _sign_matches(symptom: Symptom, text: str) -> int:
@@ -266,12 +274,30 @@ def with_emergency_line(source: dict[str, Any] | None, contact: dict[str, Any] |
     return {**source, "related": [*(source.get("related") or []), card]}
 
 
+def says_999(text: str) -> bool:
+    return bool(_999.search(text or ""))
+
+
+def with_letter_emergency_number(text: str, number: str | None) -> str:
+    """A model reply's "999" as the emergency number her letter gives; unchanged if it gives none."""
+
+    return _999.sub(number, text) if number else text
+
+
 def _call_emergency(number: str | None) -> str:
     return f"call {number}" if number else "call 999"
 
 
-def warning_sign_reply(sign: dict[str, Any], first_name: str | None, number: str | None = None) -> str:
-    reply = f"I'm sorry to hear that{_who(first_name)}. Your letter says: {sign_wording(sign)}"
+def _sorry(first_name: str | None, fall: bool) -> str:
+    """The reply's opening: about the fall if she fell, else a plain "sorry to hear that"."""
+
+    return f"I'm sorry you've had a fall{_who(first_name)}" if fall else f"I'm sorry to hear that{_who(first_name)}"
+
+
+def warning_sign_reply(
+    sign: dict[str, Any], first_name: str | None, number: str | None = None, fall: bool = False,
+) -> str:
+    reply = f"{_sorry(first_name, fall)}. Your letter says: {sign_wording(sign)}"
 
     if number and sign.get("urgency") == "emergency" and number not in reply:
         reply += f" The emergency number in your letter is {number}."
@@ -279,9 +305,11 @@ def warning_sign_reply(sign: dict[str, Any], first_name: str | None, number: str
     return reply
 
 
-def letter_sentence_reply(sentence: str, first_name: str | None, number: str | None = None) -> str:
+def letter_sentence_reply(
+    sentence: str, first_name: str | None, number: str | None = None, fall: bool = False,
+) -> str:
     return (
-        f"I'm sorry to hear that{_who(first_name)}. Your letter says: {_quote(sentence)} "
+        f"{_sorry(first_name, fall)}. Your letter says: {_quote(sentence)} "
         f"I can't give medical advice. If it's severe or sudden, {_call_emergency(number)}. "
         "Otherwise, please call NHS 111 or your care team."
     )
@@ -290,10 +318,10 @@ def letter_sentence_reply(sentence: str, first_name: str | None, number: str | N
 def no_match_reply(symptom: Symptom, first_name: str | None, number: str | None = None) -> str:
     """The fixed sentence when the letter says nothing about this symptom."""
 
-    if "pain" in symptom.groups and symptom.part_word:
+    if "pain" in symptom.groups and symptom.part_word and not symptom.fall:
         sorry = f"I'm sorry your {symptom.part_word} hurts{_who(first_name)}"
     else:
-        sorry = f"I'm sorry you're not feeling well{_who(first_name)}"
+        sorry = _sorry(first_name, symptom.fall)
 
     reply = NO_MATCH_TEMPLATE.format(sorry=sorry)
 
