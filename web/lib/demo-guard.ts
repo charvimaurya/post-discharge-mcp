@@ -2,7 +2,7 @@ import 'server-only';
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { bridgeHeaders } from './bridge';
-import { productionRuntime } from './runtime-config';
+import { localDemoLimitsDisabled, productionRuntime } from './runtime-config';
 import { clientAddress, demoCounters, demoIdentity, memoryCounters, type DemoAction } from './demo-limits';
 
 import { distributedConsume } from './demo-counter-store';
@@ -28,7 +28,7 @@ export async function withDemoLimits(request: Request, action: DemoAction, handl
       const client = DynamoDBDocumentClient.from(new DynamoDBClient({ region: process.env.AFTERWARD_AWS_REGION || process.env.AWS_REGION, maxAttempts: 2 }));
       allowed = await distributedConsume(rules, table,
         command => client.send(command, { abortSignal: AbortSignal.timeout(5000) }));
-    } else allowed = await local(rules, now);
+    } else allowed = localDemoLimitsDisabled(process.env) || await local(rules, now);
   } catch {
     return Response.json({ error: 'Demo protection is unavailable. Please try again later.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } });
   }

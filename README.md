@@ -343,6 +343,26 @@ See the [S5 implementation report](docs/s5-implementation-report.md) for tests,
 evidence and limitations. Local captions can say **8 tools, 2 prompts**; deployed
 capability must be verified separately.
 
+### Weekly history in the web demo
+
+Open `/demo`, then **Open today's plan**. The **This week** strip sits beneath
+Today's task list and shows seven patient-local days. It loads through
+`/api/week-summary` → the authenticated bridge → `get_week_summary`, using the
+same server-resolved patient as other MCP calls. Restart the local bridge after
+updating it so `/week-summary` is available; the MCP server must expose the eighth
+tool. Existing hosted MCP deployments must be checked separately.
+
+The strip refreshes after a recorded action or reset and has a **Refresh** button.
+It does not scan event history on every five-second Today poll. Missing historical
+schedule/completion evidence is **Unknown**, never automatically missed. Today
+uses the current medication occurrence reader, so recording every scheduled
+morning dose updates today's indicator, and undoing one removes that confirmation.
+The current schedule is never projected onto earlier dates. Historical days still
+need saved schedule evidence; this implementation does not create that history.
+Only explicit synthetic provenance displays **Synthetic demo history**. No history is
+seeded by opening this page. Browser rendering and refresh were verified with
+mocked API responses; this is not a live DynamoDB adherence verification.
+
 ## Built with, and where to find it
 
 | Technology | Location |

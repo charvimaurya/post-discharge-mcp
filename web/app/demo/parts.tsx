@@ -198,7 +198,7 @@ export function TodayPanel(props: {
   dayAtHome: number | null; firstName?: string | null; compact?: boolean; busy?: boolean; onDone?: (i: PlanItem) => void;
   empty?: boolean; onStart?: () => void;
   help?: HelpAction[] | null; helpCompact?: boolean; onDismissHelp?: () => void;
-  focus?: string[]; hint?: string | null;
+  focus?: string[]; hint?: string | null; weekly?: ReactNode;
 }) {
   const { items, justDone } = props;
   const focus = new Set(props.focus || []);
@@ -247,6 +247,7 @@ export function TodayPanel(props: {
       {props.onStart && <button type="button" className="back" onClick={props.onStart}>Back to start</button>}
     </>}
     </div>
+    {props.weekly}
   </div>;
 }
 

@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from app.clock import get_patient_datetime
 from app.database.event_history import get_complete_patient_events
-from app.database.recovery_state import get_recovery_state
+from app.database.recovery_state import get_medications, get_recovery_state
 from app.mcp.results import error_result, success_result
 from app.mcp.tools.recovery import get_today_tasks_for_context
 
@@ -118,6 +118,43 @@ def calculate_week(events, patient_id, timezone, now):
             and all(e.get("synthetic") is True for e in relevant), "days": days}
 
 
+def apply_current_morning(week, medications):
+    """Use the authoritative occurrence reader for today, never for past dates.
+
+    That reader excludes withdrawn/ended doses and rebuilds completion, including
+    undo, from saved events. A current plan is not evidence of a past schedule.
+    """
+    day = week["days"][-1]
+    # Preserve explicit historical evidence, including conflicts, when present.
+    if day["reason"] != "missing_schedule_evidence":
+        return
+    scheduled = [item for item in medications if not item.get("as_needed")]
+    labels = [str(item.get("time_of_day_label") or "").strip().lower() for item in scheduled]
+    if any(label not in {"morning", "midday", "afternoon", "evening", "night", "bedtime"}
+           for label in labels):
+        day["reason"] = "incomplete_current_schedule"
+        return
+    morning = [item for item, label in zip(scheduled, labels) if label == "morning"]
+    # Reject malformed, duplicate or cross-date occurrences rather than guessing.
+    ids = [item.get("occurrence_id") for item in morning]
+    if (any(not isinstance(key, str) or key.rsplit("#", 2)[-2:-1] != [day["date"]] for key in ids)
+            or len(set(ids)) != len(ids)):
+        day["reason"] = "incomplete_current_schedule"
+        return
+    taken = sum(item.get("status") == "completed" and bool(item.get("completed_at")) for item in morning)
+    day.update(schedule_evidence="current_day_occurrences", scheduled_doses=len(morning),
+               taken_doses=taken, explicitly_missed_doses=0)
+    if not morning:
+        day.update(status="no_scheduled_morning_doses", reason="empty_current_schedule")
+    elif taken == len(morning):
+        day.update(status="completed", reason="all_current_morning_doses_recorded")
+    else:
+        day.update(status="unknown", reason="partial_completion" if taken else "no_completion_evidence")
+    week["completed_days"] = sum(item["status"] == "completed" for item in week["days"])
+    # A current-day read does not establish synthetic provenance.
+    week["synthetic_demo_history"] = False
+
+
 def get_week_summary_for_context(context):
     try:
         state = get_recovery_state(context.patient_id)
@@ -126,6 +163,8 @@ def get_week_summary_for_context(context):
         timezone = state.get("timezone") or "Europe/London"
         now = get_patient_datetime(timezone)
         week = calculate_week(get_complete_patient_events(context.patient_id), context.patient_id, timezone, now)
+        if isinstance(state.get("medications"), list):
+            apply_current_morning(week, get_medications(context.patient_id, week["end_date"]))
         today = get_today_tasks_for_context(context)
         if not today.get("ok") or today["data"]["date"] != week["end_date"]:
             raise ValueError("Today snapshot unavailable")

@@ -241,6 +241,24 @@ async def today(request: Request) -> JSONResponse:
     )
 
 
+async def week_summary(request: Request) -> JSONResponse:
+    """Read the authenticated MCP weekly result; no patient/date comes from the caller."""
+    try:
+        result = get_structured_tool_result(await call_mcp_tool("get_week_summary", {}))
+        if not isinstance(result, dict) or not result.get("ok"):
+            raise ValueError("Weekly tool unavailable")
+        data = result.get("data")
+        if not isinstance(data, dict) or not isinstance(data.get("week"), dict):
+            raise ValueError("Invalid weekly result")
+        return JSONResponse(
+            {key: data.get(key) for key in ("week", "timezone", "as_of")},
+            headers={"Cache-Control": "no-store"},
+        )
+    except Exception as exc:
+        log("week_summary_failed", level="error", error=exc, route="/week-summary")
+        return JSONResponse({"error": "The weekly summary could not be checked."}, status_code=502)
+
+
 async def greeted(request: Request) -> JSONResponse:
     """The page has shown today's greeting (or a reminder, which greets too). Later visits
     today say "Welcome back". Only the demo patient and the patient-local date; nothing from the caller."""
@@ -524,6 +542,7 @@ app = Starlette(
         # The Alexa skill endpoint (app.alexa.skill): checked, then the same turn as /chat.
         Route("/alexa", alexa_endpoint, methods=["POST"]),
         Route("/today", today, methods=["GET"]),
+        Route("/week-summary", week_summary, methods=["GET"]),
         Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
         Route("/reset", reset_demo, methods=["POST"]),

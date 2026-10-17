@@ -588,3 +588,23 @@
 .awapp .turn.aw .points li{margin-bottom:10px;padding-left:4px}
 .awapp .turn.aw .points li::marker{color:#F7B7C6}
 .awapp .turn.aw.past .points{font-size:17px;margin-bottom:20px}
+
+/* Evidence-based weekly history, beneath the scrollable Today plan. */
+.awapp .week-panel{flex-shrink:0;border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
+.awapp .week-toggle{cursor:pointer;font-size:14px;font-weight:600;line-height:1.5;border-radius:4px}
+.awapp .week-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:4px}
+.awapp .week-inline-summary{font-weight:400;color:var(--soft);margin-left:10px}
+.awapp .week-disclosure[open] .week-toggle{margin-bottom:8px}
+.awapp .week-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.awapp .week-heading h3{font-family:var(--serif);font-size:23px;font-weight:600}
+.awapp .week-summary{font-size:14px;font-weight:600;margin:5px 0 8px}
+.awapp .week-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px;list-style:none;padding:0;margin:0 0 7px}
+.awapp .week-day{display:flex;flex-direction:column;align-items:center;border:1px solid var(--line);border-radius:8px;padding:5px 2px;background:var(--alt);color:var(--soft);font-size:12px}
+.awapp .week-day b{font-size:20px;line-height:1.2}
+.awapp .week-day.unknown{background:transparent;border-style:dashed}
+.awapp .week-day.unknown b{font-weight:400;font-size:22px}
+.awapp .week-day.completed{background:var(--blue-pale);color:var(--blue)}
+.awapp .week-day.missed{background:var(--accent-pale);color:var(--accent)}
+.awapp .week-day.is-today{outline:2px solid var(--blue);outline-offset:1px}
+.awapp .week-note{color:var(--soft);font-size:12px;line-height:1.4;margin-top:4px}
+.awapp .week-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

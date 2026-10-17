@@ -4,6 +4,11 @@ export function productionRuntime(env: Environment): boolean {
   return env.NODE_ENV === 'production' || env.AFTERWARD_RUNTIME === 'amplify';
 }
 
+export function localDemoLimitsDisabled(env: Environment): boolean {
+  return env.NODE_ENV === 'development' && !productionRuntime(env)
+    && env.DISABLE_LOCAL_DEMO_LIMITS === 'true';
+}
+
 export function bridgeEndpoint(env: Environment): string {
   const raw = env.AGENT_API_URL || (productionRuntime(env) ? '' : 'http://127.0.0.1:8002');
   let url: URL;
