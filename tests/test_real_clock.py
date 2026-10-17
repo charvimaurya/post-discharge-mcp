@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import ast
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import clock, web_bridge
 from app.database import recovery_state

@@ -1,5 +1,8 @@
 # Lambda deployment
 
+For the separate authenticated web bridge on ECS Fargate port 8002, see
+[bridge deployment](bridge/README.md). That configuration is prepared, not deployed.
+
 Run commands from the project root with the virtual environment active.
 Configuration files are in this directory. The document processor now uses
 AfterWard resource names; see [the migration record](../docs/aws-name-migration.md).
@@ -83,3 +86,5 @@ aws lambda invoke --function-name AfterwardReminderChecker --cli-binary-format r
 `lambda-trust-policy.json` and `redrive-policy.json` retain their existing
 contents for IAM and SQS setup. Their paths changed; no AWS resources were
 modified by the reorganization.
+
+Amplify SSR preparation and least-privilege compute-role policy: [amplify/README.md](amplify/README.md). Deployment is gated on Next.js compatibility and publication controls.

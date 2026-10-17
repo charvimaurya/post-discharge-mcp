@@ -34,19 +34,19 @@ export async function validateUpload(
   bridgeUrl: string,
   request: typeof fetch = fetch,
   requestId?: string,
-  extraHeaders: Record<string, string> = {},
+  authHeaders: Record<string, string> = {},
 ): Promise<UploadValidation> {
   try {
     const response = await request(`${bridgeUrl}/documents/validate`, {
       method: 'POST',
-      headers: { ...extraHeaders, 'Content-Type': 'application/pdf', ...(requestId ? { 'X-Request-ID': requestId } : {}) },
+      headers: { ...authHeaders, 'Content-Type': 'application/pdf', ...(requestId ? { 'X-Request-ID': requestId } : {}) },
       body: new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }), cache: 'no-store',
     });
     const result = await response.json();
     if (response.ok && result.accepted === true) return { accepted: true, status: 200 };
     return {
       accepted: false, status: response.status === 422 ? 422 : 502,
-      error: response.status === 422 ? result.error || wrongDocumentMessage
+      error: response.status === 422 ? wrongDocumentMessage
         : 'Could not check the document. Please try again.',
     };
   } catch {
@@ -60,11 +60,11 @@ export async function clearPreviousHistory(
   bridgeUrl: string,
   request: typeof fetch = fetch,
   requestId?: string,
-  extraHeaders: Record<string, string> = {},
+  authHeaders: Record<string, string> = {},
 ): Promise<boolean> {
   try {
     const response = await request(`${bridgeUrl}/documents/uploaded`, {
-      method: 'POST', headers: { ...extraHeaders, ...(requestId ? { 'X-Request-ID': requestId } : {}) }, cache: 'no-store',
+      method: 'POST', headers: { ...authHeaders, ...(requestId ? { 'X-Request-ID': requestId } : {}) }, cache: 'no-store',
     });
     return response.ok;
   } catch {

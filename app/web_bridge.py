@@ -1,13 +1,12 @@
 """
-Local HTTP bridge between the Next.js server and the Python app.
+Authenticated HTTP bridge between the Next.js server and the Python app.
 
-Only the Next.js server calls this; the browser never does. The
+Only the Next.js server calls this using X-Bridge-Key; the browser never does. The
 patient comes from the server-side demo context, and nothing the
 caller sends can choose the patient, date or time.
 """
 
 import asyncio
-import hmac
 import os
 import re
 import uuid
@@ -18,6 +17,8 @@ from starlette.middleware import Middleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route
+
+from app.auth.bridge_auth import BridgeAuthenticationMiddleware, is_production
 
 from app.agent.evidence import related_appointment_lines
 from app.agent.session import clear_session
@@ -45,6 +46,7 @@ from app.observability.log import (
     Timer, get_request_id, reset_request_id, service_log, set_request_id,
 )
 from lambdas.reminder_checker.handler import handler as reminder_handler
+from app.reminders.engine import pending_is_valid
 
 
 log = service_log("bridge")
@@ -185,20 +187,9 @@ async def chat_message(request: Request) -> JSONResponse:
     def schedule(entry: dict) -> None:
         add_scheduled_checkin(patient.patient_id, entry)
 
-    # Recording when she last spoke (real time, so no check-in interrupts a chat) and
-    # reading her record are independent DynamoDB calls, so they run at the same time.
-    activity, state = await asyncio.gather(
-        asyncio.to_thread(record_chat_activity, patient.patient_id, system_now_utc().isoformat()),
-        asyncio.to_thread(get_recovery_state, patient.patient_id),
-        return_exceptions=True,
-    )
-
-    if isinstance(activity, Exception):
-        log("chat_activity_failed", level="error", error=activity)
-
     try:
-        if isinstance(state, BaseException):
-            raise state
+        # Read first; chat activity is recorded only after a non-crisis result.
+        state = await asyncio.to_thread(get_recovery_state, patient.patient_id)
         state = state or {}
         had_checkin = bool(state.get("pending_checkin"))
 
@@ -215,6 +206,15 @@ async def chat_message(request: Request) -> JSONResponse:
     except Exception as exc:
         log("chat_failed", level="error", error=exc, route="/chat")
         return JSONResponse({"error": CHAT_ERROR}, status_code=502)
+
+    if not result.get("crisis"):
+        # Crisis turns must not write chat metadata or alter a pending reminder.
+        try:
+            await asyncio.to_thread(
+                record_chat_activity, patient.patient_id, system_now_utc().isoformat()
+            )
+        except Exception as exc:
+            log("chat_activity_failed", level="error", error=exc)
 
     # A crisis reply is not an answer to the reminder, so the reminder stays.
     if had_checkin and result.get("completed") and not result.get("crisis"):
@@ -309,7 +309,7 @@ async def today(request: Request) -> JSONResponse:
             "discharge_date": state.get("discharge_date"),
             "tasks": tasks,
             "medications": medications,
-            "pending_checkin": state.get("pending_checkin"),
+            "pending_checkin": state.get("pending_checkin") if pending_is_valid(state.get("pending_checkin") or {}, tasks, medications, now) else None,
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -332,11 +332,18 @@ async def greeted(request: Request) -> JSONResponse:
 
 async def validate_document(request: Request) -> JSONResponse:
     """Read the PDF before the upload route sends it to S3 or changes a plan."""
-    data = await request.body()
+    chunks = []
+    size = 0
+    async for chunk in request.stream():
+        size += len(chunk)
+        if size > 4 * 1024 * 1024:
+            return JSONResponse({"error": "PDF must be smaller than 4 MiB."}, status_code=413)
+        chunks.append(chunk)
+    data = b"".join(chunks)
     if not data or b"%PDF-" not in data[:1024]:
         return JSONResponse({"error": WRONG_DOCUMENT_MESSAGE}, status_code=422)
     try:
-        pages = await asyncio.to_thread(extract_pdf_text, data)
+        pages = await asyncio.to_thread(extract_pdf_text, data, max_pages=20, max_text_chars=200_000)
         text = "\n".join(page.get("text") or "" for page in pages)
         validate_discharge_document(text)
     except WrongDocumentError:
@@ -376,9 +383,7 @@ async def document_uploaded(request: Request) -> JSONResponse:
     return JSONResponse({"deleted": deleted}, headers={"Cache-Control": "no-store"})
 
 
-# The "Reset demo" button on /demo. The web server sends BRIDGE_KEY as
-# X-AfterWard-Key; this route refuses without it, and in production.
-BRIDGE_KEY_HEADER = "x-afterward-key"
+# The Reset demo route is protected by BridgeAuthenticationMiddleware.
 RESET_ERROR = "Could not reset the demo. Please try again."
 
 
@@ -390,14 +395,6 @@ async def reset_demo(request: Request) -> JSONResponse:
     any pending check-in. The patient is fixed on the server; the body may
     only carry the session_id whose chat memory is cleared.
     """
-
-    expected = os.getenv("BRIDGE_KEY", "")
-    if not expected:
-        return JSONResponse({"error": "Reset is not set up: BRIDGE_KEY is missing."}, status_code=503)
-
-    given = request.headers.get(BRIDGE_KEY_HEADER, "")
-    if not hmac.compare_digest(given.encode(), expected.encode()):
-        return JSONResponse({"error": "Not allowed."}, status_code=401)
 
     if not allows_test_hooks():
         return JSONResponse({"error": "Reset is not available in production."}, status_code=403)
@@ -508,7 +505,7 @@ async def reminder_loop(interval: float) -> None:
 async def lifespan(app: Starlette):
     task = None
 
-    if os.getenv("LOCAL_REMINDER_LOOP") == "1":
+    if os.getenv("LOCAL_REMINDER_LOOP") == "1" and not is_production():
         interval = _reminder_loop_seconds()
         log("local_reminder_loop_on", ms=int(interval * 1000))
         task = asyncio.create_task(reminder_loop(interval))
@@ -566,8 +563,14 @@ class RequestLogMiddleware:
             reset_request_id(token)
 
 
+async def bridge_health(request: Request) -> JSONResponse:
+    """Public liveness only: no AWS calls or configuration/credential details."""
+    return JSONResponse({"status": "ok"}, headers={"Cache-Control": "no-store"})
+
+
 app = Starlette(
     routes=[
+        Route("/bridge/health", bridge_health, methods=["GET"]),
         Route("/documents/validate", validate_document, methods=["POST"]),
         Route("/documents/uploaded", document_uploaded, methods=["POST"]),
         Route("/chat", chat_message, methods=["POST"]),
@@ -577,5 +580,5 @@ app = Starlette(
         Route("/reset", reset_demo, methods=["POST"]),
     ],
     lifespan=lifespan,
-    middleware=[Middleware(RequestLogMiddleware)],
+    middleware=[Middleware(RequestLogMiddleware), Middleware(BridgeAuthenticationMiddleware)],
 )

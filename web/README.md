@@ -10,7 +10,14 @@ npm run dev
 ```
 
 Open http://localhost:3000. Choose `../test_data/doc_001.pdf` and click Upload.
-Node.js 22.18+ is recommended (the test command uses native TypeScript support).
+Use Node.js 24 (see `.nvmrc`; tests use native TypeScript support).
+
+Start the Python bridge with `python scripts/run_web_bridge.py` from the root
+and run the MCP server as described in the root README. Set a matching private
+`BRIDGE_KEY` in root `.env` and `web/.env.local`; blank keys now fail closed.
+The API routes send it to the bridge server-side. `AGENT_API_URL` defaults to
+`http://127.0.0.1:8002`. Use a distinct cloud key for deployment; never prefix
+the key with `NEXT_PUBLIC_`. See [bridge deployment](../deployment/bridge/README.md).
 
 The server uses your normal AWS credential chain (for example ~/.aws/credentials
 or AWS_PROFILE). No access keys belong in browser code. Configuration is in
@@ -28,7 +35,8 @@ processing in AWS may continue. A failed status or request produces an error.
 
 Use one upload at a time: this test patient has one current RecoveryState, so
 concurrent uploads from multiple tabs can replace each other's results.
-This is a local tool bound to 127.0.0.1, with no authentication.
+This is a local tool bound to 127.0.0.1, with no visitor authentication.
+Bridge service authentication does not isolate visitors or authorize public UI use.
 
 Files:
 - app/page.tsx: upload form, status, and recovery plan display.
@@ -45,3 +53,11 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+AWS Amplify SSR configuration, compute-role policy, compatibility blocker and
+publication gates: [deployment guide](../deployment/amplify/README.md).
+
+Public API routes enforce demo quotas. Local counters are in memory; cloud
+requires DEMO_LIMIT_TABLE and a verified DEMO_TRUSTED_PROXY_HOPS. Upload attempts
+are limited to three per signed 24-hour session, with a 4 MiB file cap. See
+[the final demo test report](../docs/public-demo-final-test-report.md).

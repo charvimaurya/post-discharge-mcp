@@ -4,7 +4,7 @@ import threading
 import time
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import web_bridge
 

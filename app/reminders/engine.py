@@ -36,6 +36,7 @@ from app.agent.completion_replies import medicine_name, step_phrase
 from app.agent.next_up import build_next_up, build_steps
 from app.agent.occurrence_resolver import item_name, part_of_day
 from app.reminders import config
+from app.medication_safety import medication_withdrawn
 from app.reminders.selector import find_due_reminder
 from app.reminders.text import build_opening_greeting, build_reminder_text
 
@@ -116,7 +117,12 @@ def pending_is_valid(
     """
 
     about = set(pending.get("occurrence_ids") or [pending.get("occurrence_id")]) - {None}
-    items = [o for o in tasks + medications if o.get("occurrence_id") in about]
+    current = tasks + [o for o in medications if not medication_withdrawn(o)]
+    # A referenced dose/task removed from the current plan must not keep an
+    # old (possibly grouped) reminder alive after withdrawal or replacement.
+    if about and not about.issubset({o.get("occurrence_id") for o in current}):
+        return False
+    items = [o for o in current if o.get("occurrence_id") in about]
 
     if items and all(o.get("status") == "completed" for o in items):
         return False
@@ -305,6 +311,7 @@ def _scheduled(
         o["occurrence_id"] for o in tasks + medications
         if o.get("status") == "completed"
     }
+    available = {o.get("occurrence_id") for o in tasks + medications}
     found = []
 
     for entry in state.get("scheduled_checkins") or []:
@@ -314,6 +321,9 @@ def _scheduled(
             continue
 
         if due.astimezone(now.tzinfo).date().isoformat() != today or due > now:
+            continue
+
+        if entry.get("occurrence_id") and entry["occurrence_id"] not in available:
             continue
 
         # Already done since it was scheduled: nothing to ask.
@@ -381,6 +391,7 @@ def choose_checkin(
     and only looks at the next walk-style reminder.
     """
 
+    medications = [dose for dose in medications if not medication_withdrawn(dose)]
     today = now.date().isoformat()
 
     if force_next:

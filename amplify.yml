@@ -1,0 +1,25 @@
+version: 1
+applications:
+  - appRoot: web
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm install 24
+            - nvm use 24
+            - npm ci --cache .npm
+            - npm run check:amplify
+        build:
+          commands:
+            - node scripts/write-ssr-env.mjs
+            - npm test
+            - npm run typecheck
+            - npm run build
+      artifacts:
+        baseDirectory: .next
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - .npm/**/*
+          - .next/cache/**/*

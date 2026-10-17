@@ -1,4 +1,4 @@
-"""POST /reset: the "Reset demo" button. Protected by X-AfterWard-Key; demo patient only."""
+"""POST /reset: the "Reset demo" button. Protected by X-Bridge-Key; demo patient only."""
 
 import pytest
 from starlette.testclient import TestClient
@@ -6,7 +6,7 @@ from starlette.testclient import TestClient
 from app import demo_reset, web_bridge
 
 
-KEY = "test-bridge-key"
+KEY = "test-bridge-key-for-reset-tests-only"
 COUNTS = {"events_deleted": 3, "tasks_reset": 5, "medications_reset": 4}
 
 
@@ -26,7 +26,7 @@ def calls(monkeypatch):
 
 
 def post(body=None, key=KEY):
-    headers = {"X-AfterWard-Key": key} if key is not None else {}
+    headers = {"X-Bridge-Key": key} if key is not None else {}
     return TestClient(web_bridge.app).post("/reset", json=body, headers=headers)
 
 
@@ -98,7 +98,8 @@ def test_a_failed_reset_reports_failure_without_details(calls, monkeypatch):
 
 
 def test_reset_is_post_only():
-    assert TestClient(web_bridge.app).get("/reset").status_code == 405
+    from tests.bridge_client import BridgeClient
+    assert BridgeClient(web_bridge.app).get("/reset").status_code == 405
 
 
 def test_shared_reset_clears_the_pending_checkin_and_keeps_the_plan(monkeypatch):

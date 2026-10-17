@@ -8,6 +8,7 @@ import boto3
 from botocore.exceptions import ClientError
 
 from app import config
+from app.medication_safety import medication_withdrawn
 from app.clock import DEFAULT_TIMEZONE, get_current_date, get_current_datetime
 from app.database.event_history import (
     append_event,
@@ -358,7 +359,7 @@ def get_medications(
     ):
 
         # Not listed after the end the letter gives ("Stop after 5 days").
-        if _has_ended(medication, state, date):
+        if medication_withdrawn(medication) or _has_ended(medication, state, date):
             continue
 
         time_of_day = (

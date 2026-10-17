@@ -5,6 +5,7 @@ from functools import lru_cache
 import boto3
 
 from app import config
+from app.auth.bridge_auth import is_production
 
 
 @lru_cache(maxsize=1)
@@ -14,10 +15,14 @@ def get_mcp_auth_token() -> str:
 
     Local development sets MCP_AUTH_TOKEN directly. Deployments
     set MCP_AUTH_TOKEN_SECRET_ARN and the token is read once from
-    Secrets Manager. MCP_AUTH_TOKEN wins when both are set.
+    Secrets Manager. Local development prefers MCP_AUTH_TOKEN;
+    production/ECS requires the secret ARN and ignores a plain token.
     """
 
-    if config.MCP_AUTH_TOKEN.strip():
+    if is_production() and not config.MCP_AUTH_TOKEN_SECRET_ARN.strip():
+        raise ValueError("Production MCP credentials require MCP_AUTH_TOKEN_SECRET_ARN")
+
+    if not is_production() and config.MCP_AUTH_TOKEN.strip():
         return config.MCP_AUTH_TOKEN.strip()
 
     if config.MCP_AUTH_TOKEN_SECRET_ARN.strip():

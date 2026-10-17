@@ -1,7 +1,7 @@
 """POST /reminders/check on the web bridge, with the reminder handler replaced by a fake."""
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import web_bridge
 

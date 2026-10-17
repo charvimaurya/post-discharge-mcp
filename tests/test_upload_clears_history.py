@@ -1,7 +1,7 @@
 """A newly uploaded discharge letter deletes what was recorded against the previous one."""
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import web_bridge
 from app.database import event_history

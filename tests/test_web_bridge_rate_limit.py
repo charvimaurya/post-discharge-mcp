@@ -1,7 +1,7 @@
 """Demo chat limits: 30 messages per session and 100 per visitor IP in any hour."""
 
 import pytest
-from starlette.testclient import TestClient
+from tests.bridge_client import BridgeClient as TestClient
 
 from app import web_bridge
 
