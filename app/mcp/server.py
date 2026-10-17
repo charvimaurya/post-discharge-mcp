@@ -40,26 +40,18 @@ mcp = MCPServer(
 )
 
 
-# MCP Apps: hosts that support it draw this page next to a get_today_tasks
-# result. The tool links to it through _meta.ui.resourceUri; what the tool
-# returns is unchanged.
-TODAY_UI_URI = "ui://afterward/today.html"
-MCP_APP_MIME = "text/html;profile=mcp-app"
-TODAY_UI_FILE = Path(__file__).parent / "ui" / "today.html"
+log = service_log("mcp")
 
 
 @mcp.resource(
-    TODAY_UI_URI,
-    name="today",
-    title="Today",
-    description="The patient's Today card, drawn from the get_today_tasks result.",
-    mime_type=MCP_APP_MIME,
+    "ui://afterward/today.html",
+    name="afterward_today",
+    description="AfterWard Today card showing task progress from get_today_tasks.",
+    mime_type="text/html;profile=mcp-app",
+    meta={"ui": {"csp": {"connectDomains": [], "resourceDomains": []}, "prefersBorder": False}},
 )
-def today_ui() -> str:
-    return TODAY_UI_FILE.read_text(encoding="utf-8")
-
-
-log = service_log("mcp")
+def today_card() -> str:
+    return (Path(__file__).parent / "ui" / "today.html").read_text(encoding="utf-8")
 
 
 @mcp.prompt(
@@ -172,6 +164,7 @@ async def get_recovery_plan() -> dict:
 
 @mcp.tool(
     name="get_today_tasks",
+    meta={"ui": {"resourceUri": "ui://afterward/today.html"}},
     description=(
         "Get the patient's current recovery tasks for today. "
         "Today is determined by the server; do not pass a date. "
@@ -186,7 +179,6 @@ async def get_recovery_plan() -> dict:
     annotations=ToolAnnotations(
         read_only_hint=True,
     ),
-    meta={"ui": {"resourceUri": TODAY_UI_URI}},
 )
 @logged_tool("read")
 async def get_today_tasks() -> dict:
