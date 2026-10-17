@@ -36,8 +36,9 @@ def test_the_emergency_sign_reply_says_the_letters_number():
         "I'm sorry to hear that, Margaret. Your letter says: Call emergency services straight away "
         "if you have chest pain or sudden shortness of breath. The emergency number in your letter is 555-555-0199."
     )
-    # Not for a sign that says to call the ward.
-    assert "555" not in warning_sign_reply(WARD, "Margaret", "555-555-0199")
+    # A sign that says to call the ward still gives the letter's emergency number, in the same reply.
+    assert warning_sign_reply(WARD, "Margaret", "555-555-0199").endswith(
+        "The emergency number in your letter is 555-555-0199.")
     # No number in the letter: the reply is as before.
     assert "emergency number" not in warning_sign_reply(EMERGENCY, "Margaret", None)
 
@@ -175,3 +176,27 @@ def test_other_feelings_are_not_a_fall(message):
     symptom = find_symptom(message)
 
     assert symptom is None or "fall" not in symptom.groups
+
+
+@pytest.mark.parametrize("reply", [
+    "Please call the number I gave you straight away.",
+    "Please call the number I just gave you straight away.",
+    "Please call the emergency number I've just given you straight away.",
+])
+def test_the_number_i_gave_you_becomes_the_number(reply):
+    from app.agent.symptoms import needs_letter_number, with_letter_emergency_number
+
+    assert needs_letter_number(reply)
+    fixed = with_letter_emergency_number(reply, "555-555-0199")
+    assert fixed == "Please call 555-555-0199 straight away."
+    assert "gave you" not in with_letter_emergency_number(reply, None)
+
+
+def test_a_free_reply_about_an_emergency_gets_the_letters_number():
+    from app.agent.symptoms import with_letter_emergency_number
+
+    reply = "If it gets worse, treat it as an emergency."
+
+    assert with_letter_emergency_number(reply, "555-555-0199") == (
+        f"{reply} The emergency number in your letter is 555-555-0199."
+    )

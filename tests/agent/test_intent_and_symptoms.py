@@ -418,3 +418,18 @@ def test_the_fall_opening_keeps_the_rest_of_a_letter_reply():
         "Otherwise, please call NHS 111 or your care team."
     )
     assert warning_sign_reply({"text": "Chest pain"}, "Margaret").startswith("I'm sorry to hear that, Margaret.")
+
+
+EMERGENCY_PAGE = [{"text": "Call emergency services straight away if you have chest pain.\n"
+                           "Emergency services number: 555-555-0199 (fictional number)",
+                   "page": 2, "chunk_id": "c9", "document_id": "doc"}]
+
+
+@pytest.mark.parametrize("message", ["I'm not well", "my calf is swollen", "I fell in the bathroom"])
+def test_every_unwell_reply_says_the_letters_emergency_number(agent, message):
+    agent.letter = EMERGENCY_PAGE
+
+    reply = agent.say(message)["response"]
+
+    assert "555-555-0199" in reply
+    assert "gave you" not in reply and "999" not in reply

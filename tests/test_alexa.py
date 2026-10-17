@@ -323,3 +323,45 @@ def test_an_old_request_is_refused_by_the_timestamp_check(alexa, monkeypatch):
     monkeypatch.setenv("ALEXA_VERIFY_TIMESTAMP", "true")
 
     assert alexa.send({"type": "LaunchRequest"}).status_code == 400
+
+
+def test_i_am_back_from_my_walk_is_in_the_back_from_intent():
+    model = json.load(open("skill-package/interactionModels/custom/en-GB.json", encoding="utf-8"))
+    samples = {intent["name"]: intent["samples"] for intent in model["interactionModel"]["languageModel"]["intents"]}
+
+    assert {"I am back from {query}", "I've got back from {query}"} <= set(samples["BackFromIntent"])
+
+
+def test_i_am_back_from_my_walk_sends_the_whole_sentence(alexa):
+    alexa.send(_intent("BackFromIntent", query="my walk"))
+
+    assert alexa.turns[0][0] == "I'm back from my walk"
+
+
+@pytest.mark.parametrize("intent, sample, slots, message", [
+    ("UnwellHavingIntent", "I am having {query}", {"query": "chest pain"}, "I'm having chest pain"),
+    ("UnwellFeelingIntent", "I am feeling {query}", {"query": "dizzy"}, "I'm feeling dizzy"),
+    ("InPainIntent", "I am in pain", {}, "I'm in pain"),
+    ("NotWellIntent", "I am not well", {}, "I'm not well"),
+    ("BreathlessIntent", "I am short of breath", {}, "I'm short of breath"),
+])
+def test_the_long_form_of_an_unwell_phrase_is_on_the_same_intent_with_no_reprompt(alexa, intent, sample, slots, message):
+    model = json.load(open("skill-package/interactionModels/custom/en-GB.json", encoding="utf-8"))
+    samples = {i["name"]: i["samples"] for i in model["interactionModel"]["languageModel"]["intents"]}
+    assert sample in samples[intent]
+
+    _, reprompt, ends = alexa.speech(alexa.send(_intent(intent, **slots)))
+
+    assert alexa.turns[0][0] == message and reprompt is None and ends is False
+
+
+def test_every_contraction_sample_has_its_long_form():
+    model = json.load(open("skill-package/interactionModels/custom/en-GB.json", encoding="utf-8"))
+    long = {"i'm": "i am", "i've": "i have", "i'll": "i will", "it's": "it is",
+            "there's": "there is", "what's": "what is", "i'd": "i would"}
+    samples = {s.lower() for i in model["interactionModel"]["languageModel"]["intents"] for s in i["samples"]}
+
+    for sample in samples:
+        first, _, rest = sample.partition(" ")
+        if first in long:
+            assert f"{long[first]} {rest}".strip() in samples, sample

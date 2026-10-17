@@ -242,3 +242,58 @@ def test_no_reply_starts_with_a_dash_or_says_let_me_record(chat):
         reply = chat.say(message, asked=asked)[0]["response"]
         assert not reply.startswith(("—", "–", "-"))
         assert "let me record" not in reply.lower()
+
+
+# ---------- "I'm back" with nothing after it ----------
+
+WALKS = [
+    {"occurrence_id": f"task_walk#2026-10-23#{n}", "task_id": "task_walk", "title": "Walk", "name": "Walk",
+     "time_of_day_label": label, "occurrence_number": n, "status": "pending"}
+    for n, label in [(1, "morning"), (2, "afternoon")]
+]
+
+
+@pytest.fixture
+def walks(chat, monkeypatch):
+    tasks = [dict(w) for w in WALKS]
+    tool = service.call_mcp_tool
+
+    async def call_tool(name, arguments):
+        if name == "get_today_tasks":
+            chat.calls.append((name, arguments))
+            return SimpleNamespace(structured_content={"ok": True, "data": {"date": "2026-10-23", "tasks": [dict(t) for t in tasks]}},
+                                   is_error=False, content=[])
+        if name == "report_task_completed":
+            chat.calls.append((name, arguments))
+            next(t for t in tasks if t["occurrence_id"] == arguments["occurrence_id"])["status"] = "completed"
+            return SimpleNamespace(structured_content={"ok": True, "data": {"occurrence_id": arguments["occurrence_id"],
+                                   "already_completed": False}}, is_error=False, content=[])
+        return await tool(name, arguments)
+
+    monkeypatch.setattr(service, "call_mcp_tool", call_tool)
+    return chat
+
+
+@pytest.mark.parametrize("message", ["I'm back", "I am back.", "I’m back"])
+def test_im_back_alone_asks_about_the_walk_due_now(walks, message):
+    result, writes = walks.say(message, session="back")
+
+    assert result["response"] == "Welcome back, Margaret. Are you back from your walk?"
+    assert writes == []
+
+
+def test_yes_then_records_the_walk_due_now(walks):
+    clear_session("back-yes")
+    asyncio.run(service.chat("I'm back", "back-yes", first_name="Margaret"))
+    walks.calls.clear()
+    asyncio.run(service.chat("yes", "back-yes", first_name="Margaret"))
+
+    writes = [args["occurrence_id"] for name, args in walks.calls if name == "report_task_completed"]
+    assert writes == ["task_walk#2026-10-23#1"]
+
+
+def test_i_am_back_from_my_walk_records_the_walk(walks):
+    # Alexa's BackFromIntent sends "I am back from my walk" as "I'm back from my walk".
+    result, writes = walks.say("I'm back from my walk", session="back-from")
+
+    assert writes == ["task_walk#2026-10-23#1"]

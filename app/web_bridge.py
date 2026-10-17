@@ -38,6 +38,7 @@ from app.mcp.context import get_demo_patient_context
 from app.observability.log import (
     Timer, get_request_id, reset_request_id, service_log, set_request_id,
 )
+from app.alexa import feed as alexa_feed
 from app.alexa.skill import alexa_endpoint
 from app.turn import TurnFailed, run_turn
 from lambdas.reminder_checker.handler import handler as reminder_handler
@@ -321,6 +322,31 @@ async def reset_demo(request: Request) -> JSONResponse:
     return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 
+async def conversation(request: Request) -> JSONResponse:
+    """
+    The Alexa turns newer than ?after=N, for the /demo screen, and the latest id.
+
+    Off unless ALEXA_FEED_ENABLED=true, and only with the bridge key: it holds her
+    words. With no `after`, no turns, only the latest id. Never logs the words.
+    """
+
+    if not alexa_feed.enabled():
+        return JSONResponse({"error": "The Alexa feed is off."}, status_code=404)
+
+    expected = os.getenv("BRIDGE_KEY", "")
+    given = request.headers.get(BRIDGE_KEY_HEADER, "")
+    if not expected or not hmac.compare_digest(given.encode(), expected.encode()):
+        return JSONResponse({"error": "Not allowed."}, status_code=401)
+
+    try:
+        after = int(request.query_params["after"])
+    except (KeyError, ValueError):
+        after = None
+
+    return JSONResponse(alexa_feed.since(after if after is None or after >= 0 else None),
+                        headers={"Cache-Control": "no-store"})
+
+
 # Local stand-in for the EventBridge schedule: with LOCAL_REMINDER_LOOP=1
 # the bridge runs the same reminder handler every few seconds, so a demo
 # reminder appears without invoking anything by hand.
@@ -472,6 +498,7 @@ app = Starlette(
         Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
         Route("/reset", reset_demo, methods=["POST"]),
+        Route("/conversation", conversation, methods=["GET"]),
     ],
     lifespan=lifespan,
     middleware=[Middleware(RequestLogMiddleware)],

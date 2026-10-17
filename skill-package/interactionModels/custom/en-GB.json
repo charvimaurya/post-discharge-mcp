@@ -13,7 +13,10 @@
           ],
           "samples": [
             "I'm back from {query}",
-            "back from {query}"
+            "back from {query}",
+            "I am back from {query}",
+            "I've got back from {query}",
+            "I have got back from {query}"
           ]
         },
         {
@@ -26,7 +29,8 @@
           ],
           "samples": [
             "I've done {query}",
-            "I've just done {query}"
+            "I've just done {query}",
+            "I have just done {query}"
           ]
         },
         {
@@ -53,7 +57,8 @@
           "samples": [
             "I've finished {query}",
             "I finished {query}",
-            "I've completed {query}"
+            "I've completed {query}",
+            "I have completed {query}"
           ]
         },
         {
@@ -66,6 +71,7 @@
           ],
           "samples": [
             "I've been for {query}",
+            "I have been for {query}",
             "I went for {query}"
           ]
         },
@@ -78,7 +84,8 @@
             }
           ],
           "samples": [
-            "I'm done with {query}"
+            "I'm done with {query}",
+            "I am done with {query}"
           ]
         },
         {
@@ -92,6 +99,7 @@
           "samples": [
             "I've taken {query}",
             "I've just taken {query}",
+            "I have just taken {query}",
             "I took {query}"
           ]
         },
@@ -177,7 +185,8 @@
             }
           ],
           "samples": [
-            "I've just had {query}"
+            "I've just had {query}",
+            "I have just had {query}"
           ]
         },
         {
@@ -201,7 +210,8 @@
             }
           ],
           "samples": [
-            "I've eaten {query}"
+            "I've eaten {query}",
+            "I have eaten {query}"
           ]
         },
         {
@@ -237,7 +247,8 @@
             }
           ],
           "samples": [
-            "I've already {query}"
+            "I've already {query}",
+            "I have already {query}"
           ]
         },
         {
@@ -550,7 +561,8 @@
             }
           ],
           "samples": [
-            "I'm feeling {query}"
+            "I'm feeling {query}",
+            "I am feeling {query}"
           ]
         },
         {
@@ -574,7 +586,8 @@
             }
           ],
           "samples": [
-            "I've got {query}"
+            "I've got {query}",
+            "I have got {query}"
           ]
         },
         {
@@ -610,7 +623,8 @@
             }
           ],
           "samples": [
-            "there's {query}"
+            "there's {query}",
+            "there is {query}"
           ]
         },
         {
@@ -646,7 +660,8 @@
             }
           ],
           "samples": [
-            "I'm worried {query}"
+            "I'm worried {query}",
+            "I am worried {query}"
           ]
         },
         {
@@ -670,7 +685,8 @@
             }
           ],
           "samples": [
-            "I'm having {query}"
+            "I'm having {query}",
+            "I am having {query}"
           ]
         },
         {
@@ -682,7 +698,8 @@
             }
           ],
           "samples": [
-            "I've noticed {query}"
+            "I've noticed {query}",
+            "I have noticed {query}"
           ]
         },
         {
@@ -756,7 +773,8 @@
             }
           ],
           "samples": [
-            "I've had a fall {query}"
+            "I've had a fall {query}",
+            "I have had a fall {query}"
           ]
         },
         {
@@ -772,6 +790,7 @@
           "slots": [],
           "samples": [
             "I'm not well",
+            "I am not well",
             "I don't feel well"
           ]
         },
@@ -779,7 +798,8 @@
           "name": "InPainIntent",
           "slots": [],
           "samples": [
-            "I'm in pain"
+            "I'm in pain",
+            "I am in pain"
           ]
         },
         {
@@ -787,7 +807,9 @@
           "slots": [],
           "samples": [
             "I'm short of breath",
-            "I'm out of breath"
+            "I am short of breath",
+            "I'm out of breath",
+            "I am out of breath"
           ]
         },
         {
@@ -795,6 +817,7 @@
           "slots": [],
           "samples": [
             "what's next",
+            "what is next",
             "what next",
             "what comes next",
             "what do I do now",
@@ -806,10 +829,13 @@
           "slots": [],
           "samples": [
             "what's my plan for today",
+            "what is my plan for today",
             "what is the plan for today",
             "what's left today",
+            "what is left today",
             "what else do I have today",
-            "what's on today"
+            "what's on today",
+            "what is on today"
           ]
         },
         {

@@ -19,8 +19,10 @@ import './afterward.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
 import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str,
-  type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
+  type ChatReply, type HelpAction, type PlanItem, type PlanSummary, type Source, type Today, type ToolCall } from '../../lib/assistant-data';
 import { startReminderChecks } from '../../lib/reminder-check';
+import { feedBubbles, feedReply, speakable, startAlexaFeed } from '../../lib/alexa-feed';
+import { replyView } from '../../lib/reply-view';
 import { canListen, finishListening, listenOnce, speak } from '../../lib/voice';
 import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
 import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPanel, ToolPanel, TopBar, VoicePanel, type Turn } from './parts';
@@ -108,6 +110,9 @@ export default function DemoPage() {
   const openingGreetingShown = useRef(false);
   const todayRef = useRef(today);
   todayRef.current = today;
+  // The conversation as last drawn: the Alexa feed checks the latest message before adding a greeting.
+  const turnsRef = useRef(turns);
+  turnsRef.current = turns;
 
   useEffect(() => setMicOk(canListen()), []);
 
@@ -259,6 +264,66 @@ export default function DemoPage() {
   }
 
   // ---------- Talking to AfterWard ----------
+  // One reply on screen: the same for the web chat and for a reply via Alexa (letter excerpt,
+  // "Feeling unwell?" card, chips, ticks). Only a web reply is spoken (lib/reply-view.ts).
+  // before: the items already done before she spoke, to find what this reply saved.
+  const showReply = useCallback(async (reply: ChatReply, before: Set<string>, via?: 'alexa') => {
+    const view = replyView(reply, via);
+    setCalls(c => [...c, ...reply.tools]);
+    setRequestId(reply.requestId);
+    setSource(view.source);
+    if (view.help) { setHelp(view.help); setHelpCompact(false); } else setHelpCompact(true);
+    setChips(view.chips);
+    // After the first reply to a reminder the header says "spoke first"; after that, just "AfterWard".
+    setHead(h => (h.startsWith('AfterWard speaks first') ? h.replace('speaks', 'spoke') : 'AfterWard'));
+    // The answer is shown and spoken at once. Refreshing the plan (ticks, highlights, the
+    // "Saved" chip) follows alongside, instead of holding the answer back for it.
+    setTurns(t => [...t, view.turn]);
+    const speaking = view.speak ? say(reply.text) : Promise.resolve();
+    // Over the demo limit nothing changed, so Today is not reloaded (that would call MCP tools).
+    if (reply.rateLimited) { await speaking; return; }
+    const after = await loadToday();
+    const named = after ? itemsMentioned(reply.text, after.items) : [];
+    setFocus(named);
+    // Only for an answer that names no item, quotes no letter and is not about a symptom.
+    setNextHint(after && !named.length && !reply.source && !reply.help && !reply.saved
+      ? after.items.find(i => !i.done)?.id || null : null);
+    // Only claim a save when a report_* tool really succeeded in this reply.
+    const newlyDone = reply.saved ? after?.items.find(i => i.done && !before.has(i.id)) || null : null;
+    setJustDone(newlyDone);
+    if (newlyDone) {
+      setChips([{ kind: 'ok', icon: 'check', text: `Saved to your plan${newlyDone.doneAt ? ` at ${localTime(newlyDone.doneAt)}` : ''}` }, ...view.chips]);
+    }
+    await speaking;
+  }, [say, loadToday]);
+
+  // What she says to the Echo, and the reply, shown in the chat panel as "via Alexa" (every 2 seconds,
+  // only turns after the page opened, paused while the tab is hidden). The left panel and the help
+  // card react as for a web reply, but nothing is spoken here. Off or failing: nothing is shown.
+  useEffect(() => {
+    if (view !== 'today') return;
+    return startAlexaFeed({
+      fetchFeed: async after => {
+        const response = await fetch(`/api/conversation${after === null ? '' : `?after=${after}`}`, { cache: 'no-store' });
+        if (!response.ok) throw new Error('No Alexa feed.');
+        return response.json();
+      },
+      onEntries: entries => {
+        let latest: Turn | undefined = turnsRef.current[turnsRef.current.length - 1];
+        for (const entry of entries) {
+          const show = feedBubbles(entry, latest);
+          if (!show.said && !show.reply) continue;
+          const before = new Set(todayRef.current.items.filter(i => i.done).map(i => i.id));
+          setChips([]); setJustDone(null); setReminderNote(false);
+          if (show.said) setTurns(t => [...t, { who: 'you', text: entry.said, via: 'alexa' }]);
+          void showReply(feedReply(entry), before, 'alexa');
+          latest = { who: 'aw', text: entry.reply, via: 'alexa' };
+        }
+      },
+      page: document,
+    });
+  }, [view, showReply]);
+
   async function send(message: string) {
     if (busy || !message.trim()) return;
     window.speechSynthesis?.cancel();
@@ -272,37 +337,8 @@ export default function DemoPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(str(isObj(data) ? data.error : '') || 'AfterWard could not answer just now.');
-      const reply = readChat(data);
-      setCalls(c => [...c, ...reply.tools]);
-      setRequestId(reply.requestId);
-      setSource(reply.source);
-      if (reply.help) { setHelp(reply.help); setHelpCompact(false); } else setHelpCompact(true);
-      const letterChip = reply.source
-        ? [{ kind: '', icon: 'doc', text: `From your letter${reply.source.page ? `, page ${reply.source.page}` : ''}` }]
-        : [];
-      setChips(letterChip);
-      // After the first reply to a reminder the header says "spoke first"; after that, just "AfterWard".
-      setHead(h => (h.startsWith('AfterWard speaks first') ? h.replace('speaks', 'spoke') : 'AfterWard'));
-      // The answer is shown and spoken at once. Refreshing the plan (ticks, highlights, the
-      // "Saved" chip) follows alongside, instead of holding the answer back for it.
-      setTurns(t => [...t, { who: 'aw', text: reply.text || 'Sorry, I could not answer that.' }]);
       setBusy(false);
-      const speaking = say(reply.text);
-      // Over the demo limit nothing changed, so Today is not reloaded (that would call MCP tools).
-      if (reply.rateLimited) { await speaking; return; }
-      const after = await loadToday();
-      const named = after ? itemsMentioned(reply.text, after.items) : [];
-      setFocus(named);
-      // Only for an answer that names no item, quotes no letter and is not about a symptom.
-      setNextHint(after && !named.length && !reply.source && !reply.help && !reply.saved
-        ? after.items.find(i => !i.done)?.id || null : null);
-      // Only claim a save when a report_* tool really succeeded in this reply.
-      const newlyDone = reply.saved ? after?.items.find(i => i.done && !before.has(i.id)) || null : null;
-      setJustDone(newlyDone);
-      if (newlyDone) {
-        setChips([{ kind: 'ok', icon: 'check', text: `Saved to your plan${newlyDone.doneAt ? ` at ${localTime(newlyDone.doneAt)}` : ''}` }, ...letterChip]);
-      }
-      await speaking;
+      await showReply(readChat(data), before);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'AfterWard could not answer just now.');
       setBusy(false);
@@ -326,7 +362,7 @@ export default function DemoPage() {
       else {
         // Many people will have no screen: say it, and repeat the question still waiting, as Alexa re-prompts.
         setError('I didn’t catch that. Please try again with a few more words, tap an answer, or type.');
-        void say(reprompt(turns));
+        void say(reprompt(turns.filter(speakable)));
       }
     } catch (e) {
       setListening(false);

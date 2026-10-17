@@ -26,6 +26,7 @@ What this does NOT do:
 
 from boto3.dynamodb.conditions import Key
 
+from app.alexa import feed as alexa_feed
 from app.clock import DEFAULT_TIMEZONE, get_current_date, get_current_datetime
 from app.database.event_history import event_table
 from app.database.recovery_state import (
@@ -153,6 +154,8 @@ def reset_demo_patient() -> dict:
     today = get_current_date(state.get("timezone") or DEFAULT_TIMEZONE)
     events_deleted = delete_event_history(PATIENT_ID, today)
     tasks_reset, medications_reset = reset_recovery_state(PATIENT_ID)
+    # The /demo screen's Alexa conversation starts again too.
+    alexa_feed.clear()
 
     return {
         "events_deleted": events_deleted,

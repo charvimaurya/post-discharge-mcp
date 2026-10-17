@@ -17,6 +17,7 @@ from ask_sdk_core.dispatch_components import AbstractExceptionHandler, AbstractR
 from ask_sdk_core.utils import get_slot, is_intent_name, is_request_type
 from ask_sdk_model.ui import PlainTextOutputSpeech, Reprompt, SimpleCard
 
+from app.alexa import feed
 from app.database.recovery_state import get_recovery_state
 from app.mcp.context import get_demo_patient_context
 from app.observability.log import service_log
@@ -34,6 +35,8 @@ REPROMPT = "Anything else?"
 NOT_REACHED = "Sorry, I couldn't reach the assistant. Please try again."
 TOO_SLOW = "Give me a moment, then ask me again."
 CARD_TITLE = "From your discharge letter"
+# What the /demo feed shows she said when she opens the skill.
+LAUNCH_SAID = "Open after ward"
 
 
 def _timeout_seconds() -> float:
@@ -150,8 +153,11 @@ UNWELL = {name for name in [*OPENINGS, *FIXED] if name.startswith("Unwell")} | {
 }
 
 
-def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict | None, bool]:
-    """Run one turn on the bridge's loop and wait for it here: (what to say, the letter source, urgent)."""
+def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict | None, bool, dict]:
+    """
+    Run one turn on the bridge's loop and wait for it here: (what to say, the letter source,
+    urgent, the rest of the turn for the /demo feed: tool_trace, help and crisis, as /chat returns them).
+    """
 
     # Local testing only: ALEXA_ECHO_SENTENCE=true returns the sentence sent to the agent in the
     # response's session attributes. Never logged: logs hold no patient words.
@@ -166,14 +172,17 @@ def _turn(message: str, session_id: str, handler_input=None) -> tuple[str, dict 
         info = REQUEST_INFO.get(None)
         if info is not None:
             info["timed_out"] = True
-        return TOO_SLOW, None, False
+        return TOO_SLOW, None, False, {}
     except TurnFailed as failed:
         log("alexa_turn_failed", level="error", error=failed.__cause__)
-        return NOT_REACHED, None, False
+        return NOT_REACHED, None, False, {}
 
     # "help" is set only on a symptom reply (who to call), "crisis" on the fixed crisis
     # reply: either is urgent, whatever intent matched.
-    return result["response"], result.get("source"), bool(result.get("help") or result.get("crisis"))
+    urgent = bool(result.get("help") or result.get("crisis"))
+    extra = {key: result.get(key) for key in ("tool_trace", "help", "crisis")}
+
+    return result["response"], result.get("source"), urgent, extra
 
 
 def _session_id(handler_input) -> str:
@@ -207,6 +216,17 @@ def _say(handler_input, text: str, reprompt: bool = True, end: bool = False, sou
     return response
 
 
+def _to_feed(
+    said: str, reply: str, source: dict | None = None, extra: dict | None = None, kind: str = "turn",
+) -> None:
+    """
+    The turn, for the /demo screen's Alexa feed (memory only, off by default, never logged),
+    with what the screen shows beside a web reply: the letter passage, the help card, the tool calls.
+    """
+
+    feed.record(said, plain_speech(reply), source=source, kind=kind, **(extra or {}))
+
+
 class LaunchHandler(AbstractRequestHandler):
     """"Open after ward": the waiting reminder if there is one (left for the next turn to clear), else what's next."""
 
@@ -218,11 +238,13 @@ class LaunchHandler(AbstractRequestHandler):
         pending = state.get("pending_checkin") or {}
 
         if pending.get("text"):
+            _to_feed(LAUNCH_SAID, str(pending["text"]), kind="launch")
             return _say(handler_input, str(pending["text"]))
 
         name = state.get("first_name")
         hello = f"Hello, {name}." if name else "Hello."
-        reply, _, urgent = _turn("What is next?", _session_id(handler_input), handler_input)
+        reply, source, urgent, extra = _turn("What is next?", _session_id(handler_input), handler_input)
+        _to_feed(LAUNCH_SAID, f"{hello} {reply}", source, extra, kind="launch")
         return _say(handler_input, f"{hello} {reply}", reprompt=not urgent)
 
 
@@ -238,7 +260,8 @@ class OpeningHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         name = handler_input.request_envelope.request.intent.name
         message = FIXED[name] if name in FIXED else f"{OPENINGS[name]} {_query(handler_input)}".strip()
-        reply, source, urgent = _turn(message, _session_id(handler_input), handler_input)
+        reply, source, urgent, extra = _turn(message, _session_id(handler_input), handler_input)
+        _to_feed(message, reply, source, extra)
         return _say(handler_input, reply, reprompt=name not in UNWELL and not urgent, source=source)
 
 
@@ -251,7 +274,8 @@ class MedicineAnswerHandler(AbstractRequestHandler):
     def handle(self, handler_input):
         medicine = get_slot(handler_input, "medicine")
         message = str(medicine.value or "").strip() if medicine else ""
-        reply, source, urgent = _turn(message or "both", _session_id(handler_input), handler_input)
+        reply, source, urgent, extra = _turn(message or "both", _session_id(handler_input), handler_input)
+        _to_feed(message or "both", reply, source, extra)
         return _say(handler_input, reply, reprompt=not urgent, source=source)
 
 

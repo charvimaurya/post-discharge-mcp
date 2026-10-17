@@ -333,16 +333,18 @@ export function LetterPanel({ source, onBack, help, onDismissHelp, firstName }: 
 
 // ---------- Voice panel (the dark panel on the right) ----------
 
-export type Turn = { who: 'you' | 'aw'; text: string; reminder?: boolean };
+// via: 'alexa' for a turn said to the Echo (lib/alexa-feed.ts): shown, never spoken here.
+export type Turn = { who: 'you' | 'aw'; text: string; reminder?: boolean; via?: 'alexa' };
+const VIA_ALEXA = ' · via Alexa';
 
 const WAVE = [10, 22, 32, 18, 28, 12, 20];
 const RINGS = <div className="ringbox"><svg className="rings" width="520" height="520" viewBox="0 0 520 520" fill="none" stroke="currentColor">
   {[[62, .45], [104, .24], [156, .12]].map(([r, o]) => <circle key={r} cx="260" cy="260" r={r} strokeOpacity={o} strokeWidth="1.5" />)}</svg></div>;
 
 // AfterWard's reply. A long one is shown smaller, one sentence per bullet.
-function AwTurn({ text, past }: { text: string; past: boolean }) {
+function AwTurn({ text, past, alexa }: { text: string; past: boolean; alexa?: boolean }) {
   const points = replyPoints(text);
-  return <div className={`turn aw${past ? ' past' : ''}${text.length > 150 ? ' long' : ''}`}><small>AfterWard</small>
+  return <div className={`turn aw${past ? ' past' : ''}${text.length > 150 ? ' long' : ''}`}><small>AfterWard{alexa && VIA_ALEXA}</small>
     {points.length > 1 ? <ul className="points">{points.map((p, j) => <li key={j}>{p}</li>)}</ul> : <p>{text}</p>}</div>;
 }
 
@@ -356,7 +358,8 @@ export function VoicePanel(props: {
   const shown = props.turns.slice(n >= 3 && props.turns[n - 3].reminder ? -3 : -2);
   const lastAw = shown.map(t => t.who).lastIndexOf('aw');
   // Only while AfterWard's question is the latest thing said.
-  const choices = !props.busy && !props.listening && n > 0 && props.turns[n - 1].who === 'aw'
+  // Not for an Alexa reply: she answers that on the Echo.
+  const choices = !props.busy && !props.listening && n > 0 && props.turns[n - 1].who === 'aw' && !props.turns[n - 1].via
     ? answerChoices(props.turns[n - 1].text) : [];
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -373,8 +376,8 @@ export function VoicePanel(props: {
     <div className="vhead"><Logo size={26} /><span>{props.head}</span></div>
     <div className="turns">
       {shown.map((t, i) => t.who === 'you'
-        ? <div key={i} className="turn you"><small>You said</small><p>&ldquo;{t.text}&rdquo;</p></div>
-        : <AwTurn key={i} text={t.text} past={i !== lastAw} />)}
+        ? <div key={i} className="turn you"><small>You said{t.via && VIA_ALEXA}</small><p>&ldquo;{t.text}&rdquo;</p></div>
+        : <AwTurn key={i} text={t.text} past={i !== lastAw} alexa={!!t.via} />)}
       {/* Her words in the bubble while she is still speaking, so they appear at once. */}
       {props.listening && props.hearing &&
         <div className="turn you live"><small>You&rsquo;re saying</small><p>&ldquo;{props.hearing}&hellip;&rdquo;</p></div>}

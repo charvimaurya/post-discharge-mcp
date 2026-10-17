@@ -38,7 +38,7 @@ _SYMPTOMS = {
     "sick": r"\b(feel(ing)? sick|been sick|being sick|was sick|vomit\w*|throwing up|threw up|nause\w*)\b",
     "fall": rf"\b(fell|fallen|had a fall|have had a fall|tripped over|collapsed|{_MISHEARD_FALL})\b",
     "unwell": r"\b(unwell|poorly|feel(ing)? (awful|terrible|ill|rough|weak|worse|strange|funny)|"
-              r"(don'?t|not) feel(ing)? (well|right|good))\b",
+              r"(don'?t|not) feel(ing)? (well|right|good)|not (very |too |so )?well)\b",
     "function": r"\b(can(?:'?t|not) (move|feel|walk|stand|bend|sleep|put (any )?weight|stop)|numb\w*|tingl\w*)\b",
 }
 _SYMPTOMS = {name: re.compile(pattern) for name, pattern in _SYMPTOMS.items()}
@@ -74,6 +74,12 @@ _PERSISTS = re.compile(r"\b(not|isn'?t|won'?t|doesn'?t|hasn'?t) (going away|go a
 _PURPOSE = re.compile(r"\bfor (the |my |her )?(\w+ )?pain\b")
 _MENTIONS_FALL = re.compile(rf"\b(fell|fallen|a fall|{_MISHEARD_FALL})\b")
 _999 = re.compile(r"(?<![\d-])999(?![\d-])")
+# "the number I gave you", "the emergency number I've just given you": never said; the number is.
+_GAVE_YOU = re.compile(
+    r"\bthe (?:emergency |phone )*number (?:that )?I(?:'ve| have)?(?: just| already)? (?:gave|given) you\b",
+    re.IGNORECASE,
+)
+_EMERGENCY_TALK = re.compile(r"\b(emergenc(?:y|ies)|ambulance|A ?& ?E)\b", re.IGNORECASE)
 
 NO_MATCH_TEMPLATE = (
     "{sorry}. Your letter doesn't mention this, and I can't give medical advice. "
@@ -278,10 +284,30 @@ def says_999(text: str) -> bool:
     return bool(_999.search(text or ""))
 
 
-def with_letter_emergency_number(text: str, number: str | None) -> str:
-    """A model reply's "999" as the emergency number her letter gives; unchanged if it gives none."""
+def needs_letter_number(text: str) -> bool:
+    """A model reply that says 999, "the number I gave you", or talks about an emergency."""
 
-    return _999.sub(number, text) if number else text
+    return bool(_999.search(text or "") or _GAVE_YOU.search(text or "") or _EMERGENCY_TALK.search(text or ""))
+
+
+def with_letter_emergency_number(text: str, number: str | None) -> str:
+    """
+    A model reply with the emergency number said in full: "999" becomes the letter's number,
+    "the number I (just) gave you" becomes the number itself (999 if the letter gives none), and a
+    reply about an emergency that does not say the letter's number gets it added.
+    """
+
+    text = _GAVE_YOU.sub(number or "999", text)
+
+    if not number:
+        return text
+
+    text = _999.sub(number, text)
+
+    if number not in text and _EMERGENCY_TALK.search(text):
+        text += f" The emergency number in your letter is {number}."
+
+    return text
 
 
 def _call_emergency(number: str | None) -> str:
@@ -299,7 +325,8 @@ def warning_sign_reply(
 ) -> str:
     reply = f"{_sorry(first_name, fall)}. Your letter says: {sign_wording(sign)}"
 
-    if number and sign.get("urgency") == "emergency" and number not in reply:
+    # Every reply about feeling unwell says the number itself, never "the number I gave you".
+    if number and number not in reply:
         reply += f" The emergency number in your letter is {number}."
 
     return reply

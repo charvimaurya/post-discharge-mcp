@@ -153,7 +153,7 @@ from app.agent.symptoms import (
     letter_contacts,
     warning_signs_source,
     with_emergency_line,
-    says_999,
+    needs_letter_number,
     with_letter_emergency_number,
 )
 from app.mcp.client import (
@@ -985,6 +985,23 @@ async def _missed_dose_advice(medicine: str | None, tool_trace: list[dict]) -> t
 
 def _who(first_name: str | None) -> str:
     return f", {first_name}" if first_name else ""
+
+
+# "I'm back", with nothing after it (Alexa's "I am back" intent sends just this).
+_BARE_BACK = re.compile(r"^\s*(i'?m|i am) back( now| home)?[\s.!]*$", re.IGNORECASE)
+
+
+def _walk_due_on_return(message: str, today: dict[str, list], now):
+    """The walk due now when she says only "I'm back", else None."""
+
+    if not _BARE_BACK.match(message.replace("’", "'")):
+        return None
+
+    return next(
+        (item for item in build_next_up(today["tasks"], [], now)
+         if item.status == "due now" and "walk" in item.spoken),
+        None,
+    )
 
 
 async def _missed_dose_turn(
@@ -2147,6 +2164,13 @@ async def _chat_turn(
         resolved_reply = await _answer_follow_on_offer(
             cleaned_message, offer, now, first_name, schedule_checkin, tool_trace,
         )
+    elif offer and offer.get("kind") == "back_from" and today is not None and is_affirmative(cleaned_message):
+        # "Yes" to "Are you back from your walk?": that walk is recorded.
+        resolved_reply = await _resolve_completion(
+            "I'm back from my walk", "report_task_completed", today, now,
+            {"occurrence_id": offer["occurrence_ids"][0]}, first_name, tool_trace, extras,
+        )
+        resolved_source = extras.get("source") or resolved_source
     elif offer and offer.get("kind") in ("meal_medicines", "which_medicines") and today is not None and not reminder_ask:
         resolved_reply = await _answer_which_medicines(
             cleaned_message, offer, today, now, first_name, session_id, tool_trace,
@@ -2187,6 +2211,11 @@ async def _chat_turn(
         resolved_reply = await _food_turn(cleaned_message, today, first_name, session_id, tool_trace)
         # Open the letter at its eating and drinking lines, as for any letter answer.
         resolved_source = diet_source(resolved_reply, _TURN.get().get("diet_advice") or [])
+
+    elif today is not None and (walk := _walk_due_on_return(cleaned_message, today, now)) is not None:
+        # "I'm back" alone, with a walk due: ask, rather than a general greeting. A yes records it.
+        resolved_reply = f"Welcome back{_who(first_name)}. Are you back from your walk?"
+        extras["offer"] = {"kind": "back_from", "occurrence_ids": [walk.occurrence["occurrence_id"]]}
 
     elif (
         pending_checkin
@@ -2656,8 +2685,9 @@ async def _chat_turn(
     response_text = strip_markdown_emphasis(response_text)
 
     # A free reply about a symptom the safety code did not catch may say "999" from the
-    # model's own knowledge: in code, it becomes the emergency number her letter gives.
-    if says_999(response_text):
+    # model's own knowledge, or "the number I gave you": in code, the reply says the
+    # emergency number her letter gives, in full.
+    if needs_letter_number(response_text):
         contact, _ = await _letter_emergency_contact(tool_trace)
         response_text = with_letter_emergency_number(response_text, contact["number"] if contact else None)
 
