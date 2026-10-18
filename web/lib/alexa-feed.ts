@@ -8,13 +8,25 @@ export type FeedEntry = { id: number; said: string; reply: string; source?: unkn
 
 const same = (a: string, b: string) => a.replace(/\s+/g, ' ').trim() === b.replace(/\s+/g, ' ').trim();
 
+// One message in the chat panel. via: 'alexa' for a turn said to the Echo; none for the web.
+type PanelTurn = { who: string; text: string; via?: string };
+
 // The bubbles to add for one Alexa turn, given the latest message on screen. A greeting is
-// AfterWard's alone (no "You said"), and is not added again when the same words are already
-// the latest message (the page's own greeting or reminder, or the last time she opened the skill).
-export function feedBubbles(entry: FeedEntry, latest?: { who: string; text: string }): { said: boolean; reply: boolean } {
+// AfterWard's alone (no "You said"), and is not added again when the same words are already the
+// latest Alexa message (she opened the skill again). After the page's own greeting it is added:
+// the two are labelled differently ("AfterWard" and "AfterWard · via Alexa").
+export function feedBubbles(entry: FeedEntry, latest?: PanelTurn): { said: boolean; reply: boolean } {
   if (entry.kind !== 'launch') return { said: true, reply: true };
-  const repeat = !!latest && latest.who === 'aw' && same(latest.text, entry.reply);
+  const repeat = !!latest && latest.who === 'aw' && latest.via === 'alexa' && same(latest.text, entry.reply);
   return { said: false, reply: !repeat };
+}
+
+// The panel with `turn` added, unless it is an exact repeat of AfterWard's latest message from the
+// same source (web or Alexa). Safe to call twice with the same list (React dev mode does).
+export function addTurn<T extends PanelTurn>(turns: T[], turn: T): T[] {
+  const last = turns[turns.length - 1];
+  const repeat = turn.who === 'aw' && !!last && last.who === 'aw' && last.via === turn.via && same(last.text, turn.text);
+  return repeat ? turns : [...turns, turn];
 }
 export type FeedTurn = { who: 'you' | 'aw'; text: string; via: 'alexa' };
 

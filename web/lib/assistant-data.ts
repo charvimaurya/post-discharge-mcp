@@ -220,9 +220,10 @@ export function readToday(json: unknown): Today {
 }
 
 // Whether the demo was reset since the last /today read. `seen` is undefined before the first
-// read, so opening the page never counts as a reset.
+// read, so opening the page never counts as a reset. Only a later time counts (both are UTC ISO
+// times from the bridge), so a slow read from before the reset is ignored.
 export function wasReset(seen: string | null | undefined, next: string | null): boolean {
-  return seen !== undefined && !!next && next !== seen;
+  return seen !== undefined && !!next && (!seen || next > seen);
 }
 
 function short(v: unknown, max = 110): string {
