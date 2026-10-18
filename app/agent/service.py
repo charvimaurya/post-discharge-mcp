@@ -1153,6 +1153,22 @@ def _crisis_turn(message: str, session_id: str, first_name: str | None) -> str |
     return check_in_reply() if kind == "check_in" else crisis_reply(first_name)
 
 
+def crisis_reply_without_record(message: str, session_id: str) -> dict | None:
+    """
+    The fixed crisis reply, without her name, for a turn whose record could not be read.
+
+    The crisis check needs no record, MCP tool or model, so a crisis message is
+    still answered when the database is unreachable. Any other message: None.
+    """
+
+    text = _crisis_turn(remove_wake_word(message), session_id, None)
+
+    if text is None:
+        return None
+
+    return {"response": text, "tool_trace": [], "source": None, "completed": True, "crisis": True}
+
+
 def _saved_this_turn(tool_trace: list[dict]) -> bool:
     """Whether a report was really written this turn."""
 

@@ -11,7 +11,7 @@ import re
 
 from app.agent.evidence import related_appointment_lines
 from app.agent.safety import _ASKS_HOW_LONG
-from app.agent.service import chat
+from app.agent.service import chat, crisis_reply_without_record
 from app.clock import system_now_utc
 from app.database.recovery_state import (
     add_scheduled_checkin,
@@ -93,6 +93,16 @@ async def run_turn(message: str, session_id: str) -> dict:
     try:
         # Read first; when she last spoke is recorded only after a non-crisis reply.
         state = await asyncio.to_thread(get_recovery_state, patient.patient_id) or {}
+    except Exception as exc:
+        # Her record is unreadable, but a crisis message still gets its fixed reply:
+        # the crisis check needs no record. Anything else fails as before.
+        crisis = crisis_reply_without_record(message, session_id)
+        if crisis is None:
+            raise TurnFailed() from exc
+        log("state_read_failed", level="error", error=exc, reason="crisis_answered")
+        return {"response": crisis["response"], "tool_trace": [], "source": None, "help": None, "crisis": True}
+
+    try:
         had_checkin = bool(state.get("pending_checkin"))
 
         # The agent gets the waiting reminder, name and time zone

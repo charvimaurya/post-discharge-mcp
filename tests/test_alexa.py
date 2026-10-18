@@ -232,6 +232,17 @@ def test_stop_and_cancel_say_goodbye_and_end(alexa, intent):
     assert text == "Take care, Margaret." and ends is True and reprompt is None
 
 
+def test_stop_still_ends_the_session_when_her_record_cannot_be_read(alexa, monkeypatch):
+    def unreadable(patient_id):
+        raise RuntimeError("DynamoDB unavailable")
+
+    monkeypatch.setattr(handlers, "get_recovery_state", unreadable)
+
+    text, reprompt, ends = alexa.speech(alexa.send(_intent("AMAZON.StopIntent")))
+
+    assert text == "Take care." and ends is True and reprompt is None
+
+
 def test_a_letter_answer_comes_with_a_card_and_plain_speech(alexa, monkeypatch):
     async def letter_turn(message, session_id):
         return {"response": "Your letter says: **Do not drive** until your consultant has reviewed you.",

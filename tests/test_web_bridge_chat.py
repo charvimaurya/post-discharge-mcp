@@ -150,6 +150,27 @@ def test_agent_failure_returns_error_and_keeps_reminder(bridge, monkeypatch):
     assert bridge.state["pending_checkin"]["checkin_id"] == CHECKIN_KEY
 
 
+def test_crisis_is_answered_when_her_record_cannot_be_read(bridge, monkeypatch):
+    def unreadable(patient_id):
+        raise RuntimeError("DynamoDB unavailable")
+
+    monkeypatch.setattr(turn, "get_recovery_state", unreadable)
+
+    response = bridge.client.post("/chat", json={"message": "Alexa, I want to kill myself", "session_id": "s-crisis-down"})
+
+    assert response.status_code == 200
+    reply = response.json()["response"]
+    # The fixed reply without her name: no record, model, MCP tool or chat activity was needed.
+    assert reply.startswith("I'm really sorry you're feeling this way. ")
+    assert "999" in reply and "116 123" in reply
+    assert bridge.seen_messages == [] and bridge.tool_calls == [] and bridge.chats == []
+
+    # Anything else still fails as before.
+    response = bridge.client.post("/chat", json={"message": "What's next?", "session_id": "s-other-down"})
+    assert response.status_code == 502
+    assert response.json() == {"error": web_bridge.CHAT_ERROR}
+
+
 def test_unfinished_turn_keeps_reminder(bridge):
     # The model never stops calling tools, so chat() hits its round limit.
     bridge.model_turns = [_tool_use("get_today_tasks") for _ in range(service.MAX_TOOL_ROUNDS + 1)]

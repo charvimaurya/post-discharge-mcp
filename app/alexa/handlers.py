@@ -299,7 +299,12 @@ class StopHandler(AbstractRequestHandler):
                    for name in ("AMAZON.StopIntent", "AMAZON.CancelIntent", "AMAZON.NavigateHomeIntent"))
 
     def handle(self, handler_input):
-        name = (get_recovery_state(get_demo_patient_context().patient_id) or {}).get("first_name")
+        # Stop always ends the session; without her record it just leaves out the name.
+        try:
+            name = (get_recovery_state(get_demo_patient_context().patient_id) or {}).get("first_name")
+        except Exception as exc:
+            log("alexa_stop_name_unavailable", level="warning", error=exc)
+            name = None
         return _say(handler_input, f"Take care, {name}." if name else "Take care.", end=True)
 
 
