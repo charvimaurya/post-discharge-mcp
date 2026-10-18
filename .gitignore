@@ -24,6 +24,8 @@ infra/security/backup/
 logs/
 
 # Retired snapshots and generated Lambda artifacts.
+# AfterWardMCP/ was an AgentCore template (example tools only); local copies hold a .env.local and node_modules.
+/AfterWardMCP/
 /phase15/
 /lambda_package/
 /*.zip

@@ -42,9 +42,9 @@ CloudFront endpoint, without undo_report or get_week_summary. The other endpoint
 timed out. That listing was not refreshed in this review. Current read-only AWS
 metadata confirms the hosting resources, not source parity or a working demo.
 
-The verified MCP hosting path is CloudFront → ALB → ECS Fargate (MCP). The separate
-`AfterWardMCP/` AgentCore scaffold does not establish that the application uses
-AgentCore. Voice uses browser speech synthesis/recognition; this is a **Simulated
+The verified MCP hosting path is CloudFront → ALB → ECS Fargate (MCP). The former
+`AfterWardMCP/` AgentCore template has been removed from the repository; the
+application does not use AgentCore. Voice uses browser speech synthesis/recognition; this is a **Simulated
 Alexa+** experience, not a verified native Alexa+ integration or Amazon Polly.
 
 `discharge-letter-check` v0.1.0 supplies the extraction schema, instruction types
