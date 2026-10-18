@@ -65,6 +65,8 @@ FALLBACK = ("Sorry, I didn't catch that. You can say what you've done, or ask ab
 # phrase is its own intent: "I've had" + "my breakfast and I've taken my medicine"
 # reaches the agent as she said it. Kept in step with skill-package's en-GB.json.
 OPENINGS = {
+    "CameBackFromIntent": "I just came back from",
+    "CompletedIntent": "I completed",
     "BackFromIntent": "I'm back from",
     "DoneIntent": "I've done",
     "DidIntent": "I did",
@@ -259,6 +261,8 @@ class OpeningHandler(AbstractRequestHandler):
 
     def handle(self, handler_input):
         name = handler_input.request_envelope.request.intent.name
+        if name in {"CameBackFromIntent", "CompletedIntent", "FinishedIntent"} and not _query(handler_input):
+            return _say(handler_input, "Which recovery activity did you finish?")
         message = FIXED[name] if name in FIXED else f"{OPENINGS[name]} {_query(handler_input)}".strip()
         reply, source, urgent, extra = _turn(message, _session_id(handler_input), handler_input)
         _to_feed(message, reply, source, extra)

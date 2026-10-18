@@ -19,7 +19,7 @@ def test_host_forces_isolated_identity_and_blocks_aws(monkeypatch):
         BaseClient._make_api_call(None, "PutItem", {})
     with pytest.raises(RuntimeError, match="disabled"):
         server.report_medication_taken_for_context(context, "unused")
-    assert len(asyncio.run(server.mcp.list_tools())) == 8
+    assert len(asyncio.run(server.mcp.list_tools())) == 9
     assert len(asyncio.run(server.mcp.list_prompts())) == 2
 
 

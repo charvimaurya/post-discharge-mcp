@@ -73,6 +73,30 @@ def test_launch_without_a_reminder_greets_and_says_what_is_next(alexa):
     assert alexa.turns == [("What is next?", "amzn1.echo-api.session.s-1")]
 
 
+def test_launch_mcp_connection_failure_returns_valid_safe_fallback(alexa, monkeypatch, capsys):
+    import httpx
+    from app.turn import TurnFailed
+
+    async def failed_turn(*args):
+        try:
+            raise ExceptionGroup("transport", [httpx.ConnectError("private backend details")])
+        except ExceptionGroup as cause:
+            raise TurnFailed() from cause
+
+    monkeypatch.setattr(handlers, "run_turn", failed_turn)
+    response = alexa.send({"type": "LaunchRequest"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["version"] == "1.0"
+    reply = body["response"]
+    assert reply["outputSpeech"] == {"type": "PlainText", "text": "Hello, Margaret. " + handlers.NOT_REACHED}
+    assert reply["reprompt"]["outputSpeech"]["text"] == handlers.REPROMPT
+    assert reply["shouldEndSession"] is False
+    assert "private backend details" not in response.text
+    failed = next(row for row in log_lines(capsys.readouterr().out) if row["event"] == "alexa_turn_failed")
+    assert failed["error_causes"] == "ConnectError"
+
+
 def test_back_from_rebuilds_her_sentence_and_keeps_the_session_open(alexa):
     text, reprompt, ends = alexa.speech(alexa.send(_intent("BackFromIntent", query="my walk")))
 

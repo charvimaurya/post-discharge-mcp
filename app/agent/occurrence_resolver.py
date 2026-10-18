@@ -288,6 +288,9 @@ def _resolve_named_part(
     item = [o for o in _item_occurrences(message, occurrences, pending_checkin) or [] if not o.get("as_needed")]
     in_part = [o for o in item if part_of_day(o) == part]
 
+    if len(in_part) > 1:
+        return Resolution("ask", choices=in_part)
+
     if len(in_part) != 1:
         return Resolution("model")
 

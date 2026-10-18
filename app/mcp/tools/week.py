@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from app.clock import get_patient_datetime
 from app.database.event_history import get_complete_patient_events
-from app.database.recovery_state import get_medications, get_recovery_state
+from app.database.recovery_state import _completed, _completion_rounds, get_medications, get_recovery_state
 from app.mcp.results import error_result, success_result
 from app.mcp.tools.recovery import get_today_tasks_for_context
 
@@ -32,7 +32,7 @@ def schedule(details, day, timezone):
         if not isinstance(item, dict):
             return None
         # Explicit inactive evidence excludes a stopped/ended dose for this date.
-        if item.get("active") is False:
+        if item.get("active") is False or item.get("as_needed") is True:
             continue
         occurrence = item.get("occurrence_id")
         due = aware(item.get("due_at"))
@@ -85,6 +85,10 @@ def calculate_week(events, patient_id, timezone, now):
                     continue
                 key = event.get("idempotency_key")
                 if not isinstance(key, str) or not key or details.get("plan_version") != version:
+                    ambiguous = True
+                    continue
+                if event["event_type"] in {"medication_taken", "medication_missed"} and aware(
+                        details.get("completed_at") or event.get("recorded_at")) is None:
                     ambiguous = True
                     continue
                 if key in actions and actions[key] != event:
@@ -141,7 +145,7 @@ def apply_current_morning(week, medications):
             or len(set(ids)) != len(ids)):
         day["reason"] = "incomplete_current_schedule"
         return
-    taken = sum(item.get("status") == "completed" and bool(item.get("completed_at")) for item in morning)
+    taken = sum(item.get("status") == "completed" and aware(item.get("completed_at")) is not None for item in morning)
     day.update(schedule_evidence="current_day_occurrences", scheduled_doses=len(morning),
                taken_doses=taken, explicitly_missed_doses=0)
     if not morning:
@@ -155,6 +159,27 @@ def apply_current_morning(week, medications):
     week["synthetic_demo_history"] = False
 
 
+def task_activity(events, patient_id, days):
+    """Counts of distinct saved task occurrences, not historical adherence rates.
+
+    Use the same completion/undo rules as Today, scoped to the occurrence date.
+    Repeated delivery of a stored idempotency key must not inflate the series.
+    """
+    unique = {}
+    for event in events:
+        if event.get("patient_id") != patient_id or event.get("event_type") not in {"task_completed", "task_undone"}:
+            continue
+        key = event.get("idempotency_key") or event.get("timestamp")
+        details = event.get("details") or {}
+        occurrence = details.get("occurrence_id")
+        if (not key or not isinstance(occurrence, str)
+                or occurrence.rsplit("#", 2)[-2:-1] != [details.get("date")]):
+            continue
+        unique.setdefault(key, event)
+    return [{"date": day["date"], "completed_tasks": len(_completed(
+        _completion_rounds(list(unique.values()), "task", day["date"]))) } for day in days]
+
+
 def get_week_summary_for_context(context):
     try:
         state = get_recovery_state(context.patient_id)
@@ -162,7 +187,9 @@ def get_week_summary_for_context(context):
             raise ValueError("No plan")
         timezone = state.get("timezone") or "Europe/London"
         now = get_patient_datetime(timezone)
-        week = calculate_week(get_complete_patient_events(context.patient_id), context.patient_id, timezone, now)
+        events = get_complete_patient_events(context.patient_id)
+        week = calculate_week(events, context.patient_id, timezone, now)
+        week["activity"] = task_activity(events, context.patient_id, week["days"])
         if isinstance(state.get("medications"), list):
             apply_current_morning(week, get_medications(context.patient_id, week["end_date"]))
         today = get_today_tasks_for_context(context)

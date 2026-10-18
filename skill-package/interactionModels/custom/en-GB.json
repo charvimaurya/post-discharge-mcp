@@ -4,6 +4,22 @@
       "invocationName": "after ward",
       "intents": [
         {
+          "name": "CameBackFromIntent",
+          "slots": [{"name": "query", "type": "AMAZON.SearchQuery"}],
+          "samples": [
+            "I just came back from {query}",
+            "I came back from {query}"
+          ]
+        },
+        {
+          "name": "CompletedIntent",
+          "slots": [{"name": "query", "type": "AMAZON.SearchQuery"}],
+          "samples": [
+            "I completed {query}",
+            "I just completed {query}"
+          ]
+        },
+        {
           "name": "BackFromIntent",
           "slots": [
             {

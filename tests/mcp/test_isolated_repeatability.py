@@ -35,11 +35,13 @@ def isolated_store(monkeypatch):
     }
     events = {}
 
-    def get_item(*, Key):
+    def get_item(*, Key, ConsistentRead=False):
+        assert ConsistentRead
         assert Key["patient_id"] in patients
         return {"Item": deepcopy(plans[Key["patient_id"]])}
 
-    def query(*, KeyConditionExpression):
+    def query(*, KeyConditionExpression, ConsistentRead=False):
+        assert ConsistentRead
         patient = KeyConditionExpression.get_expression()["values"][1]
         assert patient in patients
         return {"Items": deepcopy([row for (owner, _), row in events.items() if owner == patient])}

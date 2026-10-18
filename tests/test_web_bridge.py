@@ -118,13 +118,14 @@ def test_today_includes_a_medications_list(bridge):
 
 
 def test_caller_cannot_choose_patient_date_or_time(bridge):
-    bridge.client.get(
+    response = bridge.client.get(
         "/today",
         params={"patient_id": "someone_else", "date": "2030-01-01", "demo_now": "x"},
     )
 
-    assert bridge.calls["patients"] == ["demo_patient_001"]
-    assert bridge.calls["tools"] == TOOLS_CALLED
+    assert response.status_code == 400
+    assert bridge.calls["patients"] == []
+    assert bridge.calls["tools"] == []
 
 
 def test_failed_tool_call_returns_clear_error(bridge, monkeypatch):

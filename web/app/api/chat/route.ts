@@ -15,6 +15,9 @@ async function handlePOST(request: Request, demoSession: string) {
   try { body = await (await boundedRequest(request, 16_384)).json(); }
   catch (error) { return Response.json({ error: 'Expected a small JSON message.' }, { status: error instanceof RangeError ? 413 : 400 }); }
 
+  if (body && typeof body === 'object' && 'patient_id' in body) {
+    return Response.json({ error: 'Patient identity is assigned by the server.' }, { status: 400 });
+  }
   const { message } = (body ?? {}) as { message?: unknown; session_id?: unknown };
   if (typeof message !== 'string' || !message.trim() || message.length > 4000) {
     return Response.json({ error: 'Send a message of up to 4,000 characters.' }, { status: 400 });

@@ -26,6 +26,8 @@ to the live RecoveryState table, as the Lambda would.
 
 import argparse
 import logging
+import os
+import ssl
 import sys
 from pathlib import Path
 
@@ -33,6 +35,23 @@ import uvicorn
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def configure_local_tls_trust() -> None:
+    """Supply trusted roots when a local Python install has no default CA store.
+
+    The ASK SDK downloads Amazon's signing certificate using urllib. Some
+    python.org macOS installations have missing CA links until their certificate
+    installer runs. Preserve explicit trust settings and functioning system CAs.
+    This only configures trust; HTTPS and Alexa signatures are still verified.
+    """
+    if "SSL_CERT_FILE" in os.environ or "SSL_CERT_DIR" in os.environ:
+        return
+    if ssl.create_default_context().cert_store_stats()["x509_ca"]:
+        return
+    import certifi
+
+    os.environ["SSL_CERT_FILE"] = certifi.where()
 
 
 def main() -> None:
@@ -44,6 +63,7 @@ def main() -> None:
     args = parser.parse_args()
 
     sys.path.insert(0, str(PROJECT_ROOT))
+    configure_local_tls_trust()
 
     # Show the app's own INFO lines (such as the reminder loop) next to
     # uvicorn's; other libraries, like boto3, stay at WARNING.

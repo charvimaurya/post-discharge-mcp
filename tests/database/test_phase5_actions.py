@@ -197,7 +197,7 @@ def test_state_reader_returns_item_or_none(service):
     with patch.object(service, "table") as table:
         table.get_item.return_value = {"Item": {"patient_id": PATIENT_ID}}
         assert service.get_recovery_state(PATIENT_ID) == {"patient_id": PATIENT_ID}
-        table.get_item.assert_called_once_with(Key={"patient_id": PATIENT_ID})
+        table.get_item.assert_called_once_with(Key={"patient_id": PATIENT_ID}, ConsistentRead=True)
         table.get_item.return_value = {}
         assert service.get_recovery_state(PATIENT_ID) is None
 
@@ -209,7 +209,7 @@ def test_event_reader(event_writer):
     items = [{"patient_id": PATIENT_ID, "event_type": "task_completed"}]
     table.query.return_value = {"Items": items}
     assert module.get_events(PATIENT_ID) == items
-    table.query.assert_called_once_with(KeyConditionExpression=Key("patient_id").eq(PATIENT_ID))
+    table.query.assert_called_once_with(KeyConditionExpression=Key("patient_id").eq(PATIENT_ID), ConsistentRead=True)
     table.query.return_value = {}
     assert module.get_events(PATIENT_ID) == []
 

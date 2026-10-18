@@ -69,6 +69,7 @@ test('weekly panel renders seven indicators, today and only evidence-backed synt
   const payload = fixture();
   const html = render({ summary: readWeekSummary(payload) });
   assert.match(html, /5 of 7 mornings confirmed/);
+  assert.match(html, /href="\/demo\/recovery"/);
   assert.match(html, /<details class="week-disclosure"><summary/);
   assert.ok(!/<details[^>]*\sopen(?:[\s=>])/.test(html));
   assert.equal((html.match(/<li /g) || []).length, 7);
@@ -83,4 +84,21 @@ test('weekly panel renders loading, failure and unknown history without inventin
   assert.match(render({ error: true }), /could not be checked/);
   const payload = fixture(); payload.week.days.forEach(day => { day.status = 'unknown'; });
   assert.match(render({ summary: readWeekSummary(payload) }), /Missing history does not mean a missed dose/);
+});
+
+test('task activity chart updates from saved counts independently of medicine adherence', () => {
+  const payload = fixture();
+  const activity = payload.week.days.map(day => ({ date: day.date, completed_tasks: 0 }));
+  const input = { week: { ...payload.week, activity } };
+  let summary = readWeekSummary(input)!;
+  assert.equal(summary.activity?.[6].completedTasks, 0);
+  assert.match(render({ summary }), /2026-10-23: 0 recovery tasks recorded complete/);
+  activity[6].completed_tasks = 1;
+  summary = readWeekSummary(input)!;
+  const html = render({ summary });
+  assert.match(html, /2026-10-23: 1 recovery tasks recorded complete/);
+  assert.equal((html.match(/<meter /g) || []).length, 7);
+  assert.equal(summary.completedDays, 5); // A walk never becomes medication adherence.
+  activity[6].completed_tasks = -1;
+  assert.equal(readWeekSummary(input)?.activity, undefined);
 });

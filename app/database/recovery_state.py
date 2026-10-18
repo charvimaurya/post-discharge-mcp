@@ -51,7 +51,8 @@ def get_recovery_state(
     response = table.get_item(
         Key={
             "patient_id": patient_id
-        }
+        },
+        ConsistentRead=True,
     )
 
     return response.get("Item")

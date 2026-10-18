@@ -69,6 +69,18 @@ def test_errors_are_logged_by_type_only(capsys):
     assert "Apixaban" not in json.dumps(line)
 
 
+def test_exception_groups_reveal_leaf_types_without_sensitive_messages(capsys):
+    import httpx
+
+    error = ExceptionGroup(LETTER, [ExceptionGroup(LETTER, [httpx.ConnectError(LETTER)]),
+                                    TimeoutError(LETTER)])
+    obs.log_event("agent_turn", level="error", error=error)
+    line = _last(capsys)
+    assert line["error_type"] == "ExceptionGroup"
+    assert line["error_causes"] == "ConnectError+TimeoutError"
+    assert "Apixaban" not in json.dumps(line)
+
+
 def test_event_name_must_be_a_code(capsys):
     obs.log_event(LETTER)
 

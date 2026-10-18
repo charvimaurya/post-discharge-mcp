@@ -18,6 +18,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import './afterward.css';
 import { WeekPanel } from './week-panel';
 import { readWeekSummary, type WeekSummary } from '../../lib/week-summary';
+import { completionFingerprint, readSequence } from '../../lib/recovery-sync';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
 import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str, wasReset,
@@ -102,11 +103,12 @@ export default function DemoPage() {
     }
   }, []);
 
+  const completionVersion = completionFingerprint(today);
   useEffect(() => {
     if (view !== 'today' || !today.date) return;
     void loadWeek();
     return () => { weekRequest.current += 1; };
-  }, [view, today.date, loadWeek]);
+  }, [view, today.date, completionVersion, loadWeek]);
   const [openingCheckComplete, setOpeningCheckComplete] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [head, setHead] = useState('AfterWard');
@@ -169,12 +171,15 @@ export default function DemoPage() {
     }
   }, []);
 
+  const todayReads = useRef(readSequence());
   const loadToday = useCallback(async (): Promise<Today | null> => {
+    const request = todayReads.current.begin();
     try {
       const response = await fetch('/api/today', { cache: 'no-store' });
       const data = await response.json();
       if (!response.ok) throw new Error(str(isObj(data) ? data.error : '') || 'Could not load today\'s plan.');
       const next = readToday(data);
+      if (!todayReads.current.current(request)) return null;
       // Reset elsewhere (the script, the button, or after a long idle): start the chat afresh.
       if (wasReset(seenResetAt.current, next.resetAt)) clearChat(true);
       seenResetAt.current = next.resetAt;
@@ -183,6 +188,7 @@ export default function DemoPage() {
       setError('');
       return next;
     } catch (e) {
+      if (!todayReads.current.current(request)) return null;
       setError(e instanceof Error ? e.message : 'Could not load today\'s plan.');
       return null;
     }
@@ -333,7 +339,6 @@ export default function DemoPage() {
     // Over the demo limit nothing changed, so Today is not reloaded (that would call MCP tools).
     if (reply.rateLimited) { await speaking; return; }
     const after = await loadToday();
-    if (reply.saved) void loadWeek();
     const named = after ? itemsMentioned(reply.text, after.items) : [];
     setFocus(named);
     // Only for an answer that names no item, quotes no letter and is not about a symptom.
@@ -346,7 +351,7 @@ export default function DemoPage() {
       setChips([{ kind: 'ok', icon: 'check', text: `Saved to your plan${newlyDone.doneAt ? ` at ${localTime(newlyDone.doneAt)}` : ''}` }, ...view.chips]);
     }
     await speaking;
-  }, [say, loadToday, loadWeek]);
+  }, [say, loadToday]);
 
   // What she says to the Echo, and the reply, shown in the chat panel as "via Alexa" (every 2 seconds,
   // only turns after the page opened, paused while the tab is hidden). The left panel and the help
@@ -423,13 +428,27 @@ export default function DemoPage() {
     }
   }
 
-  // Tapping "Mark as done" goes through AfterWard too, so the tick is a real report tool call.
-  // An item that repeats in the day names its time of day ("my evening knee exercises"), so the
-  // card that was tapped is the occurrence recorded, not just the next one due.
-  const tapDone = (item: PlanItem) => {
+  // Task cards retain the selected occurrence ID. Medicine reports keep the agent's safety checks.
+  const tapDone = async (item: PlanItem) => {
     const slot = item.slot.toLowerCase();
     const part = item.repeat && DAY_PARTS.includes(slot) ? `${slot} ` : '';
-    send(item.kind === 'medicine' ? `I've taken my ${part}${item.name.split(',')[0].toLowerCase()}.` : `I've done my ${part}${item.name.toLowerCase()}.`);
+    if (item.kind === 'medicine') {
+      await send(`I've taken my ${part}${item.name.split(',')[0].toLowerCase()}.`);
+      return;
+    }
+    if (busy || item.done) return;
+    setBusy(true); setError(''); setChips([]); setJustDone(null); setReminderNote(false);
+    const before = new Set(todayRef.current.items.filter(i => i.done).map(i => i.id));
+    setTurns(t => [...t, { who: 'you', text: `I've done my ${part}${item.name.toLowerCase()}.` }]);
+    try {
+      const response = await fetch('/api/tasks/complete', { method: 'POST',
+        headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ occurrence_id: item.id }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(str(isObj(data) ? data.error : '') || 'Could not save that task.');
+      await showReply(readChat(data), before);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save that task.');
+    } finally { setBusy(false); }
   };
 
   function openToday() {

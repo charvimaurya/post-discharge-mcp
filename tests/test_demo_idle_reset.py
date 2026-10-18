@@ -72,10 +72,14 @@ def test_no_plan_means_nothing_to_reset(record):
     assert demo_reset.reset_if_idle(NOW) is False
 
 
-def test_not_a_number_falls_back_to_two_hours(monkeypatch):
-    monkeypatch.setenv("DEMO_IDLE_RESET_HOURS", "soon")
+@pytest.mark.parametrize("setting", [None, "soon"])
+def test_missing_or_invalid_setting_keeps_progress(monkeypatch, setting):
+    if setting is None:
+        monkeypatch.delenv("DEMO_IDLE_RESET_HOURS", raising=False)
+    else:
+        monkeypatch.setenv("DEMO_IDLE_RESET_HOURS", setting)
 
-    assert demo_reset.idle_reset_hours() == 2
+    assert demo_reset.idle_reset_hours() == 0
 
 
 # ---------- /today ----------

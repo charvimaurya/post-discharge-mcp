@@ -94,6 +94,25 @@ def test_a_turn_that_calls_no_tool_opens_nothing(connections):
     assert connections.opened == 0
 
 
+def test_failed_connection_open_propagates_nested_transport_error_without_writes(monkeypatch):
+    import httpx
+
+    @asynccontextmanager
+    async def unavailable():
+        raise ExceptionGroup("transport", [httpx.ConnectError("unavailable")])
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(client, "_open_session", unavailable)
+
+    async def call():
+        async with client.mcp_turn():
+            await client.call_mcp_tool("get_today_tasks", {})
+
+    with pytest.raises(ExceptionGroup) as caught:
+        run(call())
+    assert isinstance(caught.value.exceptions[0], httpx.ConnectError)
+
+
 def test_a_failed_call_is_raised_and_the_next_call_gets_a_fresh_connection(connections):
     connections.fail_on = "report_task_completed"
 

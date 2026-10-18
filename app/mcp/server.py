@@ -35,6 +35,7 @@ from app.mcp.tools.recovery import (
 )
 
 from app.mcp.tools.week import get_week_summary_for_context
+from app.mcp.tools.recovery_day import get_recovery_day_details_for_context
 
 
 mcp = MCPServer(
@@ -201,6 +202,16 @@ async def get_today_tasks() -> dict:
 @logged_tool("read")
 async def get_week_summary() -> dict:
     return get_week_summary_for_context(get_current_patient_context())
+
+
+@mcp.tool(
+    name="get_recovery_day_details",
+    description="Read saved medication and task history for one patient-local date in the last seven days. No patient ID accepted. Missing history is unknown.",
+    annotations=ToolAnnotations(read_only_hint=True),
+)
+@logged_tool("read")
+async def get_recovery_day_details(date: str) -> dict:
+    return await asyncio.to_thread(get_recovery_day_details_for_context, get_current_patient_context(), date)
 
 
 @mcp.tool(

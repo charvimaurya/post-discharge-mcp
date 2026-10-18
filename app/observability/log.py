@@ -44,7 +44,7 @@ ALLOWED_FIELDS = frozenset({
     "event", "request_id", "session_id_hash", "patient_id_hash", "route", "status", "ms",
     "tool", "kind", "reason", "model", "tool_calls", "tokens_in", "tokens_out",
     "document_id", "stage", "item_count", "needs_confirmation_count", "checkin_type",
-    "error_type", "error_code",
+    "error_type", "error_code", "error_causes",
     # Alexa requests: the request type and intent name (codes, never her words), and whether it timed out.
     "request_type", "intent", "timed_out",
 })
@@ -178,6 +178,22 @@ def log_event(
         line["error_type"] = described.split("(")[0]
         if "(" in described:
             line["error_code"] = described.split("(", 1)[1].rstrip(")")
+        if isinstance(error, BaseExceptionGroup):
+            # Task-group wrappers hide transport failures. Keep bounded leaf
+            # TYPES only, never exception messages, request bodies or URLs.
+            pending = [error]
+            causes = set()
+            for _ in range(32):
+                if not pending:
+                    break
+                current = pending.pop()
+                if isinstance(current, BaseExceptionGroup):
+                    pending.extend(current.exceptions[:8])
+                else:
+                    causes.add(type(current).__name__)
+            summary = _safe_value("+".join(sorted(causes)))
+            if summary:
+                line["error_causes"] = summary
 
     dropped = 0
     metrics = []

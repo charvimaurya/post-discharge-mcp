@@ -174,11 +174,11 @@ def reset_demo_patient() -> dict:
 # The demo clock is frozen (always 07:00 on the same day), so yesterday's ticks
 # and reminders would still look like "today". After this many real hours with
 # no chat and no reset, the next visit starts fresh. 0 turns it off.
-IDLE_RESET_HOURS = 2
+IDLE_RESET_HOURS = 0
 
 
 def idle_reset_hours() -> float:
-    """DEMO_IDLE_RESET_HOURS, or 2 when it is missing or not a number."""
+    """Opt-in demo expiry. Missing/invalid settings never delete saved progress."""
 
     try:
         return float(os.getenv("DEMO_IDLE_RESET_HOURS", IDLE_RESET_HOURS))

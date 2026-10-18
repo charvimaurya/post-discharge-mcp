@@ -31,17 +31,12 @@ def build_idempotency_key(
 def get_events(
     patient_id: str,
 ) -> list[dict]:
-    """Return one query page of Event History for debugging and tests.
+    """Authoritative completion history, across all pages and without stale reads.
 
-    Event History uses patient_id as its partition key and timestamp as its
-    sort key. DynamoDB returns items in timestamp-key order. New events use
-    deterministic hashed IDs in that key, so this is not chronological order;
-    recorded_at contains their actual write time.
+    Occurrence readers and write/undo round selection must see the same history
+    as dashboard aggregation. The hashed sort key does not sort by event time.
     """
-    response = event_table.query(
-        KeyConditionExpression=Key("patient_id").eq(patient_id)
-    )
-    return response.get("Items", [])
+    return get_complete_patient_events(patient_id)
 
 
 def append_event(

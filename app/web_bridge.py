@@ -102,6 +102,9 @@ async def chat_message(request: Request) -> JSONResponse:
 
     message = body.get("message") if isinstance(body, dict) else None
 
+    if isinstance(body, dict) and "patient_id" in body:
+        return JSONResponse({"error": "Patient identity is assigned by the server."}, status_code=400)
+
     if not isinstance(message, str) or not message.strip():
         return JSONResponse({"error": "Send a message."}, status_code=400)
 
@@ -164,9 +167,36 @@ async def idle_reset(route: str) -> bool:
         return False
 
 
+async def complete_task(request: Request) -> JSONResponse:
+    """A selected web task keeps its exact occurrence; MCP validates it for the patient."""
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if (not isinstance(body, dict) or set(body) != {"occurrence_id"}
+            or not isinstance(body.get("occurrence_id"), str) or not body["occurrence_id"].strip()
+            or len(body["occurrence_id"]) > 512):
+        return JSONResponse({"error": "Choose one scheduled task."}, status_code=400)
+    arguments = {"occurrence_id": body["occurrence_id"].strip()}
+    try:
+        result = get_structured_tool_result(await call_mcp_tool("report_task_completed", arguments))
+        if (not isinstance(result, dict) or result.get("ok") is not True
+                or not isinstance(result.get("message"), str)):
+            raise ValueError("Task completion was not persisted")
+    except Exception as exc:
+        log("task_completion_failed", level="error", error=exc, route="/tasks/complete")
+        return JSONResponse({"error": "Could not save that task. Please refresh your plan and try again."},
+                            status_code=502, headers={"Cache-Control": "no-store"})
+    return JSONResponse({"response": result["message"], "source": None, "help": None,
+                         "tool_trace": [{"tool": "report_task_completed", "arguments": arguments, "ok": True}]},
+                        headers={"Cache-Control": "no-store"})
+
+
 async def today(request: Request) -> JSONResponse:
     """Today's clock label, task and medicine occurrences, and waiting reminder."""
 
+    if "patient_id" in request.query_params:
+        return JSONResponse({"error": "Patient identity is assigned by the server."}, status_code=400)
     patient = get_demo_patient_context()
 
     # A visit after a long gap starts fresh (the demo clock never moves on).
@@ -243,6 +273,8 @@ async def today(request: Request) -> JSONResponse:
 
 async def week_summary(request: Request) -> JSONResponse:
     """Read the authenticated MCP weekly result; no patient/date comes from the caller."""
+    if "patient_id" in request.query_params:
+        return JSONResponse({"error": "Patient identity is assigned by the server."}, status_code=400)
     try:
         result = get_structured_tool_result(await call_mcp_tool("get_week_summary", {}))
         if not isinstance(result, dict) or not result.get("ok"):
@@ -257,6 +289,30 @@ async def week_summary(request: Request) -> JSONResponse:
     except Exception as exc:
         log("week_summary_failed", level="error", error=exc, route="/week-summary")
         return JSONResponse({"error": "The weekly summary could not be checked."}, status_code=502)
+
+
+async def recovery_day(request: Request) -> JSONResponse:
+    params = request.query_params
+    if set(params) != {"date"} or len(params.getlist("date")) != 1:
+        return JSONResponse({"error": "Choose one date only."}, status_code=400)
+    from datetime import date
+    try:
+        if date.fromisoformat(params["date"]).isoformat() != params["date"]:
+            raise ValueError()
+    except ValueError:
+        return JSONResponse({"error": "Choose a valid date."}, status_code=400)
+    try:
+        result = get_structured_tool_result(await call_mcp_tool("get_recovery_day_details", {"date": params["date"]}))
+        if not isinstance(result, dict) or not result.get("ok"):
+            raise ValueError("Unavailable day")
+        data = result.get("data")
+        fields = ("kind", "schema_version", "date", "timezone", "as_of", "schedule_evidence", "scope", "synthetic_demo_history", "medications", "tasks")
+        if not isinstance(data, dict) or data.get("date") != params["date"]:
+            raise ValueError("Invalid day")
+        return JSONResponse({key: data.get(key) for key in fields}, headers={"Cache-Control": "no-store"})
+    except Exception as exc:
+        log("recovery_day_failed", level="error", error=exc, route="/recovery-day")
+        return JSONResponse({"error": "Recovery history could not be checked."}, status_code=502, headers={"Cache-Control": "no-store"})
 
 
 async def greeted(request: Request) -> JSONResponse:
@@ -543,6 +599,8 @@ app = Starlette(
         Route("/alexa", alexa_endpoint, methods=["POST"]),
         Route("/today", today, methods=["GET"]),
         Route("/week-summary", week_summary, methods=["GET"]),
+        Route("/recovery-day", recovery_day, methods=["GET"]),
+        Route("/tasks/complete", complete_task, methods=["POST"]),
         Route("/greeted", greeted, methods=["POST"]),
         Route("/reminders/check", check_reminder, methods=["POST"]),
         Route("/reset", reset_demo, methods=["POST"]),

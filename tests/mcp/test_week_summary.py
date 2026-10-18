@@ -150,7 +150,7 @@ def test_registered_tool_uses_only_context_and_no_writes(monkeypatch, events, pa
     assert result["data"]["week"]["completed_days"] == 5
     assert patients == [patient_id] and events == original
     tools = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
-    assert len(tools) == 8
+    assert len(tools) == 9
     assert tools["get_week_summary"].input_schema.get("properties", {}) == {}
     assert tools["get_week_summary"].meta["ui"]["resourceUri"] == "ui://afterward/today.html"
     assert tools["get_week_summary"].annotations.read_only_hint is True

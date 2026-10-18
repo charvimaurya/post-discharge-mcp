@@ -109,3 +109,9 @@ def test_alexa_needs_no_bridge_key_but_still_checks_the_skill(monkeypatch):
     response = TestClient(web_bridge.app).post("/alexa", content=b"{}")
 
     assert response.status_code == 400
+
+
+def test_only_registered_health_path_is_public():
+    client = TestClient(web_bridge.app)
+    assert client.get("/health").status_code == 401
+    assert client.get("/bridge/health").status_code == 200

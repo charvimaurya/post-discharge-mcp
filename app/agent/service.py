@@ -521,6 +521,13 @@ async def _resolve_completion(
     resolution = resolve_occurrence(message, occurrences, now, pending_checkin)
 
     if resolution.action == "model":
+        if not is_medication:
+            matches = items_mentioned(message, occurrences)
+            if len(matches) > 1:
+                # Ambiguous activity names are a question, never a model-selected write.
+                return ask_reply(matches)
+            if not matches:
+                return "Which scheduled recovery activity did you finish? I haven't marked anything complete."
         return None
 
     if resolution.action == "nothing":

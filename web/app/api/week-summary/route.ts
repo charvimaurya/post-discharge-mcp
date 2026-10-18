@@ -7,6 +7,9 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
+  if (new URL(request.url).searchParams.has('patient_id')) {
+    return Response.json({ error: 'Patient identity is assigned by the server.' }, { status: 400 });
+  }
   const rejected = checkRequestOrigin(request);
   if (rejected) return rejected;
   return withDemoLimits(request, 'read', async () => {

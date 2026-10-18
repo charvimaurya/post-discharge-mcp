@@ -188,8 +188,8 @@ def test_caller_cannot_choose_patient(bridge):
         "/chat", json={"message": "Hello", "patient_id": "someone_else", "session_id": "s-pid"}
     )
 
-    assert response.status_code == 200
-    assert bridge.patients == ["demo_patient_001"]
+    assert response.status_code == 400
+    assert bridge.patients == []
 
 
 def test_missing_session_id_gets_a_new_one(bridge):

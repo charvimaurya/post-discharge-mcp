@@ -16,7 +16,7 @@ def test_week_summary_calls_read_only_mcp_tool_without_caller_patient(monkeypatc
             "as_of": "2026-10-23T07:00:00+01:00", "today": {"patient_id": "not-for-this-response"},
         }})
     monkeypatch.setattr(web_bridge, "call_mcp_tool", fake)
-    response = BridgeClient(web_bridge.app).get('/week-summary?patient_id=someone_else&date=1900-01-01')
+    response = BridgeClient(web_bridge.app).get('/week-summary?date=1900-01-01')
     assert response.status_code == 200
     assert calls == [('get_week_summary', {})]
     assert set(response.json()) == {'week', 'timezone', 'as_of'}

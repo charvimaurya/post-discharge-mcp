@@ -1,6 +1,7 @@
 export type WeekStatus = 'completed' | 'missed' | 'unknown' | 'not_yet_due' | 'no_scheduled_morning_doses';
 export type WeekDay = { date: string; isToday: boolean; status: WeekStatus; label: string; symbol: string };
-export type WeekSummary = { days: WeekDay[]; completedDays: number; synthetic: boolean };
+export type WeekActivity = { date: string; completedTasks: number };
+export type WeekSummary = { days: WeekDay[]; completedDays: number; synthetic: boolean; activity?: WeekActivity[] };
 
 const states: Record<WeekStatus, { label: string; symbol: string }> = {
   completed: { label: 'All morning medicines recorded as taken', symbol: '✓' },
@@ -30,7 +31,13 @@ export function readWeekSummary(payload: unknown): WeekSummary | null {
     if (entry.is_today !== (days.length === 6)) return null;
     days.push({ date: entry.date, isToday: entry.is_today, status, ...states[status] });
   }
-  return { days, completedDays: days.filter(day => day.status === 'completed').length,
+  let activity: WeekActivity[] | undefined;
+  if (Array.isArray(payload.week.activity) && payload.week.activity.length === 7
+      && payload.week.activity.every((entry, index) => object(entry) && entry.date === days[index].date
+        && Number.isSafeInteger(entry.completed_tasks) && Number(entry.completed_tasks) >= 0)) {
+    activity = payload.week.activity.map(entry => ({ date: entry.date as string, completedTasks: entry.completed_tasks as number }));
+  }
+  return { days, completedDays: days.filter(day => day.status === 'completed').length, ...(activity ? { activity } : {}),
     synthetic: payload.week.synthetic_demo_history === true };
 }
 

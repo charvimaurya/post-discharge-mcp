@@ -10,6 +10,12 @@ step says otherwise.
 
 Use the synthetic demo patient only. Never type real patient details into Alexa.
 
+For sync testing, use the isolated automated procedure in
+[data-synchronisation.md](data-synchronisation.md). Do not reset or complete tasks
+against shared Margaret data without approval. Idle reset is now off by default;
+keep `DEMO_IDLE_RESET_HOURS=0` while checking that completions persist. A positive
+setting explicitly enables the previous demo reset behaviour.
+
 ## 1. Before you start
 
 Install these once.
@@ -115,6 +121,20 @@ this machine may have a Windows-wide `MCP_URL` that points at the cloud server;
 without the full line, every turn fails or the clock is wrong.
 `PYTHONUNBUFFERED` makes log lines appear straight away.
 
+The local bridge launcher also supplies the `certifi` CA bundle if Python has
+no default trusted CA certificates. This addresses macOS Python installations
+where downloading Alexa's signing certificate fails with
+`CERTIFICATE_VERIFY_FAILED`. Explicit `SSL_CERT_FILE` or `SSL_CERT_DIR` settings
+are preserved. Restart the bridge with this script after updating it. This does
+not disable HTTPS verification or Alexa signature checks; direct `uvicorn`
+invocations do not run the launcher's fallback.
+
+For liveness checks, use `http://127.0.0.1:8002/bridge/health`, which returns
+`{"status":"ok"}` without credentials. `/health` is not a registered health
+route and returns 401 without the bridge key. That 401 does not diagnose Alexa:
+`POST /alexa` uses Amazon's signature, timestamp and skill-ID checks instead.
+An unsigned curl request to `/alexa` should be refused.
+
 ### Terminal 3: Web app (port 3000)
 
 ```powershell
@@ -172,6 +192,29 @@ Do this the first time, and again after any change to
 2. Replace everything in the editor with the contents of `en-GB.json` (or drag
    the file onto the editor).
 3. Click **Save**, then **Build**. Wait for the "build successful" message.
+
+### Walk-completion checks after a model update
+
+The local model includes these completion samples. In the console's en-GB test
+simulator, open the skill and check the recognised intent and `query` value:
+
+| Phrase | Intent | `query` |
+| --- | --- | --- |
+| I just came back from my walk | `CameBackFromIntent` | my walk |
+| I finished my morning walk | `FinishedIntent` | my morning walk |
+| I completed my walk | `CompletedIntent` | my walk |
+
+`FinishedIntent` normalises its opening to "I've finished" before calling the
+shared recovery service. The activity and any morning qualifier stay in the slot.
+Only a clearly matched scheduled occurrence may be saved. Multiple matching tasks
+or multiple walks in the named part of the day must prompt for clarification.
+
+Offline tests cover sample templates, slot forwarding, the real ASK handler,
+task matching and event persistence using an isolated patient with in-memory
+storage. These do not verify Amazon's hosted NLU, device speech recognition or
+live DynamoDB. Simulator and device validation remain pending until the model is
+rebuilt. Any save/read-back test must use an isolated environment; do not reset or
+complete tasks for the shared demo patient without approval.
 
 ## 6. Stop and restart
 

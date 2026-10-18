@@ -30,7 +30,7 @@ class MemoryStore:
         }
         self.events = {}
 
-    def get_item(self, *, Key):
+    def get_item(self, *, Key, ConsistentRead=False):
         assert Key == {"patient_id": PATIENT}, "Only isolated patient is allowed"
         return {"Item": deepcopy(self.plan)}
 

@@ -76,4 +76,5 @@ def test_prompt_registration_preserves_existing_tools_and_adds_week_summary():
         "report_medication_taken",
         "undo_report",
         "get_week_summary",
+        "get_recovery_day_details",
     }
