@@ -2,7 +2,6 @@
 
 from dataclasses import asdict
 import inspect
-import json
 from pathlib import Path
 
 import pytest
@@ -52,10 +51,11 @@ def test_normalized_application_state_is_checked_in_place():
     assert state.ingestion_status == "ready"
 
 
-def test_package_schema_matches_existing_extraction_contract():
-    local = Path(bedrock.__file__).parent / "schemas" / "discharge-extraction.schema.json"
+def test_extraction_uses_the_package_schema_only():
+    # One schema in one place: AfterWard keeps no local copy of the package's schema.
+    assert not (Path(bedrock.__file__).parent / "schemas" / "discharge-extraction.schema.json").exists()
     schema = bedrock.load_extraction_schema()
     assert isinstance(schema, dict)
-    assert schema == load_schema() == json.loads(local.read_text(encoding="utf-8"))
+    assert schema == load_schema()
     schema.clear()
     assert bedrock.load_extraction_schema() == bedrock.EXTRACTION_SCHEMA

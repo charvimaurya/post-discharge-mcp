@@ -1,13 +1,12 @@
 """diet_advice: extracted word for word, 'avoid' or 'advice', and dropped if not in the letter."""
 
-import json
-from pathlib import Path
+from discharge_letter_check.schema import load_schema
 
 from app.ingestion.normalizer import normalize_recovery_plan
 from app.ingestion.validator import validate_recovery_plan
 
 
-SCHEMA = json.loads(Path("app/ingestion/schemas/discharge-extraction.schema.json").read_text(encoding="utf-8"))
+SCHEMA = load_schema()
 
 LETTER = """DAILY ACTIVITIES
 Rest with your leg raised between activities.

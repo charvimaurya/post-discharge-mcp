@@ -38,7 +38,7 @@ three Python versions.
 | Shared instruction dataclasses | [recovery_model.py](../app/models/recovery_model.py) imports package types but owns a separate application RecoveryState. |
 | Extraction and persistence | AfterWard owns PDF/image processing, model calls, normalization, patient state, RAG, MCP and reminders. The package does not perform these operations. |
 | Source-dependent checks | [pipeline.py](../app/ingestion/pipeline.py) passes document text to the validator for diet/follow-on checks. This is not a universal semantic proof of all medication instructions. |
-| Duplicate schema | The [local JSON copy](../app/ingestion/schemas/discharge-extraction.schema.json) is compared in the integration tests; runtime extraction loads the package copy. It was not deleted or updated. |
+| Single schema | The local copy was removed on 18 October 2026. Extraction ([bedrock.py](../app/ingestion/bedrock.py)) and the tests load the schema only through `discharge_letter_check.schema.load_schema()`; [test_package_integration.py](../tests/ingestion/test_package_integration.py) fails if a local copy reappears. |
 
 The current v0.1.0 [integration tests](../tests/ingestion/test_package_integration.py)
 passed **4/4**.
