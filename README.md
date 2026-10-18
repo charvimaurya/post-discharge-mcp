@@ -14,7 +14,7 @@ they did, and answers questions using the letter's own words.
 | --- | --- |
 | Demo video | **PENDING_VIDEO_URL** |
 | Devpost entry | **PENDING_DEVPOST_URL** |
-| This repository | https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa |
+| This repository | https://github.com/charvimaurya/post-discharge-mcp |
 | Open-source package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) (MIT, tests on Python 3.11 to 3.13) |
 | AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |
 | Hosted demo | None. A public deployment is optional; run AfterWard locally with the steps below. |
@@ -117,8 +117,8 @@ the Alexa+ experience in two ways. Neither is a native Alexa+ deployment.
 macOS or Linux:
 
 ```bash
-git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa.git
-cd AfterWard-A-Living-Recovery-Plan-for-Alexa
+git clone https://github.com/charvimaurya/post-discharge-mcp.git
+cd post-discharge-mcp
 python3.11 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt
@@ -132,8 +132,8 @@ cd ..
 Windows PowerShell:
 
 ```powershell
-git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa.git
-cd AfterWard-A-Living-Recovery-Plan-for-Alexa
+git clone https://github.com/charvimaurya/post-discharge-mcp.git
+cd post-discharge-mcp
 py -3.11 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
@@ -197,6 +197,15 @@ The demo patient is `demo_patient_001` (Margaret, after a knee replacement).
   **Reset demo** on `/demo`, or run `python scripts/reset_demo_patient.py --confirm`.
 
 Every visitor shares this one patient. Do not use real patient data.
+
+To see Kevin's plan (`test_data/letter3_kevin_asthma_age30_SYNTHETIC.pdf`) as
+designed, set the demo clock to 23 October 2026 in `.env`, then restart the MCP
+server and the bridge:
+
+```text
+CLOCK_MODE=demo
+DEMO_FIXED_NOW=2026-10-23T07:00:00+01:00
+```
 
 ### Try the MCP server in an MCP client, without AWS
 

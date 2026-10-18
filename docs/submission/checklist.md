@@ -119,7 +119,7 @@ requires its own receipt or successful access test. Start with the P0 items in
 
 ## Repository access and release snapshot
 
-- [x] Git origin is `charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa`;
+- [x] Git origin is `charvimaurya/post-discharge-mcp`;
   MIT license exists in `LICENSE`. This does not verify remote visibility/access.
 - [ ] Review the uncommitted changes and approve a commit/release snapshot. Remote
   main cannot be assumed to contain this working tree. No commit is authorized here.

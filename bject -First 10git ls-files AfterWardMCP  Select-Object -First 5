@@ -1,0 +1,17 @@
+[33m2257d8c[m Step 7: README for judges
+[33m0e48760[m Add recovery dashboard and fix Alexa-web state synchronisation
+[33m2fceee7[m Merge shilpa/demo-session-expiry (demo idle reset after N hours)
+[33m42d1237[m Merge main (Charvi's bridge auth, demo limits, MCP App, week summary) into charvi/more-phrases
+[33mfaaa410[m Alexa feed on /demo, long-form phrases, and the letter's number in every unwell reply
+[33mf5408bf[m adding mcp steps
+[33m83c493d[m[33m ([m[1;31morigin/shilpa/demo-session-expiry[m[33m, [m[1;32mshilpa/demo-session-expiry[m[33m)[m Demo idle reset after N hours
+[33ma549fd2[m Merge main (Charvi's demo limits, Reset, bridge key, MCP App) into shilpa/alexa-skill
+[33m2139a50[m Alexa letter card, timeout line, request log
+[33m1524749[m Add Reset demo button: protected bridge /reset sharing the reset script's logic
+[33mf37ce08[m Add Alexa env settings
+[33madb452e[m Add MCP_URL and FINAL_AGENT_MODEL_ID to the env examples
+[33mf9ccf69[m Step 5: AWS integrations page
+[33m3583b6d[m git add changes
+[33me596085[m phase 13 done
+[33m8310946[m commit
+[33m10aa991[m changes till phase 9

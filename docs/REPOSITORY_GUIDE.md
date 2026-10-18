@@ -78,8 +78,8 @@ The reset script only touches `demo_patient_001`. It does not load a letter.
 Use Python 3.11 and Node.js 22.18 or newer. Clone the current repository:
 
 ```sh
-git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa.git
-cd AfterWard-A-Living-Recovery-Plan-for-Alexa
+git clone https://github.com/charvimaurya/post-discharge-mcp.git
+cd post-discharge-mcp
 ```
 
 Follow the [README](../README.md#local-setup) to create the virtual environment,

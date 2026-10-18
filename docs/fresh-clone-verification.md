@@ -26,8 +26,8 @@ commands, and the flows that write to the shared demo patient.
 Install, exactly as in the README (macOS):
 
 ```bash
-git clone <repository> AfterWard-A-Living-Recovery-Plan-for-Alexa
-cd AfterWard-A-Living-Recovery-Plan-for-Alexa
+git clone <repository> post-discharge-mcp
+cd post-discharge-mcp
 python3.11 -m venv .venv            # python.org Python 3.11.8
 source .venv/bin/activate
 python -m pip install -r requirements-dev.txt

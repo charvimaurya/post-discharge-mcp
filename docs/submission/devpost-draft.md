@@ -79,7 +79,7 @@ live. Amplify is deployment preparation, not a verified hosted frontend.
 
 | Field | Current state |
 | --- | --- |
-| Source repository | Git origin: https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa — judge access/visibility and release snapshot unverified |
+| Source repository | Git origin: https://github.com/charvimaurya/post-discharge-mcp — judge access/visibility and release snapshot unverified |
 | Demo video | **MISSING** — record/export/review the three-minute script |
 | Interactive demo | **CANNOT VERIFY** — no frontend URL supplied; do not use the MCP endpoint as the app link |
 | Package | https://github.com/charvimaurya/discharge-letter-check — local installed integration verified; anonymous link access not verified here |
