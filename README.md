@@ -74,8 +74,9 @@ letter passages indexed in S3 Vectors. Configured reminder checks run through
 Scheduler/Lambda. The observed MCP hosting path is CloudFront → ALB → ECS/Fargate.
 These components and their verification scope are listed in
 [AWS integrations](docs/aws-integrations.md). Bridge and Amplify deployment files
-are preparations, not a verified hosted frontend. Browser speech is labelled
-**Simulated Alexa+**; native Alexa+, Polly and AgentCore hosting are unverified.
+prepare an optional public deployment and are not deployed. Browser speech is
+labelled **Simulated Alexa+**; the application does not use Amazon Polly or
+AgentCore.
 
 ## Run it locally
 

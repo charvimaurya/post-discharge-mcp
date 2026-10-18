@@ -57,15 +57,17 @@ and dependency pins; ignored `build/` contains staged dependencies and archives.
 ## Conversational interface and hosting
 
 The Next.js `/demo` interface is labelled **Simulated Alexa+**. Browser Web Speech
-APIs provide synthesis and optional recognition; the active application does not
-call Amazon Polly or establish native Alexa+ integration. The server-side bridge
-calls the Bedrock agent and authenticated MCP service. The current MCP server
-registers seven tools, including undo; the responding cloud endpoint listed six
-on 17 October 2026. EventBridge/Lambda supports scheduled reminder checks; a local
+APIs provide synthesis and optional recognition; the application does not use
+Amazon Polly. A separate Alexa skill ([setup](alexa-skill.md)) talks to the same
+bridge. The server-side bridge calls the Bedrock agent and authenticated MCP
+service. The current MCP server registers nine tools and two prompts; the deployed
+ECS task definition predates the two newest tools (see
+[AWS integrations](aws-integrations.md)). EventBridge/Lambda supports scheduled reminder checks; a local
 demo can invoke the same handler. A simulated clock must be labelled in recordings.
 
 Read-only AWS inventory confirms MCP on ECS Fargate behind ALB/CloudFront. The
-separate AgentCore scaffold is not evidence that this application path uses
-AgentCore. Bridge and Amplify configs remain deployment preparations. A complete
+application does not use AgentCore. Bridge and Amplify configs are preparations
+for an optional public deployment (implementation guide Step 9) and are not
+deployed. A complete
 hosted browser-to-agent-to-MCP journey has not been verified. See
 [submission review](submission/readiness-review.md) and [test report](public-demo-final-test-report.md).
