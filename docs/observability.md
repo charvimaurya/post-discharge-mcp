@@ -114,7 +114,32 @@ Read-only AWS inspection on 17 October 2026 confirmed:
 
 **Does not detect:** authenticated MCP protocol failures, broken tool/backend dependencies while `/health` still returns 200, partial capacity loss with at least one healthy target visible to every node, or end-to-end failures involving CloudFront, viewer DNS/TLS, listeners, routing rules or authentication. The application's `/health` route returns a static service status and does not query DynamoDB, Bedrock or Secrets Manager. Short outages may recover before the alarm threshold. This is target-health monitoring, not a synthetic patient journey.
 
-**Task 3 status: Implementation complete — awaiting deployment. Deployment status: unverified.** The changes below are local configuration only. No stack, log group, ECS revision or alarm transition was deployed or changed during this task. The read-only CloudFormation `ValidateTemplate` request was denied because the current AWS identity lacks `cloudformation:ValidateTemplate`. Local YAML/configuration tests do not replace service-side validation or notification delivery verification.
+## Deployment status: deployed 18 October 2026 (eu-west-2)
+
+Deployed through the AWS console with an administrator login.
+
+**Logs**
+
+- Created log group `/ecs/afterward-mcp` with 30-day retention.
+- Created `/aws/lambda/AfterWardDocumentProcessor` and `/aws/lambda/AfterwardReminderChecker` with 30-day retention. These did not exist before, so Lambda logs were not being kept.
+- Registered task definition `afterward-mcp:6`, built from revision 5 with only the `awslogs` settings added: group `/ecs/afterward-mcp`, region `eu-west-2`, prefix `mcp`, no `awslogs-create-group`.
+- The first rollout of revision 6 failed with `ResourceNotFoundException: The specified log group does not exist`, because the group had first been created in the wrong region. The service was rolled back to revision 5 with no outage, the group was created in eu-west-2, and revision 6 was redeployed successfully.
+- Verified: `afterward-mcp-service` runs 1 task on `afterward-mcp:6`, and log stream `mcp/afterward-mcp/775f605d91104ef8b4a196852606bf98` received events (last event checked: 2026-10-18 13:48 UTC).
+- Execution role: `AfterWardEcsTaskExecutionRole` has the AWS managed `AmazonECSTaskExecutionRolePolicy` attached. No new IAM policy was added. Successful log delivery shows the role can write logs, which supersedes the 17 October simulation result below.
+
+**Alarms**
+
+- Created stack `afterward-observability` with `McpLoadBalancerFullName=app/afterward-mcp-alb/ddd2ba9b7ecf3836`, `McpTargetGroupFullName=targetgroup/afterward-mcp-tg/d1dcfea9428a3ae1`, an alarm email address, and defaults for the other parameters.
+- All three alarms exist with actions enabled. The email subscription was confirmed, and a test message published to the `afterward-alarms` topic reached the inbox. This tests delivery, not alarm evaluation.
+- `afterward-document-dlq-not-empty` went into ALARM as soon as it was created. The DLQ held 6 S3 upload events from 14 October 2026 (21:48 to 23:14 IST) that had failed processing during setup. The queue was purged, a fresh poll returned 0 messages, and the alarm returned to OK. This shows the alarm detects real failed letters.
+- `afterward-tool-errors` and `afterward-mcp-no-healthy-targets` show OK.
+
+**Not yet verified**
+
+- An email sent by an alarm itself. The DLQ alarm fired before the subscription was confirmed, and the alarms only notify on entering ALARM.
+- `tool_errors` metric datapoints from real tool failures.
+- Lambda logs arriving in the two new Lambda log groups. This depends on the Lambda roles' log permissions.
+- The repository's `ecs-task-definition.json` is not identical to live revision 6, which keeps the newer live settings from revision 5.
 
 ## AWS administrator runbook
 
@@ -272,6 +297,8 @@ python scripts/run_web_bridge.py | rg "PASTE_REQUEST_ID_HERE"
 
 ## Pre-deployment readiness review
 
+*Historical record from 17 October 2026. Superseded by the deployment status above.*
+
 Offline checks on 17 October 2026:
 
 | Check | Result | Evidence or remaining action |
@@ -289,4 +316,4 @@ Offline checks on 17 October 2026:
 | Service-side template validation | UNVERIFIED | Previous ValidateTemplate attempt was denied. Administrator must validate before deployment. |
 | Live logs, EMF datapoints, alarm transitions and notification receipt | UNVERIFIED | No deployment or live state-changing tests performed. |
 
-Local implementation is ready for administrator hand-off. **Do not execute the rollout until the execution-role permission failure and the remaining AWS preflight checks are resolved.** The implementation status is not evidence that monitoring is deployed or fully complete. No application-code changes are needed for the three configured alarms. End-to-end authenticated MCP/CloudFront monitoring remains a separate enhancement; live alarm transitions and notification delivery are unverified.
+This review was written before deployment. See "Deployment status" for what is now live. Local implementation is ready for administrator hand-off. **Do not execute the rollout until the execution-role permission failure and the remaining AWS preflight checks are resolved.** The implementation status is not evidence that monitoring is deployed or fully complete. No application-code changes are needed for the three configured alarms. End-to-end authenticated MCP/CloudFront monitoring remains a separate enhancement; live alarm transitions and notification delivery are unverified.
