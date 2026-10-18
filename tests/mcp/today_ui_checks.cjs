@@ -18,9 +18,9 @@ class Element {
   setAttribute(key, value) { this.attributes[key] = value; }
 }
 function start(embedded = true) {
-  const elements = Object.fromEntries(['message', 'tasks', 'count', 'progress', 'week', 'week-summary', 'week-days', 'week-synthetic'].map(id => [id, new Element()]));
+  const elements = Object.fromEntries(['message', 'tasks', 'count', 'progress', 'week', 'week-summary', 'week-days', 'week-synthetic', 'week-activity', 'week-activity-days'].map(id => [id, new Element()]));
   elements.message.textContent = "Waiting for today's plan";
-  elements.count.hidden = elements.progress.hidden = elements.week.hidden = elements['week-synthetic'].hidden = true;
+  elements.count.hidden = elements.progress.hidden = elements.week.hidden = elements['week-synthetic'].hidden = elements['week-activity'].hidden = true;
   const sent = [];
   let listener;
   const host = {postMessage: (data, origin) => sent.push({data, origin})};
@@ -187,5 +187,38 @@ check('weekly JSON text works in a new instance without retained Today data', ()
   const app = start(); app.initialize(); app.deliver({content: [{type: 'text', text: JSON.stringify(weekly.structuredContent)}]});
   assert.equal(app.elements.week.hidden, false);
   assert.equal(app.elements.count.textContent, '1 of 4 done');
+});
+const counts = [2, 3, 1, 3, 2, 0, 1];
+const withActivity = JSON.parse(JSON.stringify(weekly));
+withActivity.structuredContent.data.week.activity = weekDays.map((day, i) => ({date: day.date, completed_tasks: counts[i]}));
+check('task counts render per day, apart from the morning medicines', () => {
+  const app = start(); app.initialize(); app.deliver(withActivity);
+  const rows = app.elements['week-activity-days'].children;
+  assert.equal(app.elements['week-activity'].hidden, false);
+  assert.deepEqual(rows.map(row => Number(row.children[1].textContent)), counts);
+  assert.match(rows[0].attributes['aria-label'], /^Sat 17: 2 recovery tasks recorded complete$/);
+  assert.match(rows[6].attributes['aria-label'], /1 recovery tasks recorded complete, today$/);
+  // The medicines line is computed from medicine statuses only, so the counts change nothing there.
+  assert.equal(app.elements['week-summary'].textContent, '5 of 7 days: all morning medicines taken');
+  assert.equal(app.elements['week-days'].children.length, 7);
+});
+check('missing or malformed task counts hide only the task section', () => {
+  const mutations = [a => a.pop(), a => { a[0].date = '2026-10-16'; }, a => { a[2].completed_tasks = -1; },
+    a => { a[3].completed_tasks = 1.5; }, a => { a[4].completed_tasks = '3'; }, a => { a[5] = null; }];
+  for (const mutate of [...mutations, null]) {
+    const data = JSON.parse(JSON.stringify(withActivity));
+    if (mutate) mutate(data.structuredContent.data.week.activity); else delete data.structuredContent.data.week.activity;
+    const app = start(); app.initialize(); app.deliver(withActivity); app.deliver(data);
+    assert.equal(app.elements['week-activity'].hidden, true);
+    assert.equal(app.elements['week-activity-days'].children.length, 0);
+    assert.equal(app.elements.week.hidden, false);
+    assert.equal(app.elements['week-days'].children.length, 7);
+  }
+});
+check('a new day clears the task counts with the rest of the week', () => {
+  const app = start(); app.initialize(); app.deliver(withActivity);
+  app.deliver({structuredContent: {ok: true, data: {date: '2026-10-24', tasks: []}}});
+  assert.equal(app.elements['week-activity'].hidden, true);
+  assert.equal(app.elements['week-activity-days'].children.length, 0);
 });
 console.log(`${checks.length} UI checks passed`);

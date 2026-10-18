@@ -6,6 +6,13 @@ from zoneinfo import ZoneInfo
 
 PATIENTS = {"isolated_mcpjam_s4", "isolated_week_demo"}
 
+# Recovery tasks recorded complete on the six days before today, oldest first. Today gets none:
+# its count comes from what is really recorded in the session, so it matches the Today card.
+TASK_COUNTS = (2, 3, 1, 3, 2, 0)
+TASKS = (("task_walk", 1), ("task_exercises", 1), ("task_walk", 2))
+# On this many days ago a second task is recorded and then undone, so it does not count.
+UNDONE_OFFSET = 4
+
 
 def seed_week_events(patient_id, now, timezone="Europe/London"):
     if patient_id not in PATIENTS or now.utcoffset() is None:
@@ -34,4 +41,16 @@ def seed_week_events(patient_id, now, timezone="Europe/London"):
                 add(kind, {**common, "occurrence_id": occurrence["occurrence_id"],
                            "completed_at": occurrence["due_at"]} if kind == "medication_taken" else
                     {**common, "occurrence_id": occurrence["occurrence_id"]}, occurrence["occurrence_id"])
+            # Task completions come after the day's medicine rows and use their own event types,
+            # so the morning-medicine history is unchanged.
+            tasks = list(TASKS[:TASK_COUNTS[6 - offset]])
+            if offset == UNDONE_OFFSET:
+                tasks.append(TASKS[1])
+            for task, number in tasks:
+                occurrence_id = f"{task}#{date}#{number}"
+                completed_at = datetime.combine(day, time(10 + number), zone).isoformat()
+                add("task_completed", {**common, "occurrence_id": occurrence_id, "completed_at": completed_at}, occurrence_id)
+            if offset == UNDONE_OFFSET:
+                undone = f"{TASKS[1][0]}#{date}#{TASKS[1][1]}"
+                add("task_undone", {**common, "occurrence_id": undone}, undone)
     return rows

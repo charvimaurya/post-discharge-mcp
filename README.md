@@ -211,7 +211,9 @@ python -m tests.mcp.isolated_host --token-file /tmp/afterward-mcp-token --with-w
 On Windows, use `--token-file $env:TEMP\afterward-mcp-token`. Connect an MCP client
 such as MCPJam to `http://127.0.0.1:18001/mcp` with that token as the bearer
 token, then run `get_today_tasks` or `get_week_summary` to see the Today card. Only
-those tools and task completion are enabled in this mode.
+those tools and task completion are enabled in this mode. `--with-week` adds a
+synthetic seven-day history of morning medicines and task completions, in memory
+only; see [synthetic seven-day history](docs/synthetic-week-history.md).
 
 ## Run the tests
 

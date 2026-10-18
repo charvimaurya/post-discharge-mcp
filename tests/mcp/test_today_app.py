@@ -81,4 +81,4 @@ def test_today_card_javascript_with_real_sdk_result(monkeypatch):
         text=True, capture_output=True, timeout=20,
     )
     assert completed.returncode == 0, completed.stdout + completed.stderr
-    assert "20 UI checks passed" in completed.stdout
+    assert "23 UI checks passed" in completed.stdout

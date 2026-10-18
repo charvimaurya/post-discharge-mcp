@@ -37,6 +37,33 @@ def test_seed_five_complete_one_missed_today_not_due_and_rerun(events):
     assert summary(events + deepcopy(events)) == result
 
 
+def test_seed_task_counts_are_kept_apart_from_morning_medicines(events):
+    result = summary(events)
+    activity = week.task_activity(events, PATIENT, result["days"])
+    # Six seeded days, one with a recorded-then-undone task; today only counts what the session records.
+    assert [a["completed_tasks"] for a in activity] == [2, 3, 1, 3, 2, 0, 0]
+    medicine_only = [e for e in events if not e["event_type"].startswith("task_")]
+    assert summary(medicine_only) == result
+    assert week.task_activity(medicine_only, PATIENT, result["days"]) == [
+        {"date": d["date"], "completed_tasks": 0} for d in result["days"]]
+
+
+@pytest.mark.parametrize("timezone,now", [
+    ("Europe/London", "2026-10-23T08:00:00+01:00"),
+    ("Europe/London", "2026-10-26T00:30:00+00:00"),
+    ("America/Los_Angeles", "2026-10-23T00:30:00+00:00"),
+])
+def test_seed_uses_one_seven_day_window_for_medicines_and_tasks(timezone, now):
+    instant = datetime.fromisoformat(now)
+    rows = seed_week_events(PATIENT, instant, timezone)
+    result = summary(rows, instant, timezone)
+    activity = week.task_activity(rows, PATIENT, result["days"])
+    seeded_dates = {row["details"]["date"] for row in rows}
+    assert [a["date"] for a in activity] == [d["date"] for d in result["days"]]
+    assert seeded_dates == {d["date"] for d in result["days"]}
+    assert all(row["patient_id"] == PATIENT and row["synthetic"] is True for row in rows)
+
+
 def test_absence_never_means_missed(events):
     empty = summary([])
     assert all(d["status"] == "unknown" and d["scheduled_doses"] is None for d in empty["days"])
