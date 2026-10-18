@@ -156,9 +156,11 @@ with synthetic data."
 **End card:** AfterWard · Simulated Alexa+ · synthetic data prototype · repository
 link (and video and Devpost links once they exist).
 
-Optional, only if time allows: **View weekly dashboard** (opens a new tab). With
-real data it shows evidence for 23 October only; earlier days are honestly
-"unknown". Do not present it as a week of adherence.
+Optional, only if time allows: **View weekly dashboard** (opens a new tab). The
+calendar starts at Wed 21: 21 and 22 hold demo history added with
+`scripts/seed_demo_history.py` (not recorded through the app), 23 is today, and
+24 to 27 are upcoming. Do not narrate 21 and 22 as recorded by Margaret. A new letter
+upload deletes the demo history; re-run the seed script afterwards.
 
 ## Do not say or show
 

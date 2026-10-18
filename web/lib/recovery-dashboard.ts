@@ -1,4 +1,19 @@
-import { readWeekSummary } from './week-summary.ts';
+import { readWeekSummary, type WeekDay, type WeekSummary } from './week-summary.ts';
+
+/**
+ * The dashboard calendar: it starts on the first day with saved history (or recorded tasks),
+ * never later than today, and the remaining tiles of seven are the days ahead. Days before the
+ * first saved one are left out rather than shown as empty.
+ */
+export function calendarDays(week: WeekSummary): { past: WeekDay[]; upcoming: string[] } {
+  const tasks = new Map((week.activity || []).map(entry => [entry.date, entry.completedTasks]));
+  const first = week.days.findIndex(day => day.hasHistory || (tasks.get(day.date) || 0) > 0);
+  const past = week.days.slice(first === -1 ? week.days.length - 1 : first);
+  const today = Date.parse(`${week.days[week.days.length - 1].date}T12:00:00Z`);
+  const upcoming = Array.from({ length: week.days.length - past.length },
+    (_, i) => new Date(today + (i + 1) * 86_400_000).toISOString().slice(0, 10));
+  return { past, upcoming };
+}
 
 export type RecoveryEntry = { occurrence_id: string; name: string | null; status: string; recorded_at: string | null;
   dose?: string | null; period?: string | null; due_at?: string | null; needs_confirmation?: boolean };

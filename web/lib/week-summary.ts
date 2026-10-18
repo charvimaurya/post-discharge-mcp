@@ -1,5 +1,6 @@
 export type WeekStatus = 'completed' | 'missed' | 'unknown' | 'not_yet_due' | 'no_scheduled_morning_doses';
-export type WeekDay = { date: string; isToday: boolean; status: WeekStatus; label: string; symbol: string };
+// hasHistory: the day has saved schedule evidence (a snapshot, or today's own occurrences).
+export type WeekDay = { date: string; isToday: boolean; status: WeekStatus; label: string; symbol: string; hasHistory: boolean };
 export type WeekActivity = { date: string; completedTasks: number };
 export type WeekSummary = { days: WeekDay[]; completedDays: number; synthetic: boolean; activity?: WeekActivity[] };
 
@@ -29,7 +30,8 @@ export function readWeekSummary(payload: unknown): WeekSummary | null {
         || (days.length && stamp - Date.parse(`${days.at(-1)!.date}T00:00:00Z`) !== 86_400_000)) return null;
     const status = entry.status as WeekStatus;
     if (entry.is_today !== (days.length === 6)) return null;
-    days.push({ date: entry.date, isToday: entry.is_today, status, ...states[status] });
+    const hasHistory = entry.schedule_evidence === 'snapshot' || entry.schedule_evidence === 'current_day_occurrences';
+    days.push({ date: entry.date, isToday: entry.is_today, status, ...states[status], hasHistory });
   }
   let activity: WeekActivity[] | undefined;
   if (Array.isArray(payload.week.activity) && payload.week.activity.length === 7

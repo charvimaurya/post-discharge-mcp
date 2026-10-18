@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { loadBindings, transform } from 'next/dist/build/swc/index.js';
-import { fetchRecoverySnapshot, readRecoveryDay, recordedTime } from '../lib/recovery-dashboard.ts';
+import { calendarDays, fetchRecoverySnapshot, readRecoveryDay, recordedTime } from '../lib/recovery-dashboard.ts';
 import { readWeekSummary } from '../lib/week-summary.ts';
 
 function day(date = '2026-10-23') {
@@ -85,4 +85,39 @@ test('missing historical schedules are shown honestly and previous selected-day 
   assert.match(render({ day: p }), /Not enough historical schedule evidence/);
   assert.ok(!render({ selected: '2026-10-20' }).includes('1 demo tablet'));
   assert.match(render({ day: null, error: true }), /role="alert"/);
+});
+
+// Saved history on Wed 21 and Thu 22, and today's own occurrences on Fri 23; nothing before.
+const savedFrom21 = () => {
+  const payload = weekPayload() as { week: { days: Record<string, unknown>[] } };
+  payload.week.days.forEach((entry, i) => {
+    entry.schedule_evidence = i < 4 ? 'missing' : i < 6 ? 'snapshot' : 'current_day_occurrences';
+    if (i === 4 || i === 5) entry.status = 'completed';
+  });
+  return readWeekSummary(payload)!;
+};
+
+test('the calendar starts at the first saved day and the rest are days ahead', () => {
+  const { past, upcoming } = calendarDays(savedFrom21());
+  assert.deepEqual(past.map(day => day.date), ['2026-10-21', '2026-10-22', '2026-10-23']);
+  assert.deepEqual(upcoming, ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27']);
+  // With no saved day at all, the calendar starts today.
+  const empty = readWeekSummary({ week: { days: weekPayload().week.days } })!;
+  assert.deepEqual(calendarDays(empty).past.map(day => day.date), ['2026-10-23']);
+  assert.equal(calendarDays(empty).upcoming.length, 6);
+});
+
+test('the dashboard shows Wed 21 to Tue 27, days completed, and the selected day\'s tasks', () => {
+  const html = render({ week: savedFrom21() });
+  assert.match(html, /Wed 21 – Tue 27/);
+  assert.ok(!html.includes('2026-10-20,'));
+  assert.equal((html.match(/aria-pressed=/g) || []).length, 7);
+  assert.equal((html.match(/upcoming" aria-pressed="false" disabled=""/g) || []).length, 4);
+  // The fixture's today is already confirmed, so all three shown days are complete.
+  assert.match(html, /<b>3\/3<\/b><p>Days completed<\/p>\s*<small>All morning medicines recorded<\/small>/);
+  // Tasks are for the selected day (Fri 23): one recorded out of one in its schedule.
+  assert.match(html, /<b>1\/1<\/b><p>Tasks completed<\/p>\s*<small>Fri 23<\/small>/);
+  assert.ok(!html.includes('incomplete history'));
+  // No day details yet: no task total is guessed.
+  assert.match(render({ week: savedFrom21(), day: null }), /<b>–<\/b><p>Tasks completed/);
 });

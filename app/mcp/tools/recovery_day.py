@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo
 
 from app.clock import get_patient_datetime
 from app.database.event_history import get_complete_patient_events
-from app.database.recovery_state import get_recovery_state, get_medications
+from app.database.recovery_state import get_recovery_state, get_medications, get_today_tasks
 from app.mcp.results import success_result, error_result
 from app.mcp.tools.week import aware, SYNTHETIC_PATIENTS
 
@@ -118,6 +118,11 @@ def build_day_details(state, events, patient_id, day, now):
     tasks = []
     task_snapshot = historical_schedule(rows, "task_schedule_snapshot", day, timezone)
     task_items = task_snapshot["occurrences"] if task_snapshot else []
+    if not task_snapshot and selected == local.date():
+        # Today's own task occurrences are the denominator, as for medicines; never projected backwards.
+        task_items = [{"occurrence_id": item["occurrence_id"], "name": item.get("description") or item.get("title")}
+                      for item in state.get("current_tasks", [])
+                      if isinstance(item.get("occurrence_id"), str) and item["occurrence_id"].rsplit("#", 2)[-2:-1] == [day]]
     # Saved task actions can be shown even without a historical task denominator.
     known = {item["occurrence_id"] for item in task_items}
     for event in rows:
@@ -149,6 +154,7 @@ def get_recovery_day_details_for_context(context, day):
         now = get_patient_datetime(state.get("timezone") or "Europe/London")
         if day == now.date().isoformat():
             state["current_medications"] = get_medications(context.patient_id, day)
+            state["current_tasks"] = get_today_tasks(context.patient_id, day)
         result = build_day_details(state, get_complete_patient_events(context.patient_id), context.patient_id, day, now)
         return success_result(data=result, message="Recovery history checked from saved records.")
     except (ValueError, TypeError):

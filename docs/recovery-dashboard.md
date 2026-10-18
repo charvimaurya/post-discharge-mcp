@@ -8,6 +8,14 @@ Today" closes that tab, or opens `/demo?view=today` (straight to the plan, not
 the upload screen) when the browser keeps the tab open. The dashboard uses the Today screen's frame, top bar, panels and cards. The Today
 page's five-second polling is unchanged.
 
+The calendar starts on the first day with saved history (or recorded tasks), never
+later than today, and fills the rest of its seven tiles with the days ahead, which
+cannot be opened. The totals count only the shown days up to today. To give the
+demo patient history on past days, run `scripts/seed_demo_history.py` (preview by
+default; `--confirm` writes, `--remove` deletes exactly what it wrote). It writes
+to the live Event History table; Reset demo keeps those days, a new upload removes
+them. See `app/demo_history.py`.
+
 After pulling this change, restart both the MCP server and the web bridge. A
 process started before `get_recovery_day_details` existed answers
 `Unknown tool`, and the page then shows "Recovery history could not be checked".

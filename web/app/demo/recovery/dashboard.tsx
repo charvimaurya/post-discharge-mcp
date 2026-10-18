@@ -1,7 +1,7 @@
 // The weekly recovery dashboard, in the same panels, cards and chips as the Today screen.
 // The page (page.tsx) supplies the top bar, footer and scaled frame.
 import { weekDayLabel, type WeekSummary } from '../../../lib/week-summary';
-import { recordedTime, recoveryStatus, type RecoveryDay, type RecoveryEntry } from '../../../lib/recovery-dashboard';
+import { calendarDays, recordedTime, recoveryStatus, type RecoveryDay, type RecoveryEntry } from '../../../lib/recovery-dashboard';
 
 // Card and chip look for each saved status; anything unrecorded stays neutral grey.
 const look: Record<string, { item: string; chip: string; symbol: string }> = {
@@ -32,32 +32,42 @@ export function RecoveryDashboard({ week, day, selected, loading, error, onSelec
   week: WeekSummary | null; day: RecoveryDay | null; selected: string; loading: boolean; error: boolean;
   onSelect: (date: string) => void; onRefresh: () => void;
 }) {
-  const tasksDone = week?.activity ? week.activity.reduce((n, d) => n + d.completedTasks, 0) : null;
+  const calendar = week ? calendarDays(week) : null;
+  const tiles = calendar ? [...calendar.past.map(d => d.date), ...calendar.upcoming] : [];
   const shown = day && day.date === selected ? day : null;
+  // The selected day's tasks: recorded complete out of that day's saved (or, today, current) schedule.
+  const tasksDone = shown ? shown.tasks.filter(t => t.status === 'completed').length : null;
   const selectedDay = week?.days.find(d => d.date === selected);
   return <div className="stage recovery-stage">
     <div className="panel recovery-week">
       <div className="th">
-        <div><div className="eyebrow">{week ? `${weekDayLabel(week.days[0].date)} ${week.days[0].date.slice(-2)} – ${weekDayLabel(week.days[6].date)} ${week.days[6].date.slice(-2)}` : 'Last 7 days'}</div>
+        <div><div className="eyebrow">{tiles.length ? `${weekDayLabel(tiles[0])} ${tiles[0].slice(-2)} – ${weekDayLabel(tiles[tiles.length - 1])} ${tiles[tiles.length - 1].slice(-2)}` : 'Last 7 days'}</div>
           <h2>This week</h2></div>
         <button type="button" className="back" onClick={onRefresh} disabled={loading}>Refresh</button>
       </div>
       <div className="tbody" tabIndex={0} role="region" aria-label="Weekly summary">
         <div aria-live="polite">{error ? <p className="recovery-alert" role="alert">Recovery history could not be checked. Please try Refresh.</p>
           : loading && !week ? <p className="note">Checking saved records…</p> : null}</div>
-        {week && <>
+        {week && calendar && <>
           <section className="recovery-stats" aria-label="Weekly totals">
-            <div><b>{week.completedDays}<span> of 7</span></b><p>Mornings confirmed</p></div>
-            <div><b>{tasksDone ?? '–'}</b><p>Tasks recorded complete</p></div>
-            <div><b>{week.days.filter(d => d.status === 'unknown').length}</b><p>Days with incomplete history</p></div>
+            <div><b>{calendar.past.filter(d => d.status === 'completed').length}/{calendar.past.length}</b><p>Days completed</p>
+              <small>All morning medicines recorded</small></div>
+            <div><b>{shown && shown.tasks.length ? `${tasksDone}/${shown.tasks.length}` : '–'}</b><p>Tasks completed</p>
+              <small>{selected ? `${weekDayLabel(selected)} ${selected.slice(-2)}` : 'Choose a day'}</small></div>
           </section>
           <div className="slot-h">Choose a day</div>
           <nav className="recovery-days" aria-label="Choose a recovery date">
-            {week.days.map(d => <button key={d.date} type="button" className={`week-day ${d.status}`} aria-pressed={selected === d.date}
+            {calendar.past.map(d => <button key={d.date} type="button" className={`week-day ${d.status}`} aria-pressed={selected === d.date}
               aria-current={d.isToday ? 'date' : undefined} onClick={() => onSelect(d.date)}
               aria-label={`${d.date}, ${d.label}${d.isToday ? ', today' : ''}`}>
               <span>{weekDayLabel(d.date)}</span><b>{d.date.slice(-2)}</b><i aria-hidden="true">{d.symbol}</i>
               <small>{d.isToday ? 'Today' : ' '}</small>
+            </button>)}
+            {/* Days ahead have no history yet, so they cannot be opened. */}
+            {calendar.upcoming.map(date => <button key={date} type="button" className="week-day upcoming" aria-pressed={false}
+              disabled aria-label={`${date}, upcoming`}>
+              <span>{weekDayLabel(date)}</span><b>{date.slice(-2)}</b><i aria-hidden="true">·</i>
+              <small>Upcoming</small>
             </button>)}
           </nav>
           <p className="week-note">✓ Taken · – Recorded missed · ◌ No history · ○ Not yet due · · None scheduled</p>
