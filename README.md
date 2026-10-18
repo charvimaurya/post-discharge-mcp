@@ -1,173 +1,120 @@
 # AfterWard
 
-AfterWard is a post-discharge companion prototype with document ingestion, structured recovery plans and a browser voice interface labelled **Simulated Alexa+**.
+**A living recovery plan for Alexa+.** AfterWard reads a hospital discharge letter,
+turns it into a daily plan, reminds the patient at the right moment, records what
+they did, and answers questions using the letter's own words.
 
-Deployment configuration uses AfterWard resource names. The [migration record](docs/aws-name-migration.md) describes retained rollback resources; their full current availability has not been reverified.
+> **Synthetic data only.** Every letter and patient in this repository is invented.
+> AfterWard is a hackathon prototype, not a medical device, and has not been
+> clinically validated.
 
-Use `DOCUMENT_BUCKET` for the S3 bucket setting. `AFTERWARD_BUCKET` is also
-accepted by the Python configuration as a compatibility fallback; the web server uses
-`DOCUMENT_BUCKET`. Bucket values must refer to an existing bucket.
-See [deployment instructions](deployment/README.md) for building
-`build/afterward_document_processor.zip` and the updated configuration paths.
+## Judge links
 
-- `app/mcp/`: authenticated MCP server and recovery-plan tools
-- `app/`: ingestion, RAG, AWS services, and database operations
-- `lambdas/`: Lambda entry points
-- `deployment/`: deployment configuration and dependency pins
-- `build/`: generated packages (excluded from Git)
-- `tests/`: project tests
-
-## Judge links and scope
-
-| Item | Link or status |
+| Item | Link |
 | --- | --- |
-| Public demo | **PENDING_DEMO_URL**. A hosted frontend has not been verified. |
-| Three-minute video | **PENDING_VIDEO_URL** |
-| Devpost | **PENDING_DEVPOST_URL** |
-| Application repository access | **PENDING_REPOSITORY_ACCESS**. Anonymous GitHub API lookup returned 404 for the configured origin; judge access is not established. |
-| Reusable package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) |
-| Package CI | [Verified three-version run](https://github.com/charvimaurya/discharge-letter-check/actions/runs/38950242737), Python 3.11/3.12/3.13 |
-| Engineering feedback | [Product feedback draft](docs/product-feedback.md), not submitted externally |
+| Demo video | **PENDING_VIDEO_URL** |
+| Devpost entry | **PENDING_DEVPOST_URL** |
+| This repository | https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa |
+| Open-source package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) (MIT, tests on Python 3.11 to 3.13) |
+| AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |
+| Hosted demo | None. A public deployment is optional; run AfterWard locally with the steps below. |
 
-Use synthetic data only. This prototype has not been clinically validated.
-The medication safety issues below block patient-facing use.
+## The problem
 
-## Prototype and hosting status (17 October 2026)
+Leaving hospital comes with a letter full of instructions: tablets at set times,
+exercises, walks, wound care, warning signs. At home, with no nurse nearby,
+patients and families have to remember all of it alone. A missed instruction or a
+misread dose can send someone back to hospital.
 
-The current application registers **eight MCP tools**: get_recovery_plan,
-get_today_tasks, get_medications, search_discharge_instructions,
-report_task_completed, report_medication_taken, undo_report and get_week_summary.
-An earlier authenticated read-only check found **six tools** at one deployed
-CloudFront endpoint, without undo_report or get_week_summary. The other endpoint
-timed out. That listing was not refreshed in this review. Current read-only AWS
-metadata confirms the hosting resources, not source parity or a working demo.
+## What AfterWard does
 
-The verified MCP hosting path is CloudFront → ALB → ECS Fargate (MCP). The former
-`AfterWardMCP/` AgentCore template has been removed from the repository; the
-application does not use AgentCore. Voice uses browser speech synthesis/recognition; this is a **Simulated
-Alexa+** experience, not a verified native Alexa+ integration or Amazon Polly.
+1. **Reads the letter.** Upload a PDF or photo. Amazon Bedrock extracts every
+   medicine, task, appointment and warning sign, each with the exact sentence it
+   came from. The [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check)
+   package flags anything unclear for a person to confirm, so nothing is guessed.
+2. **Builds today's plan.** Tasks and doses by time of day, with a weekly view.
+3. **Speaks first.** At 07:00 it says what is coming up, without being asked.
+4. **Records progress.** "I'm back from my walk" ticks the walk.
+5. **Answers from the letter.** "Can I drive?" gets the letter's own sentence and
+   page. If the letter does not say, AfterWard says so instead of guessing.
+6. **Responds safely to a crisis.** A message showing a risk of self-harm gets one
+   fixed reply pointing to 999 and Samaritans, before anything else runs.
 
-`discharge-letter-check` v0.1.0 supplies the extraction schema, instruction types
-and validation helpers. AfterWard owns ingestion orchestration, recovery state,
-retrieval, agent behavior and reminders. Its four v0.1.0 integration checks pass.
-The separate package main is v0.2.0, but a source compatibility probe failed three
-of four checks; no upgrade was applied. See the [package review and medication
-safety findings](docs/discharge-letter-check-review.md).
+## Hackathon tracks
 
-A hosted frontend and end-to-end public demo have **not** been verified. Bridge
-and Amplify configurations are prepared, not deployed; shared-patient safety and
-Next.js/Amplify compatibility remain release blockers. See the
-[submission readiness review](docs/submission/readiness-review.md),
-[demo test report](docs/public-demo-final-test-report.md),
-[video script](docs/submission/video-script.md) and
-[submission checklist](docs/submission/checklist.md).
+- **Alexa+ track.** A voice-first recovery companion, shown as a **Simulated
+  Alexa+** web experience plus an Alexa skill (see below).
+- **AWS Builder.** Bedrock, Titan Embeddings, S3, S3 Vectors, SQS, Lambda,
+  DynamoDB, EventBridge Scheduler, ECS Fargate, CloudFront and Secrets Manager. See
+  [AWS integrations](docs/aws-integrations.md) for each service, the file that uses
+  it and its checked deployment status.
+- **Open Source.** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check)
+  is a separate public MIT package, split out of AfterWard. AfterWard installs it
+  from the `v0.1.0` release (`requirements.txt`) and uses it for the extraction
+  schema and every letter check.
 
 ## Architecture
 
-The browser talks to Next.js server API routes, which call the authenticated
-Python bridge/agent. The agent uses MCP tools to read the plan, retrieve letter
-passages and record reported completion. Service credentials stay server-side;
-bridge authentication does not provide visitor or patient isolation.
+![AfterWard architecture](docs/architecture.svg)
 
-Uploads follow S3 → SQS → document Lambda → Bedrock extraction → DynamoDB, with
-letter passages indexed in S3 Vectors. Configured reminder checks run through
-Scheduler/Lambda. The observed MCP hosting path is CloudFront → ALB → ECS/Fargate.
-These components and their verification scope are listed in
-[AWS integrations](docs/aws-integrations.md). Bridge and Amplify deployment files
-prepare an optional public deployment and are not deployed. Browser speech is
-labelled **Simulated Alexa+**; the application does not use Amazon Polly or
-AgentCore.
+- **Letter to plan:** web upload → S3 → SQS (with a dead-letter queue) → Lambda →
+  Bedrock extraction, checked by discharge-letter-check → DynamoDB plan. Each page
+  is embedded with Titan and stored in S3 Vectors for search.
+- **Conversation:** the web app and the Alexa skill call the Python bridge, which
+  runs the Bedrock agent. The agent reads and records everything through the MCP
+  server.
+- **Reminders:** EventBridge Scheduler runs a Lambda every 5 minutes, which saves
+  a check-in for AfterWard to speak.
 
-## Run it locally
+More detail: [architecture](docs/architecture.md),
+[AWS integrations](docs/aws-integrations.md),
+[Alexa and web data synchronisation](docs/data-synchronisation.md).
 
-To run AfterWard on Alexa from your own Windows machine, follow
-[Running the Alexa skill locally](docs/alexa-skill.md): setup, the five
-terminals, connecting the skill, a quick check and troubleshooting.
+## How AfterWard uses MCP
 
-## Setup and local checks
+AfterWard runs its own MCP server ([app/mcp/server.py](app/mcp/server.py)) over
+Streamable HTTP with a bearer token. The agent has no other way to read or change
+the patient's data.
 
-Use Python 3.11 for AfterWard and Node.js 24 for `web/`. The reusable package's
-three-version CI does not establish Python 3.12/3.13 support for the whole app.
-A full local web workflow still needs the configured AWS services and authorized
-synthetic data. Do not run uploads, resets or task writes against shared Margaret.
+| Kind | Tools and prompts |
+| --- | --- |
+| Read the plan | `get_recovery_plan`, `get_today_tasks`, `get_medications`, `get_week_summary`, `get_recovery_day_details` |
+| Search the letter | `search_discharge_instructions` (S3 Vectors; returns the letter's sentences and page numbers) |
+| Record progress | `report_task_completed`, `report_medication_taken`, `undo_report` |
+| Prompts | `ask_my_letter(question)`, `morning_checkin()` |
+| MCP App | `get_today_tasks` and `get_week_summary` link to `ui://afterward/today.html`, a Today card that MCP Apps hosts render |
 
-From a fresh clone:
+The patient is chosen by the server from the token, never by the model. The
+deployed MCP server on ECS was last updated before `get_week_summary` and
+`get_recovery_day_details` were added; the demo runs the current server locally.
 
-```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-python -m pip install pytest
-# Copy only when .env does not already exist.
-test -f .env || cp .env.example .env
-```
+## The Simulated Alexa+ demo
 
-Fill `.env` using your authorized development configuration: region, model IDs,
-DynamoDB tables, bucket, queue, vector bucket/index, private `MCP_AUTH_TOKEN` and
-`BRIDGE_KEY`. Set `MCP_URL=http://127.0.0.1:8001/mcp` for the local workflow.
-Use your normal AWS credential chain or `AWS_PROFILE`; never commit credentials.
-Replace the example local token and use distinct deployment secrets. In test model
-mode, `TEST_MODEL_ID` must name an accessible model; final mode requires
-`FINAL_EXTRACTION_MODEL_ID` and `FINAL_AGENT_MODEL_ID` (add the latter explicitly
-if it is absent from your environment template). See [.env.example](.env.example).
+The Alexa+ developer toolkit is open only to selected partners, so AfterWard shows
+the Alexa+ experience in two ways. Neither is a native Alexa+ deployment.
 
-Run the default checks without enabling live integration tests:
+- **Web demo (`/demo`), labelled "Simulated Alexa+".** The browser speaks and
+  listens with its own Web Speech API; you can also type. A Developer view shows
+  every MCP tool call. **View weekly dashboard** opens a seven-day history.
+- **Alexa skill ("open after ward").** A classic Alexa custom skill, tested in the
+  Alexa developer console simulator. It talks to the same local bridge through a
+  temporary tunnel, so both share one plan. It is not published.
+  Setup: [Running the Alexa skill locally](docs/alexa-skill.md).
 
-```bash
-python -m pytest -q
-cd web
-npm ci
-npm test
-npm run typecheck
-npm run build
-```
+## Run AfterWard locally
 
-The current checkout passed **878 Python tests, 10 live integrations deselected**,
-**73 web tests**, typecheck and a production web build in this review. See the [review results](docs/discharge-letter-check-review.md).
-These are checkout results, not proof of a clean machine or deployed workflow.
+### What you need
 
-For an AWS-free, isolated MCP App preview, from the root with the venv active:
+- Python 3.11 and Node.js 24 ([web/.nvmrc](web/.nvmrc)).
+- An AWS account in eu-west-2 with Bedrock model access, the two DynamoDB tables,
+  the documents bucket, the S3 Vectors index, and (for uploads) the deployed
+  document Lambda. See [AWS setup](docs/aws-setup.md) and [deployment](deployment/README.md).
+- AWS credentials through your normal credential chain or `AWS_PROFILE`. Never put
+  access keys in `.env`.
 
-```bash
-python -m tests.mcp.isolated_host --token-file /private/tmp/afterward-local-token --with-week
-```
+### Install
 
-Connect MCPJam to `http://127.0.0.1:18001/mcp` using the private ephemeral test
-token. Storage is mocked memory and AWS calls are blocked. Only Today, task
-completion and weekly summary are enabled in that test host. Do not use production
-tokens. The [S4](docs/s4-isolated-validation.md) and
-[S5](docs/s5-implementation-report.md) reports explain the observed host checks.
-
-For the normal AWS-backed MCP server, use a separate terminal:
-
-```bash
-source .venv/bin/activate
-python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001
-```
-
-For the normal bridge, use another terminal with the same configured local MCP URL:
-
-```bash
-source .venv/bin/activate
-export MCP_URL=http://127.0.0.1:8001/mcp
-export LOCAL_REMINDER_LOOP=0
-python scripts/run_web_bridge.py
-```
-
-For the web UI, copy `web/.env.example` to `web/.env.local` only if absent. Set the
-same private `BRIDGE_KEY`, `AGENT_API_URL=http://127.0.0.1:8002` and authorized AWS
-settings. From `web/`, run `npm run dev`, then open `http://localhost:3000/demo`.
-Use localhost consistently for browser requests; the S4 check observed a 403 from
-the alternate 127.0.0.1 browser origin. See [web setup](web/README.md).
-
-The normal HTTP authentication maps valid tokens to the shared demo identity.
-Starting services does not isolate it. The legacy
-[HTTP smoke script](scripts/test_mcp_http.py) can write task completion and is not
-a judge health check; it was not executed in this review.
-
-### macOS
-
-Install dependencies from a fresh clone:
+macOS or Linux:
 
 ```bash
 git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa.git
@@ -182,32 +129,7 @@ cp .env.example .env.local
 cd ..
 ```
 
-Fill in `.env` and `web/.env.local` as described in Settings below.
-
-Terminal 1, from the repository root:
-
-```bash
-source .venv/bin/activate
-python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001
-```
-
-Terminal 2, from the repository root:
-
-```bash
-source .venv/bin/activate
-python scripts/run_web_bridge.py --port 8002
-```
-
-Terminal 3, from the repository root:
-
-```bash
-cd web
-npm run dev -- --port 3000
-```
-
-### Windows PowerShell
-
-Install dependencies from a fresh clone:
+Windows PowerShell:
 
 ```powershell
 git clone https://github.com/charvimaurya/AfterWard-A-Living-Recovery-Plan-for-Alexa.git
@@ -222,183 +144,117 @@ Copy-Item .env.example .env.local
 cd ..
 ```
 
-Fill in `.env` and `web/.env.local` as described in Settings below.
+If PowerShell blocks `Activate.ps1`, use `.\.venv\Scripts\python.exe` in place of
+`python`.
 
-Terminal 1, from the repository root:
+### Settings
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001
+Fill in `.env` (repository root) and `web/.env.local` from their examples. Every
+setting is commented in [.env.example](.env.example) and
+[web/.env.example](web/.env.example). The ones you must set:
+
+| Setting | File | Value |
+| --- | --- | --- |
+| `TEST_MODEL_ID`, or `MODEL_MODE=final` with `FINAL_EXTRACTION_MODEL_ID` and `FINAL_AGENT_MODEL_ID` | `.env` | Bedrock model IDs your account can use |
+| `DOCUMENT_BUCKET`, `S3_VECTOR_BUCKET` | `.env` | Your AWS resource names |
+| `DOCUMENT_BUCKET` | `web/.env.local` | Same bucket |
+| `MCP_AUTH_TOKEN` | `.env` | A long random value; replace the example token |
+| `BRIDGE_KEY` | both files | The same long random value in both |
+| `MCP_URL` | `.env` | Already `http://127.0.0.1:8001/mcp` |
+| `AGENT_API_URL` | `web/.env.local` | Already `http://127.0.0.1:8002` |
+| `CLOCK_MODE=demo` | `.env` | Optional: fixes the clock at `DEMO_FIXED_NOW` (07:00 on 23 October) so the morning reminder plays. Shown as "Demo time" on screen |
+
+Make a random value with `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+Never commit `.env` or `web/.env.local`; both are ignored by Git.
+
+### Start the three parts
+
+Use three terminals, each from the repository root.
+
+| | macOS or Linux | Windows PowerShell |
+| --- | --- | --- |
+| 1. MCP server (port 8001) | `source .venv/bin/activate`<br>`python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001` | `.\.venv\Scripts\Activate.ps1`<br>`python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001` |
+| 2. Python bridge (port 8002) | `source .venv/bin/activate`<br>`python scripts/run_web_bridge.py --port 8002` | `.\.venv\Scripts\Activate.ps1`<br>`python scripts/run_web_bridge.py --port 8002` |
+| 3. Web app (port 3000) | `cd web`<br>`npm run dev` | `cd web`<br>`npm run dev` |
+
+Open http://127.0.0.1:3000/demo. After changing Python code or `.env`, restart the
+MCP server and the bridge.
+
+### Load or reset Margaret, the synthetic demo patient
+
+The demo patient is `demo_patient_001` (Margaret, after a knee replacement).
+
+- **Load her plan** with either:
+  - On `/demo`, choose **Upload a discharge letter** and pick
+    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`. This uses the
+    deployed S3, SQS and Lambda pipeline.
+  - Or process the letter locally with the current code, without S3 or Lambda:
+    `python scripts/ingestion/reingest_demo_letter.py --confirm`. This replaces her
+    plan.
+- **Reset her day** (keeps the plan, clears today's ticks and check-ins): press
+  **Reset demo** on `/demo`, or run `python scripts/reset_demo_patient.py --confirm`.
+
+Every visitor shares this one patient. Do not use real patient data.
+
+### Try the MCP server in an MCP client, without AWS
+
+This starts an isolated MCP server with in-memory synthetic data and AWS calls
+blocked. It writes a new random token to the file you name (the file must not
+already exist):
+
+```bash
+python -m tests.mcp.isolated_host --token-file /tmp/afterward-mcp-token --with-week
 ```
 
-Terminal 2, from the repository root:
+On Windows, use `--token-file $env:TEMP\afterward-mcp-token`. Connect an MCP client
+such as MCPJam to `http://127.0.0.1:18001/mcp` with that token as the bearer
+token, then run `get_today_tasks` or `get_week_summary` to see the Today card. Only
+those tools and task completion are enabled in this mode.
 
-```powershell
-.\.venv\Scripts\Activate.ps1
-python scripts/run_web_bridge.py --port 8002
-```
+## Run the tests
 
-Terminal 3, from the repository root:
-
-```powershell
+```bash
+python -m pytest -q
 cd web
-npm run dev -- --port 3000
+npm test
+npm run typecheck
 ```
 
-If PowerShell blocks activation, run `.\.venv\Scripts\python.exe` in place of `python` for Python commands. Activation is not needed with that path.
+`pytest` skips tests marked `integration`, which contact real AWS
+([pytest.ini](pytest.ini)). The default tests use mocks and need no AWS access.
 
-### MCP Prompts and MCP App
+## Safety and limitations
 
-The server exposes two prompts alongside its eight tools. Retrieving a prompt
-returns instructions for the client; it does not execute tools.
-
-- `ask_my_letter(question)` requires the patient's question and instructs the
-  agent to call `search_discharge_instructions` first, using that question.
-  Answers must use relevant returned letter passages, cite page numbers when
-  available, and acknowledge anything that could not be verified. It prohibits
-  invented medical instructions or medication changes.
-- `morning_checkin()` takes no arguments. It references `get_today_tasks` and
-  `get_medications`, then requests one short, spoken-friendly summary of what
-  is complete and what comes next. It requires confirmed data and performs no
-  medication-taking actions.
-
-Margaret's Today card renders actual task results with a completed/total count,
-progress bar, completed ticks and available completion times, a highlighted next
-actionable pending task, and **Needs confirmation** labels where flagged.
-Its count covers tasks, not medications. It handles empty or unavailable results
-and initially displays **Waiting for today's plan**.
-
-The `get_today_tasks` tool links to `ui://afterward/today.html` through
-`_meta.ui.resourceUri`. The resource serves
-[`app/mcp/ui/today.html`](app/mcp/ui/today.html) with MIME type
-`text/html;profile=mcp-app`. The standalone page receives tool results through
-the MCP Apps host protocol. Run the tool again to fetch changed backend state;
-a previously rendered response is not a live subscription.
-
-The normal local MCP server uses port 8001:
-
-```bash
-source .venv/bin/activate
-python -m uvicorn app.mcp.http_server:app --host 127.0.0.1 --port 8001
-```
-
-The server loads the repository-root `.env`. Configure `MCP_AUTH_TOKEN` locally
-without committing it; deployed token configuration can use Secrets Manager.
-Start the local MCPJam version used for S4:
-
-```bash
-npx --yes @mcpjam/inspector@3.16.1
-```
-
-Open its private local access link and add an HTTP/Streamable HTTP connection:
-
-- URL: `http://127.0.0.1:8001/mcp`
-- Header format: `Authorization: Bearer <MCP_AUTH_TOKEN>`
-- In MCPJam, select **Bearer Token** authentication and enter only the configured
-  token value in the masked field. The header above is a placeholder.
-
-Confirm eight tools and the two prompts are discovered. In MCPJam 3.16.1, the
-Tools response pane shows JSON and directs you to Chat. Open **Chat/Playground**,
-select `get_today_tasks`, and click **Run** to display the Today card. Select the
-intended host timezone before recording completion times. Keep authentication
-settings and private access links out of screenshots and recordings.
-
-A host must support MCP Apps to render the HTML. Ordinary MCP clients may expose
-only the tool result and resource. Local MCPJam 3.16.1 discovery and actual card
-rendering were observed in S4, including a captured change from one to two
-completed tasks. Later backend reads returned one again, with the cause
-unidentified. Stable repeatability on the shared synthetic patient and a final
-recording in the intended timezone remain pending. Confirmation labels were
-verified with automated fixtures, not flagged live data. Other hosts and the
-currently deployed server have not been validated for these new features.
-
-### This week recovery summary
-
-`get_week_summary()` adds an eighth read-only tool and links to the same Today
-resource. Its response includes a current Today task snapshot plus seven
-patient-local dates, so a fresh MCP App can render both sections independently.
-Call this tool in MCPJam Chat/Playground to display **This week**; calling only
-`get_today_tasks` still displays the Today card alone in a fresh App.
-
-The strip shows calculated completed days, completed ticks, explicit missed
-markers, neutral unknown/not-yet-due states and an outline for today. Missing
-medication events never imply missed doses. Historical schedules require explicit
-dated evidence; today's plan is not projected backwards. Existing history
-without that evidence is shown as unknown.
-
-Real MCPJam 3.16.1 rendering was verified with isolated in-memory synthetic data,
-including independent Today and weekly App instances. This is not DynamoDB or
-deployment verification. The **Synthetic demo history** label is restricted to
-recognized test identities with synthetic evidence. For memory-only testing:
-
-```bash
-python -m tests.mcp.isolated_host --token-file /private/tmp/afterward-week-token --with-week
-```
-
-Connect MCPJam to `http://127.0.0.1:18001/mcp` with the private test token. The
-launcher blocks AWS calls and supports only Today, task completion and the weekly
-tool; other registered tools are disabled in this test environment. Omitting
-`--with-week` produces no seeded history. This flag belongs to the isolated test
-launcher, not `reset_demo_patient.py`. Never use production credentials here.
-See the [S5 implementation report](docs/s5-implementation-report.md) for tests,
-evidence and limitations. Local captions can say **8 tools, 2 prompts**; deployed
-capability must be verified separately.
-
-### Weekly history in the web demo
-
-Open `/demo`, then **Open today's plan**. The **This week** strip sits beneath
-Today's task list and shows seven patient-local days. It loads through
-`/api/week-summary` → the authenticated bridge → `get_week_summary`, using the
-same server-resolved patient as other MCP calls. Restart the local bridge after
-updating it so `/week-summary` is available; the MCP server must expose the eighth
-tool. Existing hosted MCP deployments must be checked separately.
-
-The strip refreshes after a recorded action or reset and has a **Refresh** button.
-It does not scan event history on every five-second Today poll. Missing historical
-schedule/completion evidence is **Unknown**, never automatically missed. Today
-uses the current medication occurrence reader, so recording every scheduled
-morning dose updates today's indicator, and undoing one removes that confirmation.
-The current schedule is never projected onto earlier dates. Historical days still
-need saved schedule evidence; this implementation does not create that history.
-Only explicit synthetic provenance displays **Synthetic demo history**. No history is
-seeded by opening this page. Browser rendering and refresh were verified with
-mocked API responses; this is not a live DynamoDB adherence verification.
-
-## Built with, and where to find it
-
-| Technology | Location |
-| --- | --- |
-| mcp-apps | [app/mcp/ui/today.html](app/mcp/ui/today.html) |
-| discharge-letter-check v0.1.0 | [Schema integration](app/ingestion/bedrock.py), [validator boundary](app/ingestion/validator.py) |
-
-## Known limitations before publication
-
-- Medication normalization loses incoming stopped status; the package can leave
-  missing doses and uncertain timing unflagged. Unflagged means the checks ran,
-  not that clinical correctness or a complete dose was established.
-- The saved final-model evaluation is **13/14**, with an ambiguous medication-write
-  failure. It was not rerun in this documentation review.
-- Visitors share a demo patient, and conversation/crisis state is process-local.
-  The earlier shared-state regression remains unexplained. Isolated memory tests
-  do not verify DynamoDB consistency or public multi-user isolation.
-- Weekly adherence needs explicit historical schedule/action evidence. Without
-  it, days remain unknown. Mocked seeding does not populate shared Margaret.
-- Upload/abuse controls, TLS, live least privilege and Amplify compatibility need
-  deployment-level verification. Customer-managed KMS encryption is not confirmed.
-
-See the [package review](docs/discharge-letter-check-review.md),
-[security review](docs/security-audit.md) and
-[submission checklist](docs/submission/checklist.md). Missing submission links
-remain placeholders; nothing was published by this review.
+- **Synthetic data only. Not a medical device. Not clinically validated.** Nothing
+  here shows a clinical benefit.
+- AfterWard only repeats what the letter says. Unclear items are marked **Needs
+  confirmation**, and it will not invent a dose, time or instruction.
+- Crisis messages get a fixed reply with 999 and Samaritans (116 123) before any
+  model or tool runs ([app/agent/crisis.py](app/agent/crisis.py)). Phrase matching
+  cannot catch every way of expressing distress.
+- One shared demo patient; conversation memory is held in the bridge process and
+  is lost on restart.
+- Medication normalisation does not keep a "stopped" status from the letter; see
+  the [package review](docs/discharge-letter-check-review.md).
+- The recorded final-model evaluation passed 13 of 14 cases, using synthetic
+  in-memory tools ([agent-final-evaluation.json](docs/agent-final-evaluation.json)).
+  The failure was an ambiguous medicine report that was recorded without asking.
+- Voice in the web demo is the browser's own; the Alexa skill runs in the Alexa
+  developer console simulator. There is no native Alexa+ deployment and no Amazon
+  Polly.
 
 ## Documentation
 
-- [Repository guide: setup, file map, workflow, and testing order](docs/REPOSITORY_GUIDE.md)
-- [Architecture](docs/architecture.md)
+- [Architecture](docs/architecture.md) and [AWS integrations](docs/aws-integrations.md)
+- [Running the Alexa skill locally](docs/alexa-skill.md)
+- [Recovery dashboard](docs/recovery-dashboard.md)
+- [AWS setup](docs/aws-setup.md) and [deployment](deployment/README.md)
+- [Logging and metrics](docs/observability.md)
+- [Security review](docs/security-audit.md)
 - [Testing](docs/testing.md)
-- [AWS setup and troubleshooting](docs/aws-setup.md)
-- [AWS integrations](docs/aws-integrations.md)
-- [Deployment](deployment/README.md)
+- [Friction log](docs/friction-log.md) and [product feedback](docs/product-feedback.md)
+- [Repository guide](docs/REPOSITORY_GUIDE.md)
 
-- [Package integration and safety review](docs/discharge-letter-check-review.md)
-- [Engineering product feedback](docs/product-feedback.md)
+## Licence
+
+[MIT](LICENSE). Copyright (c) 2026 Charvi Maurya and Shilpa Agarwal.
