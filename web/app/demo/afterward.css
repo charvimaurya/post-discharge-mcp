@@ -1,6 +1,4 @@
 /* AfterWard look, copied from docs/ui_mockups/source/theme.py and scoped under .awapp */
-.awapp .week-toggle>a{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:1;color:inherit;text-decoration:none}
-.awapp .week-toggle>a:focus-visible{outline:3px solid #1F5E8C;outline-offset:3px}
 
 .awapp{
   --bg:#FAF7F2; --ink:#17222B; --ink2:#223340; --soft:#4D5863; --muted:#8B95A0;
@@ -592,8 +590,14 @@
 .awapp .turn.aw.past .points{font-size:17px;margin-bottom:20px}
 
 /* Evidence-based weekly history, beneath the scrollable Today plan. */
-.awapp .week-panel{flex-shrink:0;border-top:1px solid var(--line);margin-top:12px;padding-top:10px}
-.awapp .week-toggle{cursor:pointer;font-size:14px;font-weight:600;line-height:1.5;border-radius:4px}
+.awapp .week-panel{flex-shrink:0;border-top:1px solid var(--line);margin-top:12px;padding-top:10px;position:relative}
+/* Sits on the right of the "This week" row whether the strip is open or closed. */
+.awapp .week-link{position:absolute;top:6px;right:0;z-index:1;display:inline-flex;align-items:center;gap:6px;
+  border:1.5px solid var(--accent);border-radius:999px;padding:3px 12px;font-size:13px;font-weight:600;
+  color:var(--accent);background:#fff;text-decoration:none;transition:background .15s}
+.awapp .week-link:hover{background:var(--accent-pale)}
+.awapp .week-link:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.awapp .week-toggle{cursor:pointer;font-size:14px;font-weight:600;line-height:1.5;border-radius:4px;padding-right:190px}
 .awapp .week-toggle:focus-visible{outline:2px solid var(--blue);outline-offset:4px}
 .awapp .week-inline-summary{font-weight:400;color:var(--soft);margin-left:10px}
 .awapp .week-disclosure[open] .week-toggle{margin-bottom:8px}

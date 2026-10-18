@@ -4,12 +4,16 @@ export function WeekPanel({ summary, loading, error, onRefresh }: {
   summary: WeekSummary | null; loading: boolean; error: boolean; onRefresh: () => void;
 }) {
   return <section className="week-panel" aria-labelledby="week-heading" aria-busy={loading}>
+    {/* A sibling of the disclosure, not inside <summary>, so opening the strip and following the link stay separate. */}
+    {/* A new tab, so the chat and Today plan stay as they are in this one. */}
+    <a className="week-link" href="/demo/recovery" target="_blank" rel="noopener">View weekly dashboard <span aria-hidden="true">↗</span>
+      <span className="week-sr"> (opens in a new tab)</span></a>
     <details className="week-disclosure">
-      <summary className="week-toggle"><a href="/demo/recovery" aria-label="Open recovery dashboard"><span id="week-heading">This week</span>
+      <summary className="week-toggle"><span id="week-heading">This week</span>
         <span className="week-inline-summary">{loading ? 'Checking history…'
           : error || !summary ? 'Summary unavailable'
           : `${summary.completedDays} of 7 mornings confirmed`}</span>
-      </a></summary>
+      </summary>
     <div className="week-heading">
       <button type="button" className="back" disabled={loading} onClick={onRefresh}>Refresh</button></div>
     <div aria-live="polite">

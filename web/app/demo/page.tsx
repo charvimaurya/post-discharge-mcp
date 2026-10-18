@@ -28,7 +28,7 @@ import { addTurn, feedBubbles, feedReply, speakable, startAlexaFeed } from '../.
 import { replyView } from '../../lib/reply-view';
 import { canListen, finishListening, listenOnce, speak } from '../../lib/voice';
 import { alreadySpoken, clearSpoken, forgetSpoken, markSpoken, shouldSpeakOpening } from '../../lib/spoken';
-import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPanel, ToolPanel, TopBar, VoicePanel, type Turn } from './parts';
+import { BuildScreen, ConversationLog, LetterPanel, Screen, StartScreen, TodayPanel, ToolPanel, TopBar, VoicePanel, useFitFrame, type Turn } from './parts';
 
 type View = 'start' | 'build' | 'today';
 const POLL_MS = 5000;
@@ -36,21 +36,6 @@ const POLL_MS = 5000;
 const REMINDER_NOTE_MS = 12000;
 // The parts of the day the agent matches a report to (app/agent/occurrence_resolver.py).
 const DAY_PARTS = ['morning', 'midday', 'afternoon', 'evening', 'bedtime'];
-
-// Keep the mock-up's readable scale while extending the frame to every window edge.
-function useFitFrame() {
-  const [frame, setFrame] = useState({ scale: 1, width: 1280, height: 720 });
-  useEffect(() => {
-    const fit = () => {
-      const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
-      if (scale <= 0) return;
-      setFrame({ scale, width: window.innerWidth / scale, height: window.innerHeight / scale });
-    };
-    fit(); window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, []);
-  return frame;
-}
 
 function sessionId(): string {
   let id = sessionStorage.getItem('afterward-session');
@@ -71,6 +56,14 @@ export default function DemoPage() {
   const frame = useFitFrame();
   const [view, setView] = useState<View>('start');
   const [error, setError] = useState('');
+  // /demo?view=today (the recovery dashboard's "Back to Today") opens the plan, not the upload screen.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get('view') !== 'today') return;
+    url.searchParams.delete('view');
+    window.history.replaceState(null, '', url.pathname + url.search);
+    setView('today');
+  }, []);
 
   // Upload and "building the plan"
   const [uploading, setUploading] = useState(false);

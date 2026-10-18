@@ -1,8 +1,16 @@
 # Recovery dashboard
 
-Open `/demo/recovery`. The weekly summary text on `/demo` links to this page;
-its existing disclosure and Refresh control remain available. The Today page's
-five-second polling is unchanged.
+Open `/demo/recovery`, or use **View weekly dashboard** on the This week row
+beneath the Today plan on `/demo`. The link sits beside the disclosure, not
+inside it, so opening the strip and following the link stay separate actions.
+The dashboard opens in a new tab so the chat stays as it was. Its "Back to
+Today" closes that tab, or opens `/demo?view=today` (straight to the plan, not
+the upload screen) when the browser keeps the tab open. The dashboard uses the Today screen's frame, top bar, panels and cards. The Today
+page's five-second polling is unchanged.
+
+After pulling this change, restart both the MCP server and the web bridge. A
+process started before `get_recovery_day_details` existed answers
+`Unknown tool`, and the page then shows "Recovery history could not be checked".
 
 ## What is shown
 

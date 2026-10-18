@@ -1,10 +1,25 @@
 // The building blocks of the demo screen. Each one copies a part of the mock-ups
 // (docs/ui_mockups/source/screens.py) and uses the same CSS class names.
-import { useEffect, useRef, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Icon, Logo } from './icons';
 import { answerChoices, emergencyNumber, replyPoints, letterBlocks, letterTitle, localTime, prettyTime, slotOrder, splitClock, type LetterBlock, type HelpAction, type PlanItem, type PlanSummary, type Source, type ToolCall } from '../../lib/assistant-data';
 
 // ---------- Frame: top bar and footer ----------
+
+// Keep the mock-up's readable scale while extending the frame to every window edge.
+export function useFitFrame() {
+  const [frame, setFrame] = useState({ scale: 1, width: 1280, height: 720 });
+  useEffect(() => {
+    const fit = () => {
+      const scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+      if (scale <= 0) return;
+      setFrame({ scale, width: window.innerWidth / scale, height: window.innerHeight / scale });
+    };
+    fit(); window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, []);
+  return frame;
+}
 
 // patient: the first name from the current plan, so every screen shows whose plan it is.
 // onReset: the "Reset demo" button, shown only when given; resetting disables it while it runs.
