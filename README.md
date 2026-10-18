@@ -178,7 +178,9 @@ Use three terminals, each from the repository root.
 | 3. Web app (port 3000) | `cd web`<br>`npm run dev` | `cd web`<br>`npm run dev` |
 
 Open http://127.0.0.1:3000/demo. After changing Python code or `.env`, restart the
-MCP server and the bridge.
+MCP server and the bridge. Run the web app locally with `npm run dev`: the
+production server (`npm start`) refuses API requests unless `APP_ORIGIN` is set to
+an HTTPS address, because it is meant for a hosted deployment.
 
 ### Load or reset Margaret, the synthetic demo patient
 
@@ -218,6 +220,7 @@ python -m pytest -q
 cd web
 npm test
 npm run typecheck
+npm run build
 ```
 
 `pytest` skips tests marked `integration`, which contact real AWS
@@ -251,7 +254,7 @@ npm run typecheck
 - [AWS setup](docs/aws-setup.md) and [deployment](deployment/README.md)
 - [Logging and metrics](docs/observability.md)
 - [Security review](docs/security-audit.md)
-- [Testing](docs/testing.md)
+- [Testing](docs/testing.md) and the [fresh-clone verification](docs/fresh-clone-verification.md)
 - [Friction log](docs/friction-log.md) and [product feedback](docs/product-feedback.md)
 - [Repository guide](docs/REPOSITORY_GUIDE.md)
 
