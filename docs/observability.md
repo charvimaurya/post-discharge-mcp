@@ -121,7 +121,7 @@ Deployed through the AWS console with an administrator login.
 **Logs**
 
 - Created log group `/ecs/afterward-mcp` with 30-day retention.
-- Created `/aws/lambda/AfterWardDocumentProcessor` and `/aws/lambda/AfterwardReminderChecker` with 30-day retention. These did not exist before, so Lambda logs were not being kept.
+- Lambda log groups `/aws/lambda/AfterWardDocumentProcessor` and `/aws/lambda/AfterwardReminderChecker` already existed with 30-day retention and are receiving logs. Each has 100+ log streams; the document processor's latest checked stream was 2026-10-18 18:00 UTC. The reminder checker runs every 5 minutes with 0 errors over the 3 hours checked.
 - Registered task definition `afterward-mcp:6`, built from revision 5 with only the `awslogs` settings added: group `/ecs/afterward-mcp`, region `eu-west-2`, prefix `mcp`, no `awslogs-create-group`.
 - The first rollout of revision 6 failed with `ResourceNotFoundException: The specified log group does not exist`, because the group had first been created in the wrong region. The service was rolled back to revision 5 with no outage, the group was created in eu-west-2, and revision 6 was redeployed successfully.
 - Verified: `afterward-mcp-service` runs 1 task on `afterward-mcp:6`, and log stream `mcp/afterward-mcp/775f605d91104ef8b4a196852606bf98` received events (last event checked: 2026-10-18 13:48 UTC).
@@ -138,7 +138,6 @@ Deployed through the AWS console with an administrator login.
 
 - An email sent by an alarm itself. The DLQ alarm fired before the subscription was confirmed, and the alarms only notify on entering ALARM.
 - `tool_errors` metric datapoints from real tool failures.
-- Lambda logs arriving in the two new Lambda log groups. This depends on the Lambda roles' log permissions.
 - The repository's `ecs-task-definition.json` is not identical to live revision 6, which keeps the newer live settings from revision 5.
 
 ## AWS administrator runbook

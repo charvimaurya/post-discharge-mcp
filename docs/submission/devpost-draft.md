@@ -41,9 +41,35 @@ application recovery state, retrieval, agent behavior and reminder experience.
 The browser calls a server-side bridge, and the agent uses authenticated MCP
 tools. The verified cloud MCP service runs on ECS Fargate behind ALB/CloudFront;
 the active application path has not been established as using AgentCore or Polly.
-The local app registers seven MCP tools. The cloud endpoint tested on 17 October
-listed six, without undo_report. The hosted frontend and full end-to-end public
+The MCP server registers nine tools, two prompts and an MCP App card for today's
+plan; the cloud ECS deployment predates the two newest tools. We use Claude
+Haiku 4.5 for development and testing and Claude Sonnet 4.5 for the final
+extraction and agent; one setting, `MODEL_MODE`, switches all models. The hosted frontend and full end-to-end public
 journey remain unverified; bridge/Amplify deployment files are preparations.
+
+## Open Source: discharge-letter-check
+
+**https://github.com/charvimaurya/discharge-letter-check** · MIT · v0.1.0
+
+An AI model reading a discharge letter can misread a dose or miss a date.
+discharge-letter-check is the safety gate we built to catch that, released as its
+own package so any health app can use it.
+
+1. **A fixed form.** The AI must fill in the same sections for every letter
+   (medicines, tasks, appointments, restrictions, monitoring, warning signs, diet),
+   with the sentence each item came from.
+2. **A rule check.** Any item missing key details, or marked unclear or unreadable,
+   is flagged for a person to confirm. The checks are rules, not AI, so the same
+   letter always gets the same result.
+3. **Proven in use.** AfterWard installs it from the v0.1.0 release for every
+   letter. 149 tests run on Python 3.11, 3.12 and 3.13 in GitHub Actions.
+
+**Devpost "Open Source description" field:** discharge-letter-check is the safety
+gate between an AI model and a patient's recovery plan. It gives the AI a fixed
+form to fill in from a discharge letter, then flags any item that is missing key
+details or marked unclear, so a person confirms it instead of the app guessing.
+The checks are plain rules, so results are repeatable. AfterWard installs it from
+the v0.1.0 release, and it has 149 tests on Python 3.11 to 3.13.
 
 ## What we learned and what is working
 
@@ -51,12 +77,12 @@ MCP provides a clear boundary between conversation, evidence retrieval and state
 changes. Page-preserving retrieval makes the letter inspectable. Explicit unknowns
 matter: “continue as directed” does not justify an invented stop date.
 
-In the current review, 841 default Python tests and 73 web tests passed. Ten live
-AWS integrations were excluded. A separate final-model evaluation using the
-configured Sonnet 4.5 profile and synthetic in-memory tools passed 13 of 14 checks;
-three crisis probes made zero model/tool calls. The failed check was an ambiguous
-medicine report that the current deterministic policy recorded without naming
-confirmation. That remains a workflow risk, not a successful safety result.
+**Testing.** 1,264 Python tests and 138 web tests pass (10 tests that need live
+AWS run separately). In a final check of the agent on Claude Sonnet 4.5, 13 of 14
+scenarios passed, and all three crisis messages were handled by the fixed safety
+reply before any AI call. The one miss: when a patient says "I took my tablet"
+without naming it, AfterWard records it instead of first asking which medicine.
+That is our next fix.
 
 ## Challenges and next steps
 
@@ -66,6 +92,10 @@ shared session state, a reviewed medication-confirmation workflow, isolated PDF
 processing, deployed abuse-control verification and clinical evaluation. Browser
 voice behavior also varies by platform. The prototype does not replace the care
 team or establish clinical benefit.
+
+Next, we will add an "other instructions" section to discharge-letter-check, so
+every instruction in a letter reaches the plan, and test it on a wider range of
+letters.
 
 ## Built with
 
@@ -83,7 +113,7 @@ live. Amplify is deployment preparation, not a verified hosted frontend.
 | Demo video | **MISSING** — record/export/review the three-minute script |
 | Interactive demo | **CANNOT VERIFY** — no frontend URL supplied; do not use the MCP endpoint as the app link |
 | Package | https://github.com/charvimaurya/discharge-letter-check — local installed integration verified; anonymous link access not verified here |
-| Product feedback | **MISSING EVIDENCE** — see checklist; no feedback sent or claimed |
+| Product feedback | Draft in docs/product-feedback.md; not yet submitted |
 | Official hackathon and track | **CANNOT VERIFY** — official URL/rules and 15 October guide required |
 | Existing Devpost page / team / submission status | **CANNOT VERIFY** — no URL, team or submission receipt supplied |
 

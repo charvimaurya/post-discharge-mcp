@@ -28,7 +28,7 @@ misread dose can send someone back to hospital.
 
 ## What AfterWard does
 
-1. **Reads the letter.** Upload a PDF or photo. Amazon Bedrock extracts every
+1. **Reads the letter.** Upload a PDF letter. Amazon Bedrock extracts every
    medicine, task, appointment and warning sign, each with the exact sentence it
    came from. The [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check)
    package flags anything unclear for a person to confirm, so nothing is guessed.
@@ -48,10 +48,18 @@ misread dose can send someone back to hospital.
   DynamoDB, EventBridge Scheduler, ECS Fargate, CloudFront and Secrets Manager. See
   [AWS integrations](docs/aws-integrations.md) for each service, the file that uses
   it and its checked deployment status.
-- **Open Source.** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check)
-  is a separate public MIT package, split out of AfterWard. AfterWard installs it
-  from the `v0.1.0` release (`requirements.txt`) and uses it for the extraction
-  schema and every letter check.
+- **Open Source: [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check).**
+  A separate public Python package (MIT, v0.1.0), split out of AfterWard so any
+  health app can reuse it. It is the safety gate between the AI and the patient's
+  plan:
+  - It gives the AI a fixed form to fill in for each letter: medicines, tasks,
+    appointments, restrictions, monitoring, warning signs and diet.
+  - It checks the filled-in form with simple rules. Any item missing key details,
+    or marked unclear or unreadable, is flagged for a person to confirm. Nothing
+    uncertain is treated as fact.
+  - AfterWard installs it from the v0.1.0 release, and
+    [a test](tests/ingestion/test_package_integration.py) proves AfterWard calls
+    the package itself, not a copy. 149 tests run on Python 3.11 to 3.13.
 
 ## Architecture
 
@@ -62,11 +70,11 @@ misread dose can send someone back to hospital.
   is embedded with Titan and stored in S3 Vectors for search.
 - **Conversation:** the web app and the Alexa skill call the Python bridge, which
   runs the Bedrock agent. The agent reads and records everything through the MCP
-  server.
+  server: 9 tools, 2 prompts and an MCP App card that shows today's plan.
 - **Reminders:** EventBridge Scheduler runs a Lambda every 5 minutes, which saves
   a check-in for AfterWard to speak.
 
-More detail: [architecture](docs/architecture.md),
+More detail: [architecture and tech choices](docs/architecture.md),
 [AWS integrations](docs/aws-integrations.md),
 [Alexa and web data synchronisation](docs/data-synchronisation.md).
 
@@ -248,6 +256,9 @@ npm run build
   cannot catch every way of expressing distress.
 - One shared demo patient; conversation memory is held in the bridge process and
   is lost on restart.
+- The letter form has fixed sections. An instruction that fits none of them is not
+  added to the daily plan, but the full letter can still be searched and quoted.
+  Tested on synthetic letters only.
 - Medication normalisation does not keep a "stopped" status from the letter; see
   the [package review](docs/discharge-letter-check-review.md).
 - The recorded final-model evaluation passed 13 of 14 cases, using synthetic
