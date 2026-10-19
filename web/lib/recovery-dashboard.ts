@@ -1,14 +1,10 @@
 import { readWeekSummary, type WeekDay, type WeekSummary } from './week-summary.ts';
 
-/**
- * The dashboard calendar: it starts on the first day with saved history (or recorded tasks),
- * never later than today, and the remaining tiles of seven are the days ahead. Days before the
- * first saved one are left out rather than shown as empty.
- */
+// The dashboard calendar: the two days before today, today, then the days ahead (seven tiles).
+export const DAYS_BEFORE_TODAY = 2;
+
 export function calendarDays(week: WeekSummary): { past: WeekDay[]; upcoming: string[] } {
-  const tasks = new Map((week.activity || []).map(entry => [entry.date, entry.completedTasks]));
-  const first = week.days.findIndex(day => day.hasHistory || (tasks.get(day.date) || 0) > 0);
-  const past = week.days.slice(first === -1 ? week.days.length - 1 : first);
+  const past = week.days.slice(-(DAYS_BEFORE_TODAY + 1));
   const today = Date.parse(`${week.days[week.days.length - 1].date}T12:00:00Z`);
   const upcoming = Array.from({ length: week.days.length - past.length },
     (_, i) => new Date(today + (i + 1) * 86_400_000).toISOString().slice(0, 10));
@@ -54,15 +50,29 @@ export function recordedTime(stamp: string | null, timezone: string): string {
   return stamp ? new Intl.DateTimeFormat('en-GB', { timeZone: timezone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(stamp)) : 'No confirmed record';
 }
 
+// How much of a day's plan is recorded done, counted like the Today page: every task and
+// scheduled medicine dose that day (as-needed medicines are not listed).
+export type DayProgress = { done: number; total: number; state: 'complete' | 'in_progress' | 'none' };
+export function dayProgress(day: RecoveryDay): DayProgress {
+  const total = day.tasks.length + day.medications.length;
+  const done = day.tasks.filter(t => t.status === 'completed').length + day.medications.filter(m => m.status === 'taken').length;
+  return { done, total, state: total > 0 && done === total ? 'complete' : done > 0 ? 'in_progress' : 'none' };
+}
+
+/** The week, plus the details of every day on the calendar up to today (the selected one included). */
 export async function fetchRecoverySnapshot(selected: string, signal: AbortSignal, fetcher: typeof fetch = fetch) {
   const response = await fetcher('/api/week-summary', { cache: 'no-store', signal });
   if (!response.ok) throw new Error('Unavailable');
   const week = readWeekSummary(await response.json());
   if (!week) throw new Error('Invalid history');
-  const date = week.days.some(d => d.date === selected) ? selected : week.days[6].date;
-  const details = await fetcher(`/api/recovery-day?date=${date}`, { cache: 'no-store', signal });
-  if (!details.ok) throw new Error('Unavailable');
-  const day = readRecoveryDay(await details.json(), date);
-  if (!day) throw new Error('Invalid history');
-  return { week, day, date };
+  const dates = calendarDays(week).past.map(d => d.date);
+  const date = dates.includes(selected) ? selected : dates[dates.length - 1];
+  const days = Object.fromEntries(await Promise.all(dates.map(async when => {
+    const details = await fetcher(`/api/recovery-day?date=${when}`, { cache: 'no-store', signal });
+    if (!details.ok) throw new Error('Unavailable');
+    const parsed = readRecoveryDay(await details.json(), when);
+    if (!parsed) throw new Error('Invalid history');
+    return [when, parsed] as const;
+  }))) as Record<string, RecoveryDay>;
+  return { week, day: days[date], date, days };
 }

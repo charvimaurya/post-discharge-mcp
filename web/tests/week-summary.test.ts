@@ -61,43 +61,24 @@ const module = { exports: {} as { WeekPanel?: React.ComponentType<any> } };
 new Function('require', 'module', 'exports', compiled)((id: string) =>
   id === '../../lib/week-summary' ? require('../lib/week-summary.ts') : require(id), module, module.exports);
 const WeekPanel = module.exports.WeekPanel!;
-const render = (props: Record<string, unknown>) => renderToStaticMarkup(createElement(WeekPanel, {
-  summary: null, loading: false, error: false, onRefresh() {}, ...props,
-}));
+const render = () => renderToStaticMarkup(createElement(WeekPanel));
 
-test('weekly panel renders seven indicators, today and only evidence-backed synthetic label', () => {
-  const payload = fixture();
-  const html = render({ summary: readWeekSummary(payload) });
-  assert.match(html, /5 of 7 mornings confirmed/);
-  assert.match(html, /href="\/demo\/recovery"/);
-  assert.match(html, /<details class="week-disclosure"><summary/);
-  assert.ok(!/<details[^>]*\sopen(?:[\s=>])/.test(html));
-  assert.equal((html.match(/<li /g) || []).length, 7);
-  assert.match(html, /aria-current="date"/);
-  assert.ok(!html.includes('Synthetic demo history'));
-  payload.week.synthetic_demo_history = true;
-  assert.match(render({ summary: readWeekSummary(payload) }), /Synthetic demo history/);
+test('beneath Today there is only the button to the weekly dashboard, opening in a new tab', () => {
+  const html = render();
+  assert.match(html, /<a class="week-link" href="\/demo\/recovery" target="_blank" rel="noopener">View weekly dashboard/);
+  assert.match(html, /\(opens in a new tab\)/);
+  // No weekly strip, counts or history are shown here any more: the dashboard has them.
+  assert.ok(!/<details|<li |<meter |mornings confirmed|Refresh/.test(html));
 });
 
-test('weekly panel renders loading, failure and unknown history without inventing adherence', () => {
-  assert.match(render({ loading: true }), /Checking this week/);
-  assert.match(render({ error: true }), /could not be checked/);
-  const payload = fixture(); payload.week.days.forEach(day => { day.status = 'unknown'; });
-  assert.match(render({ summary: readWeekSummary(payload) }), /Missing history does not mean a missed dose/);
-});
-
-test('task activity chart updates from saved counts independently of medicine adherence', () => {
+test('task counts are read from saved counts, apart from medicine adherence', () => {
   const payload = fixture();
   const activity = payload.week.days.map(day => ({ date: day.date, completed_tasks: 0 }));
   const input = { week: { ...payload.week, activity } };
-  let summary = readWeekSummary(input)!;
-  assert.equal(summary.activity?.[6].completedTasks, 0);
-  assert.match(render({ summary }), /2026-10-23: 0 recovery tasks recorded complete/);
+  assert.equal(readWeekSummary(input)!.activity?.[6].completedTasks, 0);
   activity[6].completed_tasks = 1;
-  summary = readWeekSummary(input)!;
-  const html = render({ summary });
-  assert.match(html, /2026-10-23: 1 recovery tasks recorded complete/);
-  assert.equal((html.match(/<meter /g) || []).length, 7);
+  const summary = readWeekSummary(input)!;
+  assert.equal(summary.activity?.[6].completedTasks, 1);
   assert.equal(summary.completedDays, 5); // A walk never becomes medication adherence.
   activity[6].completed_tasks = -1;
   assert.equal(readWeekSummary(input)?.activity, undefined);

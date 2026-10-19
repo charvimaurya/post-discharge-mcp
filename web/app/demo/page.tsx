@@ -17,8 +17,7 @@ import '@fontsource/ibm-plex-mono/400.css';
 import '@fontsource/ibm-plex-mono/500.css';
 import './afterward.css';
 import { WeekPanel } from './week-panel';
-import { readWeekSummary, type WeekSummary } from '../../lib/week-summary';
-import { completionFingerprint, readSequence } from '../../lib/recovery-sync';
+import { readSequence } from '../../lib/recovery-sync';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { waitForRecoveryState, type RecoveryState } from '../../lib/poll';
 import { daysAtHome, isObj, itemsMentioned, localTime, readChat, readPlan, readToday, reprompt, splitClock, str, wasReset,
@@ -74,34 +73,6 @@ export default function DemoPage() {
   // Today and the conversation
   const [today, setToday] = useState<Today>({ clockLabel: '', firstName: null, openingGreeting: '', date: null, dischargeDate: null, items: [], pendingCheckin: null, resetAt: null });
   const [todayLoaded, setTodayLoaded] = useState(false);
-  const [week, setWeek] = useState<WeekSummary | null>(null);
-  const [weekLoading, setWeekLoading] = useState(false);
-  const [weekError, setWeekError] = useState(false);
-  const weekRequest = useRef(0);
-  const loadWeek = useCallback(async () => {
-    const sequence = ++weekRequest.current;
-    setWeekLoading(true);
-    setWeek(null);
-    setWeekError(false);
-    try {
-      const response = await fetch('/api/week-summary', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Weekly history unavailable');
-      const next = readWeekSummary(await response.json());
-      if (!next) throw new Error('Invalid weekly history');
-      if (sequence === weekRequest.current) setWeek(next);
-    } catch {
-      if (sequence === weekRequest.current) setWeekError(true);
-    } finally {
-      if (sequence === weekRequest.current) setWeekLoading(false);
-    }
-  }, []);
-
-  const completionVersion = completionFingerprint(today);
-  useEffect(() => {
-    if (view !== 'today' || !today.date) return;
-    void loadWeek();
-    return () => { weekRequest.current += 1; };
-  }, [view, today.date, completionVersion, loadWeek]);
   const [openingCheckComplete, setOpeningCheckComplete] = useState(false);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [head, setHead] = useState('AfterWard');
@@ -305,7 +276,6 @@ export default function DemoPage() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || 'Could not reset the demo.');
       await loadToday();
-      await loadWeek();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not reset the demo.');
     } finally {
@@ -474,7 +444,7 @@ export default function DemoPage() {
         dayAtHome={dayAtHome} firstName={today.firstName} compact={dev} busy={busy} onDone={tapDone}
         empty={todayLoaded && today.items.length === 0} onStart={backToStart}
         help={help} helpCompact={helpCompact} onDismissHelp={() => setHelp(null)} focus={focus} hint={nextHint}
-        weekly={<WeekPanel summary={week} loading={weekLoading} error={weekError} onRefresh={() => void loadWeek()} />} />;
+        weekly={<WeekPanel />} />;
 
   let screen;
   if (view === 'start') screen = <StartScreen onUpload={upload} onOpen={openToday} busy={uploading} />;

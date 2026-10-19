@@ -50,7 +50,7 @@ def test_seeded_days_show_morning_medicines_taken_and_tasks_done(events):
     assert summary["synthetic_demo_history"] is False
     activity = {a["date"]: a["completed_tasks"] for a in week.task_activity(events, PATIENT, summary["days"])}
     assert activity == {"2026-10-17": 0, "2026-10-18": 0, "2026-10-19": 0, "2026-10-20": 0,
-                        "2026-10-21": 6, "2026-10-22": 6, "2026-10-23": 0}
+                        "2026-10-21": 7, "2026-10-22": 7, "2026-10-23": 0}
 
 
 def test_day_details_list_every_scheduled_dose_and_task(events):
@@ -58,7 +58,7 @@ def test_day_details_list_every_scheduled_dose_and_task(events):
     assert details["schedule_evidence"] == "snapshot" and details["scope"] == "all_scheduled"
     assert [m["status"] for m in details["medications"]] == ["taken"] * 6
     assert "Senna" not in [m["name"] for m in details["medications"]]  # as needed: never scheduled
-    assert [t["status"] for t in details["tasks"]] == ["completed"] * 6 + ["unknown"]
+    assert [t["status"] for t in details["tasks"]] == ["completed"] * 7
     assert details["tasks"][4]["recorded_at"] == "2026-10-21T16:05:00+01:00"  # 15:55 walk + 10 minutes
     assert details["synthetic_demo_history"] is False
 
@@ -84,3 +84,13 @@ def test_today_lists_all_of_todays_tasks_not_only_the_recorded_ones(events):
     # Today's plan is never projected backwards: a past day keeps its own saved schedule only.
     past = recovery_day.build_day_details(state, events, PATIENT, "2026-10-20", NOW)
     assert past["tasks"] == []
+
+
+def test_each_task_says_when_to_do_it(events):
+    _, tasks = _occurrences("2026-10-23")
+    state = {"timezone": "Europe/London", "current_medications": [], "current_tasks": tasks}
+    today = recovery_day.build_day_details(state, events, PATIENT, "2026-10-23", NOW)
+    # The letter's clock time when it gives one, else its part of the day; nothing invented.
+    assert [t["period"] for t in today["tasks"]] == ["morning", "afternoon", "evening", "07:30", "15:55", None, None]
+    past = recovery_day.build_day_details(state, events, PATIENT, "2026-10-21", NOW)
+    assert [t["period"] for t in past["tasks"]] == ["morning", "afternoon", "evening", "07:30", "15:55", None, None]

@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { loadBindings, transform } from 'next/dist/build/swc/index.js';
-import { calendarDays, fetchRecoverySnapshot, readRecoveryDay, recordedTime } from '../lib/recovery-dashboard.ts';
+import { calendarDays, dayProgress, fetchRecoverySnapshot, readRecoveryDay, recordedTime } from '../lib/recovery-dashboard.ts';
 import { readWeekSummary } from '../lib/week-summary.ts';
 
 function day(date = '2026-10-23') {
@@ -32,27 +32,45 @@ test('daily parser refuses wrong dates, duplicate doses, missing timestamps and 
   assert.match(recordedTime('2026-10-23T06:45:00+01:00', 'Europe/London'), /06:45/);
 });
 
-test('refresh reads the selected date and sees updated persisted results without patient selectors', async () => {
+test('refresh reads every calendar day and sees updated persisted results without patient selectors', async () => {
   let count = 0;
   const urls: string[] = [];
   const fetcher = async (url: any, init?: RequestInit) => {
     urls.push(String(url)); assert.equal(init?.cache, 'no-store');
     if (String(url).includes('week-summary')) return Response.json(weekPayload());
-    const p = day('2026-10-20'); p.medications[0].status = count++ ? 'taken' : 'unknown';
-    if (count === 1) p.medications[0].recorded_at = null as any;
+    const date = String(url).split('date=')[1];
+    const p = day(date);
+    if (date === '2026-10-22') {
+      p.medications[0].status = count++ ? 'taken' : 'unknown';
+      if (count === 1) p.medications[0].recorded_at = null as any;
+    }
     return Response.json(p);
   };
   const signal = new AbortController().signal;
-  assert.equal((await fetchRecoverySnapshot('2026-10-20', signal, fetcher)).day.medications[0].status, 'unknown');
-  assert.equal((await fetchRecoverySnapshot('2026-10-20', signal, fetcher)).day.medications[0].status, 'taken');
-  assert.deepEqual(urls, ['/api/week-summary', '/api/recovery-day?date=2026-10-20', '/api/week-summary', '/api/recovery-day?date=2026-10-20']);
+  const first = await fetchRecoverySnapshot('2026-10-22', signal, fetcher);
+  assert.equal(first.day.medications[0].status, 'unknown');
+  assert.deepEqual(Object.keys(first.days), ['2026-10-21', '2026-10-22', '2026-10-23']);
+  assert.equal((await fetchRecoverySnapshot('2026-10-22', signal, fetcher)).day.medications[0].status, 'taken');
+  const days = ['/api/recovery-day?date=2026-10-21', '/api/recovery-day?date=2026-10-22', '/api/recovery-day?date=2026-10-23'];
+  assert.deepEqual(urls, ['/api/week-summary', ...days, '/api/week-summary', ...days]);
   await assert.rejects(fetchRecoverySnapshot('', signal, async () => Response.json({}, { status: 502 })));
 });
 
-test('date selection outside the displayed window falls back to today', async () => {
-  const result = await fetchRecoverySnapshot('1900-01-01', new AbortController().signal,
-    async (url: any) => Response.json(String(url).includes('week-summary') ? weekPayload() : day()));
-  assert.equal(result.date, '2026-10-23');
+test('date selection outside the calendar falls back to today', async () => {
+  for (const selected of ['1900-01-01', '2026-10-20']) {
+    const result = await fetchRecoverySnapshot(selected, new AbortController().signal,
+      async (url: any) => Response.json(String(url).includes('week-summary') ? weekPayload() : day(String(url).split('date=')[1])));
+    assert.equal(result.date, '2026-10-23');
+  }
+});
+
+test('a day is done only when every task and dose is recorded', () => {
+  const p = readRecoveryDay(day(), '2026-10-23')!;
+  assert.deepEqual(dayProgress(p), { done: 2, total: 2, state: 'complete' });
+  p.tasks[0] = { ...p.tasks[0], status: 'unknown', recorded_at: null };
+  assert.deepEqual(dayProgress(p), { done: 1, total: 2, state: 'in_progress' });
+  p.medications[0] = { ...p.medications[0], status: 'unknown', recorded_at: null };
+  assert.deepEqual(dayProgress(p), { done: 0, total: 2, state: 'none' });
 });
 
 const require = createRequire(import.meta.url);
@@ -66,7 +84,7 @@ new Function('require', 'module', 'exports', code)((id: string) => id.startsWith
   ? require(`../lib/${id.split('/').at(-1)}.ts`) : require(id), module, module.exports);
 const render = (props: object = {}) => renderToStaticMarkup(createElement(module.exports.RecoveryDashboard, {
   week: readWeekSummary(weekPayload()), day: readRecoveryDay(day(), '2026-10-23'), selected: '2026-10-23',
-  loading: false, error: false, onSelect() {}, onRefresh() {}, ...props,
+  loading: false, error: false, onSelect() {}, ...props,
 }));
 
 test('dashboard renders accessible date selection, medicine details, task activity and safe provenance', () => {
@@ -97,27 +115,57 @@ const savedFrom21 = () => {
   return readWeekSummary(payload)!;
 };
 
-test('the calendar starts at the first saved day and the rest are days ahead', () => {
-  const { past, upcoming } = calendarDays(savedFrom21());
-  assert.deepEqual(past.map(day => day.date), ['2026-10-21', '2026-10-22', '2026-10-23']);
-  assert.deepEqual(upcoming, ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27']);
-  // With no saved day at all, the calendar starts today.
-  const empty = readWeekSummary({ week: { days: weekPayload().week.days } })!;
-  assert.deepEqual(calendarDays(empty).past.map(day => day.date), ['2026-10-23']);
-  assert.equal(calendarDays(empty).upcoming.length, 6);
+test('the calendar is the two days before today, today and four days ahead, with or without history', () => {
+  for (const week of [savedFrom21(), readWeekSummary({ week: { days: weekPayload().week.days } })!]) {
+    const { past, upcoming } = calendarDays(week);
+    assert.deepEqual(past.map(day => day.date), ['2026-10-21', '2026-10-22', '2026-10-23']);
+    assert.deepEqual(upcoming, ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27']);
+  }
 });
 
 test('the dashboard shows Wed 21 to Tue 27, days completed, and the selected day\'s tasks', () => {
-  const html = render({ week: savedFrom21() });
+  // Wed 21 all done, Thu 22 only partly done, Fri 23 (selected) all done.
+  const partial = day('2026-10-22'); partial.tasks[0].status = 'unknown'; (partial.tasks[0] as any).recorded_at = null;
+  const days = { '2026-10-21': readRecoveryDay(day('2026-10-21'), '2026-10-21'), '2026-10-22': readRecoveryDay(partial, '2026-10-22'),
+    '2026-10-23': readRecoveryDay(day('2026-10-23'), '2026-10-23') };
+  const html = render({ week: savedFrom21(), days });
   assert.match(html, /Wed 21 – Tue 27/);
+  assert.match(html, /class="week-day completed"[^>]*aria-label="2026-10-21, All done"/);
+  assert.match(html, /class="week-day in-progress"[^>]*aria-label="2026-10-22, In progress"/);
+  assert.match(html, /✓ All done · ◐ In progress · ◌ Nothing recorded/);
   assert.ok(!html.includes('2026-10-20,'));
   assert.equal((html.match(/aria-pressed=/g) || []).length, 7);
   assert.equal((html.match(/upcoming" aria-pressed="false" disabled=""/g) || []).length, 4);
-  // The fixture's today is already confirmed, so all three shown days are complete.
-  assert.match(html, /<b>3\/3<\/b><p>Days completed<\/p>\s*<small>All morning medicines recorded<\/small>/);
-  // Tasks are for the selected day (Fri 23): one recorded out of one in its schedule.
-  assert.match(html, /<b>1\/1<\/b><p>Tasks completed<\/p>\s*<small>Fri 23<\/small>/);
+  // Out of all seven days: Wed and Fri are fully done; Thu is in progress and the four ahead are not yet.
+  assert.match(html, /<b>2\/7<\/b><p>Days completed<\/p><\/div>/);
+  // The selected day (Fri 23), counted like Today: its 1 task and 1 scheduled dose, both recorded done.
+  assert.match(html, /<b>2\/2<\/b><p>Tasks completed<\/p>\s*<small>Fri 23<\/small>/);
   assert.ok(!html.includes('incomplete history'));
   // No day details yet: no task total is guessed.
   assert.match(render({ week: savedFrom21(), day: null }), /<b>–<\/b><p>Tasks completed/);
+});
+
+test('a dose or task with nothing recorded has no status label', () => {
+  const p = day();
+  Object.assign(p.medications[0], { status: 'unknown', recorded_at: null });
+  const html = render({ day: p });
+  assert.ok(!html.includes('Not enough evidence') && !html.includes('No confirmed record'));
+  assert.match(html, /Recorded complete/); // the recorded walk keeps its label
+});
+
+test('each task says when to do it, and repeats are numbered as on the Today page', () => {
+  const p = day();
+  const task = (n: number, period: string | null, name = 'Knee exercises') =>
+    ({ occurrence_id: `task_${n}#2026-10-23#${n}`, name, period, status: 'unknown', recorded_at: null });
+  Object.assign(p, { tasks: [task(1, 'morning'), task(2, 'afternoon'), task(3, 'evening'),
+    task(4, '07:30', 'Walking'), task(5, '15:00', 'Walking'), task(6, null, 'Ice pack')] });
+  const html = render({ day: readRecoveryDay(p, '2026-10-23') });
+  for (const line of ['Morning · 1 of 3', 'Afternoon · 2 of 3', 'Evening · 3 of 3', '07:30 · 1 of 2', '15:00 · 2 of 2']) {
+    assert.ok(html.includes(line), line);
+  }
+  assert.match(html, /Ice pack<\/b><span class="d">Any time</);
+});
+
+test('there is no Refresh button: the page reloads its data by itself', () => {
+  assert.ok(!render().includes('Refresh'));
 });

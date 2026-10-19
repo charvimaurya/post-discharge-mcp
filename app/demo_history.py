@@ -3,7 +3,7 @@ Demo history for past days of the demo patient, so the weekly dashboard is not e
 
 Pure: given the medicine and task occurrences the plan gives for a past day (the same
 ones the app builds for that date), return the events a well-kept day would have saved:
-the day's schedule snapshots, every scheduled dose taken and most tasks done.
+the day's schedule snapshots, every scheduled dose taken and every task done.
 scripts/seed_demo_history.py writes them; nothing here touches AWS.
 
 Every idempotency key starts with KEY_PREFIX, so the seeded events can be found and
@@ -23,8 +23,8 @@ PERIOD_TIMES = {"morning": time(8), "midday": time(12), "afternoon": time(15),
                 "evening": time(18), "night": time(21), "bedtime": time(22)}
 DEFAULT_TIME = time(12)
 DONE_AFTER = timedelta(minutes=10)
-# The day's last task is left undone: a believable day, not a perfect one.
-TASKS_LEFT_UNDONE = 1
+# Every task is recorded done, so the dashboard shows these days as complete.
+TASKS_LEFT_UNDONE = 0
 
 
 def _due(day: str, clock: str | None, period: str | None, zone: ZoneInfo) -> datetime:
@@ -79,6 +79,7 @@ def build_demo_day(day: str, today: str, medications: list[dict], tasks: list[di
             continue
         due = _due(day, task.get("clock_time"), task.get("time_of_day_label"), zone)
         planned.append({"occurrence_id": key, "name": task.get("description") or task.get("title"),
+                        "period": task.get("clock_time") or task.get("time_of_day_label"),
                         "active": True, "due_at": due.isoformat()})
     add("task_schedule_snapshot", {**snapshot, "occurrences": planned}, "tasks")
     for task in planned[:max(len(planned) - TASKS_LEFT_UNDONE, 0)]:

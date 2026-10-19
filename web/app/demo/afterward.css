@@ -589,10 +589,9 @@
 .awapp .turn.aw .points li::marker{color:#F7B7C6}
 .awapp .turn.aw.past .points{font-size:17px;margin-bottom:20px}
 
-/* Evidence-based weekly history, beneath the scrollable Today plan. */
-.awapp .week-panel{flex-shrink:0;border-top:1px solid var(--line);margin-top:12px;padding-top:10px;position:relative}
-/* Sits on the right of the "This week" row whether the strip is open or closed. */
-.awapp .week-link{position:absolute;top:6px;right:0;z-index:1;display:inline-flex;align-items:center;gap:6px;
+/* Beneath the scrollable Today plan: the button to the weekly dashboard. */
+.awapp .week-panel{flex-shrink:0;border-top:1px solid var(--line);margin-top:12px;padding-top:10px;display:flex;justify-content:flex-end}
+.awapp .week-link{display:inline-flex;align-items:center;gap:6px;
   border:1.5px solid var(--accent);border-radius:999px;padding:3px 12px;font-size:13px;font-weight:600;
   color:var(--accent);background:#fff;text-decoration:none;transition:background .15s}
 .awapp .week-link:hover{background:var(--accent-pale)}

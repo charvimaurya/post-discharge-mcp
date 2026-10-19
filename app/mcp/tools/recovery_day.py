@@ -120,7 +120,9 @@ def build_day_details(state, events, patient_id, day, now):
     task_items = task_snapshot["occurrences"] if task_snapshot else []
     if not task_snapshot and selected == local.date():
         # Today's own task occurrences are the denominator, as for medicines; never projected backwards.
-        task_items = [{"occurrence_id": item["occurrence_id"], "name": item.get("description") or item.get("title")}
+        # When to do it: the letter's clock time if it gives one, else its part of the day.
+        task_items = [{"occurrence_id": item["occurrence_id"], "name": item.get("description") or item.get("title"),
+                       "period": item.get("clock_time") or item.get("time_of_day_label")}
                       for item in state.get("current_tasks", [])
                       if isinstance(item.get("occurrence_id"), str) and item["occurrence_id"].rsplit("#", 2)[-2:-1] == [day]]
     # Saved task actions can be shown even without a historical task denominator.
@@ -136,7 +138,9 @@ def build_day_details(state, events, patient_id, day, now):
         if item.get("active") is False:
             continue
         status, stamp = action_status(rows, item["occurrence_id"], "task", local)
+        period = item.get("period")
         tasks.append({"occurrence_id": item["occurrence_id"], "name": item.get("name"),
+                      "period": period if isinstance(period, str) and period else None,
                       "status": status, "recorded_at": stamp})
     return {"kind": "recovery_day_details", "schema_version": 1, "date": day, "timezone": timezone,
         "as_of": now.isoformat(), "schedule_evidence": "current_day_occurrences" if current else "snapshot" if snapshot else "missing_or_conflicting",

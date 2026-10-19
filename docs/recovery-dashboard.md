@@ -1,16 +1,18 @@
 # Recovery dashboard
 
-Open `/demo/recovery`, or use **View weekly dashboard** on the This week row
-beneath the Today plan on `/demo`. The link sits beside the disclosure, not
-inside it, so opening the strip and following the link stay separate actions.
+Open `/demo/recovery`, or use the **View weekly dashboard** button beneath the
+Today plan on `/demo`; the Today page shows no weekly history of its own.
 The dashboard opens in a new tab so the chat stays as it was. Its "Back to
 Today" closes that tab, or opens `/demo?view=today` (straight to the plan, not
 the upload screen) when the browser keeps the tab open. The dashboard uses the Today screen's frame, top bar, panels and cards. The Today
 page's five-second polling is unchanged.
 
-The calendar starts on the first day with saved history (or recorded tasks), never
-later than today, and fills the rest of its seven tiles with the days ahead, which
-cannot be opened. The totals count only the shown days up to today. To give the
+The calendar always shows the two days before today, today and the four days ahead
+(seven tiles); days ahead cannot be opened. Each day counts like the Today page:
+every task and scheduled medicine dose that day (as-needed medicines are not listed).
+A tile shows ✓ when all of them are recorded done, ◐ "In progress" when some are, and
+◌ when none are. "Days completed" is the number of ✓ days out of all seven on the
+calendar; "Tasks completed" is done out of total for the selected day. To give the
 demo patient history on past days, run `scripts/seed_demo_history.py` (preview by
 default; `--confirm` writes, `--remove` deletes exactly what it wrote). It writes
 to the live Event History table; Reset demo keeps those days, a new upload removes

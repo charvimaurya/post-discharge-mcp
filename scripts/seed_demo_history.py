@@ -2,7 +2,7 @@
 Fill past days of the demo patient's history, so the weekly dashboard is not empty.
 
 For each date given (before today), save what a well-kept day looks like: the day's
-schedule snapshots, every scheduled dose taken and all but the last task done. The
+schedule snapshots, every scheduled dose taken and every task done. The
 medicines and tasks come from Margaret's current plan for that date, so a new letter
 needs a new run. See app/demo_history.py. demo_patient_001 only.
 
