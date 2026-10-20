@@ -31,3 +31,4 @@ logs/
 /*.zip
 /lambda-smoke-response.json
 /output.txt
+/manifest.json
