@@ -61,6 +61,10 @@ misread dose can send someone back to hospital.
     [a test](tests/ingestion/test_package_integration.py) proves AfterWard calls
     the package itself, not a copy. 149 tests run on Python 3.11 to 3.13.
 
+### Hackathon requirements at a glance
+
+![How AfterWard meets every hackathon requirement](docs/architecture-requirements.png)
+
 ## Architecture
 
 ![AfterWard architecture](docs/architecture.svg)
@@ -92,9 +96,8 @@ the patient's data.
 | Prompts | `ask_my_letter(question)`, `morning_checkin()` |
 | MCP App | `get_today_tasks` and `get_week_summary` link to `ui://afterward/today.html`, a Today card that MCP Apps hosts render |
 
-The patient is chosen by the server from the token, never by the model. The
-deployed MCP server on ECS was last updated before `get_week_summary` and
-`get_recovery_day_details` were added; the demo runs the current server locally.
+The patient is chosen by the server from the token, never by the model. The deployed MCP server on ECS was updated on 20 October 2026 and has the
+same 9 tools and 2 prompts as the code. The recorded demo runs the same code locally.
 
 ## The Simulated Alexa+ demo
 

@@ -22,9 +22,7 @@ requires its own receipt or successful access test. Start with the P0 items in
   requirements, eligible prior work dates, external package attribution, team
   eligibility and limits, and any mandated product-feedback evidence. Mark each
   rule satisfied only with a matching artifact or an organizer's written exception.
-- [ ] Choose the recording target and label it. Resolve or disclose **seven local
-  versus six deployed tools**; the responding endpoint lacks undo_report, and the
-  other endpoint timed out. Do not silently show a local trace as cloud execution.
+- [ ] Choose the recording target and label it. Local and deployed now match (**nine tools, two prompts**, redeployed 20 Oct). Do not silently show a local trace as cloud execution.
 - [ ] Approve an isolated synthetic demo tenant/recording environment. Shared
   patient uploads, resets and completions can affect other sessions. Do not expose
   unrestricted visitors or real patient data to obtain a submission link.
@@ -57,7 +55,7 @@ requires its own receipt or successful access test. Start with the P0 items in
 - [x] Prepared [local Devpost draft](devpost-draft.md); not posted.
 - [ ] Obtain any existing Devpost draft and compare **every** external claim with
   the [claim ledger](readiness-review.md). Remove unsupported claims about native
-  Alexa+, AgentCore, Polly, seven deployed tools, clinical benefit, production
+  Alexa+, AgentCore, Polly, clinical benefit, production
   readiness, universal grounding or a hosted frontend.
 - [ ] Confirm project name, tagline, description, team names/contributions, build
   dates, tools/services actually used, external package credits, license and any
@@ -104,6 +102,7 @@ requires its own receipt or successful access test. Start with the P0 items in
   medicine report caused a deterministic write. Do not state “all tests passed.”
 - [x] Authenticated deployed **tools/list** verified six tools at one CloudFront
   endpoint; local registration verified seven. This is not an end-to-end test.
+- [x] 20 Oct: ECS redeployed; authenticated deployed tools/list shows nine tools and two prompts.
 - [ ] Approve and execute a fresh final-target smoke test for upload → ready plan →
   reminder → named completion → re-read → sourced answer, using isolated synthetic
   state. The existing `scripts/test_mcp_http.py` can write completions; it is not

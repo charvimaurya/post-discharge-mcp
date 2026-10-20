@@ -24,7 +24,7 @@ was created, changed or deployed.
 | AWS Lambda | `AfterWardDocumentProcessor` turns a letter into a plan; `AfterwardReminderChecker` decides when AfterWard should speak first | [document_processor](../lambdas/document_processor/handler.py), [reminder_checker](../lambdas/reminder_checker/handler.py) | [build_document_lambda.py](../scripts/deployment/build_document_lambda.py), [deployment README](../deployment/README.md) | **Live.** Both Active, Python 3.11. Code last updated 14 Oct and 9 Oct; later repo changes are not deployed |
 | Amazon DynamoDB | `PostDischargeRecoveryState` holds the plan and reminder state; `PostDischargeEventHistory` holds what was done and when | [recovery_state.py](../app/database/recovery_state.py), [event_history.py](../app/database/event_history.py) | [AWS setup](aws-setup.md) | **Live.** Both tables ACTIVE |
 | Amazon EventBridge Scheduler | Runs the reminder check every 5 minutes | Invokes the reminder Lambda | [reminder-schedule-target.json](../deployment/reminder-schedule-target.json), [scheduler policies](../deployment/scheduler-invoke-policy.json), [deployment README](../deployment/README.md) | **Live.** `afterward-reminder-checker`, `rate(5 minutes)`, ENABLED |
-| Amazon ECS on Fargate, Amazon ECR | Hosts the MCP server | [MCP HTTP server](../app/mcp/http_server.py), [Dockerfile](../Dockerfile) | [ecs-task-definition.json](../ecs-task-definition.json) | **Live.** `afterward-mcp-service` ACTIVE, 1 running task, task definition `afterward-mcp:6` (registered 18 Oct; adds CloudWatch logging only), image `afterward-mcp:latest` from ECR, pushed 8 Oct |
+| Amazon ECS on Fargate, Amazon ECR | Hosts the MCP server | [MCP HTTP server](../app/mcp/http_server.py), [Dockerfile](../Dockerfile) | [ecs-task-definition.json](../ecs-task-definition.json) | **Live.** `afterward-mcp-service` ACTIVE, 1 running task, task definition `afterward-mcp:6` (registered 18 Oct; adds CloudWatch logging only), image `afterward-mcp:latest` from ECR, pushed 20 Oct (redeployed; 9 tools and 2 prompts checked in MCP Inspector) |
 | Elastic Load Balancing | Routes traffic from CloudFront to the MCP containers | n/a | [ecs-task-definition.json](../ecs-task-definition.json) (`ALB_HOST`) | **Live.** `afterward-mcp-alb`, application, internet-facing, active |
 | Amazon CloudFront | HTTPS front door for the MCP server | n/a | [cloudfront-config.json](../cloudfront-config.json) | **Live.** Two distributions Deployed and enabled, both with the ALB as origin. One uses HTTPS to the origin, one HTTP |
 | AWS Secrets Manager | Holds the MCP bearer token, so it is never in code or task settings | [mcp_auth.py](../app/auth/mcp_auth.py), [mcp_token.py](../app/auth/mcp_token.py) | `secrets` in [ecs-task-definition.json](../ecs-task-definition.json) | **Live.** The MCP token secret exists (metadata only, last changed 4 Oct) |
@@ -68,12 +68,10 @@ with a bearer token ([client.py](../app/mcp/client.py)):
 - **Writes**: `report_task_completed`, `report_medication_taken` and `undo_report`
   record events in `PostDischargeEventHistory`.
 
-The local code registers these nine tools and two prompts. The live ECS service
-runs the `afterward-mcp:latest` image pushed on 8 October, before `get_week_summary`
-and `get_recovery_day_details` were added (task definition revision 6, from
-18 October, changed only logging), so the deployed MCP server does not have the
-current tool set. The demo and video run the MCP server locally; redeploy the ECS
-image before claiming cloud parity.
+The local code registers these nine tools and two prompts. On 20 October 2026 the
+ECS service was redeployed with a new `afterward-mcp:latest` image built from this
+code, and MCP Inspector on the deployed endpoint listed the same nine tools and two
+prompts. The demo and video run the MCP server locally.
 
 Reminders run separately: EventBridge Scheduler invokes `AfterwardReminderChecker`
 every 5 minutes, which reads the plan and saves a pending check-in to DynamoDB for

@@ -108,9 +108,7 @@ clinical workflow validation still ahead.”
 * Start with a successful full rehearsal, matching clocks and the correct document
   ID. Browser mic/speech availability must be tested on the recording machine.
   Type prompts if recognition fails and label that fallback; do not fake listening.
-* Use a reachable, authenticated MCP target. Current local code lists seven tools;
-  the responding cloud target lists six. This story uses tools present in both;
-  omit undo and do not claim seven deployed tools. Recheck and label the final target.
+* Use a reachable, authenticated MCP target. Local code and the cloud target both list nine tools (cloud redeployed 20 Oct). Recheck and label the final target.
 * A real MCP claim needs actual transport/server evidence. Pair the UI request ID
   with a server log or a real client capture. The previous final-model evaluation
   used in-memory tool fixtures and is **not** footage of cloud tool execution.

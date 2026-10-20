@@ -42,7 +42,7 @@ The browser calls a server-side bridge, and the agent uses authenticated MCP
 tools. The verified cloud MCP service runs on ECS Fargate behind ALB/CloudFront;
 the active application path has not been established as using AgentCore or Polly.
 The MCP server registers nine tools, two prompts and an MCP App card for today's
-plan; the cloud ECS deployment predates the two newest tools. We use Claude
+plan; the cloud ECS deployment has the same set. We use Claude
 Haiku 4.5 for development and testing and Claude Sonnet 4.5 for the final
 extraction and agent; one setting, `MODEL_MODE`, switches all models. The hosted frontend and full end-to-end public
 journey remain unverified; bridge/Amplify deployment files are preparations.
