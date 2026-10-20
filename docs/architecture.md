@@ -102,13 +102,14 @@ tool we would use instead.
 | Proactive reminders | EventBridge Scheduler and a reminder Lambda | Managed clock, no always-on server | Real Alexa+ speaking first is not available to us, so the demo client does it | Celery Beat or APScheduler |
 | Patient interface | Next.js Simulated Alexa+ app and an Alexa skill | Shows the full flow, including check-ins, without Alexa+ access | Must be clearly labelled as simulated | Already open source |
 | Voice out | Browser voice (Web Speech API) | Free and instant, with no server | Sounds a little different on each computer. Next step: Amazon Polly | Piper |
-| Monitoring | CloudWatch logs, metrics and a dead-letter-queue alarm | Built in, no extra setup | AWS only | Prometheus and Grafana |
+| Monitoring | CloudWatch logs, metrics and three CloudWatch alarms (tool errors, failed letters, MCP health) with email alerts | Built in, no extra setup | AWS only | Prometheus and Grafana |
 
 ## What is deployed
 
 - **On AWS:** S3, SQS and the dead-letter queue, the document Lambda, DynamoDB,
   S3 Vectors, EventBridge Scheduler and the reminder Lambda, and the MCP server on
-  ECS Fargate behind ALB and CloudFront. The cloud MCP task predates the two
+  ECS Fargate behind ALB and CloudFront, and three CloudWatch alarms (tool errors,
+  failed letters, MCP health) with email alerts. The cloud MCP task predates the two
   newest tools. See [AWS integrations](aws-integrations.md) for each service, the
   file that uses it and how it was checked.
 - **Runs locally:** the web app, the bridge and the demo agent. Bridge and Amplify

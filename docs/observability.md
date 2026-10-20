@@ -108,7 +108,7 @@ Read-only AWS inspection on 17 October 2026 confirmed:
 - Target-group HTTP health check: `/health`, traffic port 8000, success code 200, interval 30 seconds, timeout 5 seconds, unhealthy threshold 2 and healthy threshold 5.
 - CloudWatch returned 15 recent one-minute datapoints for this exact dimension pair, each with minimum healthy count 1.
 - Both CloudFront distributions were enabled and Deployed, pointing to this ALB. `E1G5Y3L9QK930` used an `https-only` origin policy; `E1SEY0O6MW9CTW` used `http-only`. Neither route was exercised by these metadata checks.
-- No alarms with any of the three configured names were found in this account/region. No AWS resources were changed.
+- Before deployment (17 Oct): No alarms with any of the three configured names were found in this account/region. No AWS resources were changed.
 
 **Detects:** crashed or unreachable tasks, health-check timeouts/non-200 responses, and loss of all registered targets or sustained missing health metrics. It depends on ALB health-check detection before the alarm evaluation window. CloudWatch may use older real datapoints before filling missing periods, so three minutes is not a guaranteed outage-to-notification deadline. Missing telemetry or an incorrectly configured dimension can also trigger it; verify fresh datapoints before deployment. Intentional scale-to-zero or maintenance may alert.
 
@@ -313,6 +313,6 @@ Offline checks on 17 October 2026:
 | Regression checks and whitespace | PASS | 36 configuration/logging tests passed; git diff --check passed. |
 | Order, retention, costs and rollback documentation | PASS | Administrator-managed group and permissions precede ECS rollout; reviewed change set precedes execution. |
 | Service-side template validation | UNVERIFIED | Previous ValidateTemplate attempt was denied. Administrator must validate before deployment. |
-| Live logs, EMF datapoints, alarm transitions and notification receipt | UNVERIFIED | No deployment or live state-changing tests performed. |
+| Live logs, EMF datapoints, alarm transitions and notification receipt | UNVERIFIED | Logs and alarms deployed 18 Oct; see Deployment status. Alarm-triggered email not yet tested |
 
-This review was written before deployment. See "Deployment status" for what is now live. Local implementation is ready for administrator hand-off. **Do not execute the rollout until the execution-role permission failure and the remaining AWS preflight checks are resolved.** The implementation status is not evidence that monitoring is deployed or fully complete. No application-code changes are needed for the three configured alarms. End-to-end authenticated MCP/CloudFront monitoring remains a separate enhancement; live alarm transitions and notification delivery are unverified.
+This review was written before deployment. See "Deployment status" for what is now live. Deployed 18 October 2026; see Deployment status above. No application-code changes are needed for the three configured alarms. End-to-end authenticated MCP/CloudFront monitoring remains a separate enhancement; live alarm transitions and notification delivery are unverified.
