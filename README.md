@@ -188,6 +188,14 @@ Use three terminals, each from the repository root.
 | 2. Python bridge (port 8002) | `source .venv/bin/activate`<br>`python scripts/run_web_bridge.py --port 8002` | `.\.venv\Scripts\Activate.ps1`<br>`python scripts/run_web_bridge.py --port 8002` |
 | 3. Web app (port 3000) | `cd web`<br>`npm run dev` | `cd web`<br>`npm run dev` |
 
+On Windows, `.\scripts\start-demo.ps1` starts all three at once, each in its own
+window (add `-Alexa` for the tunnel and `-Reset` to reset Margaret's day first). To reset her day while the demo is
+running, use `.\scripts\reset-demo.ps1` or the **Reset demo** button.
+For a recording take, add `-Record`: it fixes the demo clock to 23 October, 07:00,
+for that run only, without changing `.env`.
+The demo uses a local copy of the MCP server by default; to use the one on AWS,
+see [MCP server on AWS](docs/mcp-on-aws.md).
+
 Open http://127.0.0.1:3000/demo. After changing Python code or `.env`, restart the
 MCP server and the bridge. Run the web app locally with `npm run dev`: the
 production server (`npm start`) refuses API requests unless `APP_ORIGIN` is set to
