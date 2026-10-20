@@ -312,7 +312,7 @@ Offline checks on 17 October 2026:
 | Newly introduced credentials or broad IAM grants | PASS | Gitleaks scanned the tracked diff and new configuration test with no leaks; reviewed IAM grants have no wildcard actions. Existing account/resource ARNs are references, not credentials. |
 | Regression checks and whitespace | PASS | 36 configuration/logging tests passed; git diff --check passed. |
 | Order, retention, costs and rollback documentation | PASS | Administrator-managed group and permissions precede ECS rollout; reviewed change set precedes execution. |
-| Service-side template validation | UNVERIFIED | Previous ValidateTemplate attempt was denied. Administrator must validate before deployment. |
-| Live logs, EMF datapoints, alarm transitions and notification receipt | UNVERIFIED | Logs and alarms deployed 18 Oct; see Deployment status. Alarm-triggered email not yet tested |
+| Service-side template validation | PASS | The `afterward-observability` stack was created successfully on 18 Oct, which validates the template. |
+| Live logs, EMF datapoints, alarm transitions and notification receipt | PARTIAL | Logs and alarms deployed 18 Oct: log streams receive events, all three alarms exist and show OK, and a test email reached the inbox. Not yet seen: a `tool_errors` datapoint from a real failure, or an email sent by an alarm itself. See Deployment status. |
 
 This review was written before deployment. See "Deployment status" for what is now live. Deployed 18 October 2026; see Deployment status above. No application-code changes are needed for the three configured alarms. End-to-end authenticated MCP/CloudFront monitoring remains a separate enhancement; live alarm transitions and notification delivery are unverified.
