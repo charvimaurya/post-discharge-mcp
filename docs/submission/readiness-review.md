@@ -1,5 +1,7 @@
 # Final hackathon submission readiness review
 
+> **Superseded on 20 Oct 2026:** deployed and local both have 9 tools and 2 prompts; the latest run is 1,264 Python and 138 web tests. See [checklist.md](checklist.md) for the current status.
+
 17 October 2026. Reviewed working tree on `main`, HEAD `5160c54`; many changes,
 including bridge/Amplify/security/demo controls, remain uncommitted. This is not
 an attestation that the remote main branch contains the current implementation.
