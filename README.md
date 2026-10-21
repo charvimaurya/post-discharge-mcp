@@ -19,6 +19,14 @@ they did, and answers questions using the letter's own words.
 | AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |
 | Hosted demo | None. A public deployment is optional; run AfterWard locally with the steps below. |
 
+## Running AfterWard for judging
+
+**Start here:** [Judge quick-start, reproducible demo scenarios, local/AWS boundaries, MCP evidence and success metrics](docs/judging-guide.md).
+
+The browser is a **Simulated Alexa+** client, not a published Alexa+ add-on. A classic Alexa custom skill was tested in the developer console. All patient data is synthetic. The full experience needs configured AWS resources; the isolated MCP fixture runs only a subset of features without AWS.
+
+**Evidence:** [AWS integrations](docs/aws-integrations.md) · [Product feedback](docs/product-feedback.md) · [15-item friction log](docs/friction-log.md) · [Testing](docs/testing.md) · [Fresh-clone checks](docs/fresh-clone-verification.md) · [Open-source validator](https://github.com/charvimaurya/discharge-letter-check).
+
 ## The problem
 
 Leaving hospital comes with a letter full of instructions: tablets at set times,
@@ -96,7 +104,7 @@ the patient's data.
 | Prompts | `ask_my_letter(question)`, `morning_checkin()` |
 | MCP App | `get_today_tasks` and `get_week_summary` link to `ui://afterward/today.html`, a Today card that MCP Apps hosts render |
 
-The patient is chosen by the server from the token, never by the model. The deployed MCP server on ECS was updated on 20 October 2026 and has the
+The server sets the patient from the request's authentication, never from tool arguments or the model. The hackathon mapping sends any valid token to the one demo patient. The deployed MCP server on ECS was updated on 20 October 2026 and has the
 same 9 tools and 2 prompts as the code. The recorded demo runs the same code locally.
 
 ## The Simulated Alexa+ demo
