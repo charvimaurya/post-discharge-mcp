@@ -23,7 +23,7 @@ def test_host_forces_isolated_identity_and_blocks_aws(monkeypatch):
     assert len(asyncio.run(server.mcp.list_prompts())) == 2
 
 
-@pytest.mark.parametrize("with_week,completed", [(False, 0), (True, 5)])
+@pytest.mark.parametrize("with_week,completed", [(False, 0), (True, 2)])
 def test_week_query_is_read_only_with_and_without_mock_seed(monkeypatch, with_week, completed):
     from copy import deepcopy
     from app.auth.patient_scope import PatientContext

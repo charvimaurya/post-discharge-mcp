@@ -26,11 +26,18 @@ def events():
     return seed_week_events(PATIENT, NOW)
 
 
-def test_seed_five_complete_one_missed_today_not_due_and_rerun(events):
+@pytest.fixture
+def taken_events():
+    """Every earlier day taken, so tests that edit the first day start from a complete day."""
+    return seed_week_events(PATIENT, NOW, taken_offsets=range(1, 7))
+
+
+def test_seed_tuesday_and_wednesday_complete_others_missed_today_not_due_and_rerun(events):
     original = deepcopy(events)
     result = summary(events)
-    assert result["completed_days"] == 5
-    assert [d["status"] for d in result["days"]] == ["completed"] * 5 + ["missed", "not_yet_due"]
+    assert result["completed_days"] == 2
+    assert [d["status"] for d in result["days"]] == ["missed"] * 3 + ["completed"] * 2 + ["missed", "not_yet_due"]
+    assert [d["date"] for d in result["days"] if d["status"] == "completed"] == ["2026-10-20", "2026-10-21"]
     assert result["start_date"] == "2026-10-17" and result["end_date"] == "2026-10-23"
     assert result["synthetic_demo_history"] is True
     assert events == original == seed_week_events(PATIENT, NOW)
@@ -74,7 +81,8 @@ def test_absence_never_means_missed(events):
 
 
 @pytest.mark.parametrize("mutation", ["partial", "incomplete", "ambiguous_period", "naive_due", "duplicate_dose", "no_version"])
-def test_incomplete_evidence_is_unknown(events, mutation):
+def test_incomplete_evidence_is_unknown(taken_events, mutation):
+    events = taken_events
     day = events[0]["details"]["date"]
     if mutation == "partial":
         events.pop(1)
@@ -94,7 +102,8 @@ def test_incomplete_evidence_is_unknown(events, mutation):
         assert result["taken_doses"] == 1 and result["reason"] == "partial_completion"
 
 
-def test_undo_and_retake_and_conflict(events):
+def test_undo_and_retake_and_conflict(taken_events):
+    events = taken_events
     action = deepcopy(events[1])
     action.update(event_type="medication_undone", idempotency_key="undo-1")
     events.append(action)
@@ -135,7 +144,7 @@ def test_local_day_boundaries_and_dst(timezone, now, expected):
     rows = seed_week_events(PATIENT, instant, timezone)
     result = summary(rows, instant, timezone)
     assert result["start_date"] == expected
-    assert result["completed_days"] == 5
+    assert result["completed_days"] == 2
     assert len({d["date"] for d in result["days"]}) == 7
     with pytest.raises(ValueError):
         summary(rows, instant.replace(tzinfo=None), timezone)
@@ -174,7 +183,7 @@ def test_registered_tool_uses_only_context_and_no_writes(monkeypatch, events, pa
         result = asyncio.run(server.get_week_summary())
     finally:
         reset_current_patient_context(token)
-    assert result["data"]["week"]["completed_days"] == 5
+    assert result["data"]["week"]["completed_days"] == 2
     assert patients == [patient_id] and events == original
     tools = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
     assert len(tools) == 9

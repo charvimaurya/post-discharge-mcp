@@ -22,10 +22,12 @@ The window is the seven patient-local days ending on the clock's "today" (with
 `--with-week`, the isolated host fixes the clock at 23 October 2026, 08:00 London,
 so 17 to 23 October). Medicines and tasks use the same seven dates.
 
-| | 6 days ago | 5 | 4 | 3 | 2 | 1 | Today |
+| | 6 days ago (Sat) | 5 (Sun) | 4 (Mon) | 3 (Tue) | 2 (Wed) | 1 (Thu) | Today (Fri) |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Morning medicines (2 doses) | taken | taken | taken | taken | taken | missed | not yet due |
+| Morning medicines (2 doses) | missed | missed | missed | taken | taken | missed | not yet due |
 | Recovery tasks recorded complete | 2 | 3 | 1 (a second was recorded, then undone) | 3 | 2 | 0 | what the session records |
+
+So the week shows **2 of 7 days** with all morning medicines taken: Tuesday and Wednesday.
 
 Each day also gets a morning schedule snapshot, which the weekly summary needs before
 it will call a day complete. Today has no seeded task completions: its count comes
