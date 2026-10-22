@@ -17,6 +17,9 @@ they did, and answers questions using the letter's own words.
 | This repository | https://github.com/charvimaurya/post-discharge-mcp |
 | Open-source package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) (MIT, tests on Python 3.11 to 3.13) |
 | AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |
+| Judge quick-start | [Running AfterWard for judging](docs/judging-guide.md) |
+| Product feedback | [docs/product-feedback.md](docs/product-feedback.md) |
+| Friction log | [docs/friction-log.md](docs/friction-log.md) |
 | Hosted demo | None. A public deployment is optional; run AfterWard locally with the steps below. |
 
 ## Running AfterWard for judging
@@ -33,6 +36,12 @@ Leaving hospital comes with a letter full of instructions: tablets at set times,
 exercises, walks, wound care, warning signs. At home, with no nurse nearby,
 patients and families have to remember all of it alone. A missed instruction or a
 misread dose can send someone back to hospital.
+
+## Why AfterWard is different
+
+- **Beyond reminders:** A discharge letter becomes a daily plan that can reflect recorded progress, rather than a static list of alarms.
+- **Beyond document Q&A:** A patient can report an activity, check what is left, and ask for the supporting words from their own letter.
+- **Uncertainty stays visible:** The reusable [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) package checks structured extraction fields and flags specified missing or uncertain information for confirmation. It is **not** a clinical verifier and cannot detect every extraction error.
 
 ## What AfterWard does
 

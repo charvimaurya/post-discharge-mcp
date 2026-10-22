@@ -39,7 +39,7 @@ or write data. Use the synthetic test documents.
 The MCP server and user-facing app are implemented. Local startup uses three
 processes: the authenticated MCP server, the Python bridge, and the Next.js web app.
 
-Follow the [README local setup](../README.md#local-setup) for exact macOS and
+Follow the [README local setup](../README.md#run-afterward-locally) for exact macOS and
 Windows commands, dependencies, and all settings. It also has the judge demo steps.
 
 From the repository root, with the Python virtual environment active, run each
@@ -82,7 +82,7 @@ git clone https://github.com/charvimaurya/post-discharge-mcp.git
 cd post-discharge-mcp
 ```
 
-Follow the [README](../README.md#local-setup) to create the virtual environment,
+Follow the [README](../README.md#run-afterward-locally) to create the virtual environment,
 install Python and web dependencies, and copy both environment examples.
 The root requirements include the AWS SDK and uvicorn. `requirements-dev.txt`
 adds pytest on top of them, as shown in the README.
