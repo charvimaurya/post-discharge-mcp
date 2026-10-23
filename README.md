@@ -8,6 +8,8 @@ they did, and answers questions using the letter's own words.
 > AfterWard is a hackathon prototype, not a medical device, and has not been
 > clinically validated.
 
+**Team:** Charvi Maurya and Shilpa Agarwal. **Built:** between 31 August and 23 October 2026.
+
 ## Judge links
 
 | Item | Link |
@@ -269,6 +271,8 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+Expected results: `python -m pytest -q` shows **1,298 passed, 10 deselected**, and `npm test` shows **145 passed**.
 
 `pytest` skips tests marked `integration`, which contact real AWS
 ([pytest.ini](pytest.ini)). The default tests use mocks and need no AWS access.
