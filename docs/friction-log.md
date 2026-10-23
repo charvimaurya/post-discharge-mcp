@@ -1,6 +1,6 @@
 # AfterWard friction log
 
-Built 31 Aug to 23 Oct 2026. Team: Charvi Maurya (developer), Shilpa Agarwal (mentor).
+Built 31 Aug to 23 Oct 2026. Team: Charvi Maurya (developer), Shilpa Agarwal (team member).
 First time using AWS and first time building a voice agent.
 Repository: public, at https://github.com/charvimaurya/post-discharge-mcp.
 

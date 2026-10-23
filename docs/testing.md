@@ -82,6 +82,6 @@ not run.
 A passing mock-based test does not prove cloud permissions, deployed code, or
 medical extraction accuracy. Compare extraction output against the synthetic
 source document. The sample PDF is
-test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf, two pages.
+test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf, two pages.
 
 See ../scripts/README.md for script groups and ../tests/README.md for test groups.

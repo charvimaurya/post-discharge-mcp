@@ -1,3 +1,5 @@
+> **OLD DRAFT. Do not paste this file into Devpost.** It has placeholders and older numbers. The final text is [AfterWard_Devpost_About_The_Project.md](AfterWard_Devpost_About_The_Project.md).
+
 ## At a glance
 
 > **AfterWard turns a hospital discharge letter into a daily recovery plan that speaks first, on Alexa+.**

@@ -81,7 +81,7 @@ Friday 23 October, 20:00 BST). Nothing can be edited after this.
   as our next fix. This matches the 13/14 evaluation.
 - [ ] Fill the "At a glance" gaps: video link, repo link
   (https://github.com/charvimaurya/post-discharge-mcp), package link (above),
-  friction log link, and the test count `[N]` from a fresh `pytest -q` run.
+  friction log link, and the test count (filled in: 1,298 Python and 145 web tests).
 - [x] **Encryption and AgentCore wording fixed** (20 Oct): the Devpost text now says
   "encrypted at rest" (S3 uses SSE-S3; there is no customer-managed KMS key), and
   the AgentCore challenge gives the real reason (the starter would not deploy).
