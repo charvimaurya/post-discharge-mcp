@@ -2,7 +2,7 @@ export type WeekStatus = 'completed' | 'missed' | 'unknown' | 'not_yet_due' | 'n
 // hasHistory: the day has saved schedule evidence (a snapshot, or today's own occurrences).
 export type WeekDay = { date: string; isToday: boolean; status: WeekStatus; label: string; symbol: string; hasHistory: boolean };
 export type WeekActivity = { date: string; completedTasks: number };
-export type WeekSummary = { days: WeekDay[]; completedDays: number; synthetic: boolean; activity?: WeekActivity[] };
+export type WeekSummary = { days: WeekDay[]; completedDays: number; synthetic: boolean; activity?: WeekActivity[]; dischargeDate?: string };
 
 const states: Record<WeekStatus, { label: string; symbol: string }> = {
   completed: { label: 'All morning medicines recorded as taken', symbol: '✓' },
@@ -39,7 +39,12 @@ export function readWeekSummary(payload: unknown): WeekSummary | null {
         && Number.isSafeInteger(entry.completed_tasks) && Number(entry.completed_tasks) >= 0)) {
     activity = payload.week.activity.map(entry => ({ date: entry.date as string, completedTasks: entry.completed_tasks as number }));
   }
+  const discharge = payload.week.discharge_date;
+  const dischargeDate = typeof discharge === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(discharge)
+    && Number.isFinite(Date.parse(`${discharge}T12:00:00Z`))
+    && new Date(`${discharge}T12:00:00Z`).toISOString().slice(0, 10) === discharge ? discharge : undefined;
   return { days, completedDays: days.filter(day => day.status === 'completed').length, ...(activity ? { activity } : {}),
+    ...(dischargeDate ? { dischargeDate } : {}),
     synthetic: payload.week.synthetic_demo_history === true };
 }
 

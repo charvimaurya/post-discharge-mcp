@@ -224,7 +224,7 @@ The demo patient is `demo_patient_001` (Margaret, after a knee replacement).
 
 - **Load her plan** with either:
   - On `/demo`, choose **Upload a discharge letter** and pick
-    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`. This uses the
+    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`. This uses the
     deployed S3, SQS and Lambda pipeline.
   - Or process the letter locally with the current code, without S3 or Lambda:
     `python scripts/ingestion/reingest_demo_letter.py --confirm`. This replaces her

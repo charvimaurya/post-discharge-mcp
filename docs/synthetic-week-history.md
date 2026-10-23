@@ -1,10 +1,10 @@
 # Synthetic seven-day history
 
 The **This week** view needs saved history: morning-medicine actions with the
-day's schedule, and recovery-task completions. Shared Margaret
-(`demo_patient_001`) has saved evidence for only the current demo day, so earlier
-days show as unknown. To show a full week without touching shared data, AfterWard
-generates a synthetic history **in memory only**.
+day's schedule, and recovery-task completions. The isolated test host generates
+a full synthetic history **in memory only**, without touching shared data.
+Shared Margaret (`demo_patient_001`) also has a separate discharge-based recording
+fixture, described at the end of this page.
 
 ## Where it comes from
 
@@ -62,6 +62,20 @@ discards the history.
 
 ## Limitation
 
-This shows how the week view works; it is not real saved history. Shared Margaret's
-week fills in only as real events are recorded day by day. The demo clock is fixed
-on one day, so in the live demo the six earlier days stay unknown.
+The isolated week above uses synthetic events in memory. For shared Margaret on
+the demo clock, the week and day tools automatically restore completed dummy
+history from **the day after the uploaded letter's discharge date through yesterday**
+once her plan is ready, within the most recent seven-day window.
+They use the replacement plan's scheduled occurrences and save the same
+idempotent events as `scripts/seed_demo_history.py`. After a letter upload clears
+the old events, the next history read restores these days. The dashboard starts
+the day after discharge, adding upcoming dates to keep seven tiles when needed.
+After the first week, it shows the most recent seven days. With discharge on
+**16 October** and demo Today on **23 October**, it displays **17–23 October**:
+17–22 have ticks and Today shows only progress actually recorded, giving
+**6/7 Days completed** until today is also completed.
+
+The repair runs only for `demo_patient_001` in `CLOCK_MODE=demo`.
+It skips the discharge day and earlier dates, plans still being
+processed, and dates with actions outside the dummy seed. Today's progress and
+future dates are never filled. Real and production clocks do not create history.

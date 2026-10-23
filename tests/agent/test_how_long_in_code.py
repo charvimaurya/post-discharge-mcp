@@ -107,3 +107,60 @@ def test_nothing_saved_this_turn_goes_to_the_model():
     _, today = _turn(PRED)
 
     assert _how_long_in_code("How long do I take it for?", [], today) is None
+
+
+# ---------- The letter panel shows the medicine's whole row from the letter ----------
+
+# The medicines table as the letter search returns it: the name is in its own column.
+TABLE_CHUNK = (
+    "MEDICINES TO TAKE AT HOME\nMedicine\nHow to take it\nStatus\n"
+    "1. Paracetamol 500 mg\ntablets.\n" + PARA_LINE + "\nNew\n"
+    "2. Codeine 30 mg tablets.\nTake 1 tablet up to four times a day, only if needed for pain. Stop after 5 days.\nNew\n"
+    "3. Apixaban 2.5 mg tablets.\n" + APIX_LINE + "\nNew\n"
+)
+
+
+def _letter_row(monkeypatch, search):
+    import asyncio
+    from app.agent import service
+
+    async def call_tool(name, arguments):
+        assert name == "search_discharge_instructions"
+        return search(arguments)
+
+    monkeypatch.setattr(service, "call_mcp_tool", call_tool)
+    monkeypatch.setattr(service, "get_structured_tool_result", lambda raw: raw)
+    trace = []
+    saved = {"document_id": "doc", "page": 1, "chunk_id": None, "section": None,
+             "text": PARA_LINE, "highlight": PARA_LINE, "passage": PARA_LINE, "highlighted_line": PARA_LINE}
+    return asyncio.run(service._with_letter_row(saved, trace)), trace, saved
+
+
+def test_saved_line_is_shown_as_the_letters_full_row(monkeypatch):
+    source, trace, _ = _letter_row(monkeypatch, lambda arguments: {
+        "ok": True, "data": [{"text": TABLE_CHUNK, "page": 1, "document_id": "doc", "chunk_id": "c1"}]})
+
+    assert "1. Paracetamol 500 mg tablets." in source["text"]
+    assert source["text"].count("tablets.") >= 3  # the other rows are shown too
+    assert source["highlight"].startswith("Paracetamol 500 mg tablets.") and PARA_LINE in source["highlight"]
+    assert trace == [{"tool": "search_discharge_instructions", "arguments": {"query": PARA_LINE}, "ok": True}]
+
+
+@pytest.mark.parametrize("search", [
+    lambda arguments: {"ok": True, "data": [{"text": "Keep the wound dry for 10 days.", "page": 1}]},
+    lambda arguments: {"ok": False, "error": "insufficient evidence"},
+])
+def test_saved_line_stays_when_the_letter_has_no_matching_row(monkeypatch, search):
+    source, _, saved = _letter_row(monkeypatch, search)
+
+    assert source == saved
+
+
+def test_saved_line_stays_when_the_search_fails(monkeypatch):
+    def broken(arguments):
+        raise RuntimeError("offline")
+
+    source, trace, saved = _letter_row(monkeypatch, broken)
+
+    assert source == saved
+    assert trace[0]["ok"] is False

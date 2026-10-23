@@ -9,7 +9,7 @@ cp .env.example .env.local # only needed if .env.local does not exist
 npm run dev
 ```
 
-Open http://localhost:3000. Choose `../test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf` and click Upload.
+Open http://localhost:3000. Choose `../test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf` and click Upload.
 Use Node.js 24 (see `.nvmrc`; tests use native TypeScript support).
 
 Start the Python bridge with `python scripts/run_web_bridge.py` from the root
