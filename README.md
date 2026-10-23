@@ -62,7 +62,8 @@ misread dose can send someone back to hospital.
 - **Alexa+ track.** A voice-first recovery companion, shown as a **Simulated
   Alexa+** web experience plus an Alexa skill (see below).
 - **AWS Builder.** Bedrock, Titan Embeddings, S3, S3 Vectors, SQS, Lambda,
-  DynamoDB, EventBridge Scheduler, ECS Fargate, CloudFront and Secrets Manager. See
+  DynamoDB, EventBridge Scheduler, ECS Fargate, ECR, CloudFront, CloudWatch and
+  Secrets Manager. See
   [AWS integrations](docs/aws-integrations.md) for each service, the file that uses
   it and its checked deployment status.
 - **Open Source: [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check).**
@@ -109,8 +110,7 @@ the patient's data.
 | Prompts | `ask_my_letter(question)`, `morning_checkin()` |
 | MCP App | `get_today_tasks` and `get_week_summary` link to `ui://afterward/today.html`, a Today card that MCP Apps hosts render |
 
-The server sets the patient from the request's authentication, never from tool arguments or the model. The hackathon mapping sends any valid token to the one demo patient. The deployed MCP server on ECS was updated on 20 October 2026 and has the
-same 9 tools and 2 prompts as the code. The recorded demo runs the same code locally.
+The server sets the patient from the request's authentication, never from tool arguments or the model. The hackathon mapping sends any valid token to the one demo patient. The deployed MCP server on ECS was updated on 20 October 2026 and has the same 9 tools and 2 prompts as the code. The recorded demo runs the same code locally.
 
 ## The Simulated Alexa+ demo
 
@@ -220,7 +220,7 @@ The demo patient is `demo_patient_001` (Margaret, after a knee replacement).
 
 - **Load her plan** with either:
   - On `/demo`, choose **Upload a discharge letter** and pick
-    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`. This uses the
+    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`. This uses the
     deployed S3, SQS and Lambda pipeline.
   - Or process the letter locally with the current code, without S3 or Lambda:
     `python scripts/ingestion/reingest_demo_letter.py --confirm`. This replaces her
@@ -265,6 +265,9 @@ npm test
 npm run typecheck
 npm run build
 ```
+
+Expected results: `python -m pytest -q` shows **1,298 passed, 10 deselected**,
+and `npm test` shows **145 passed**.
 
 `pytest` skips tests marked `integration`, which contact real AWS
 ([pytest.ini](pytest.ini)). The default tests use mocks and need no AWS access.
