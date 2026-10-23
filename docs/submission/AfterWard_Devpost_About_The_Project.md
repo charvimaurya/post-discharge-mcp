@@ -11,20 +11,49 @@
 - ⚠️ **Demo scope:** synthetic patient letters and records; **Alexa+ is simulated** in the Next.js client. A classic Alexa skill, tested in the Alexa developer console simulator, is also part of the build. It does not proactively speak first.
 
 ## Inspiration
-
-> **7:00 on a Friday morning.** Margaret, 68, is one week home after a knee replacement. Nobody has asked anything, but the screen beside her lights up and speaks:
+> **7:00 AM on a Friday morning.** Margaret, 68, is recovering at home after knee replacement surgery. Nobody has asked anything, but the screen beside her lights up and speaks:
 >
 > *"Good morning, Margaret. I hope you slept well. You have about thirty minutes until your morning walk, at half past seven."*
 
-That moment is why we built AfterWard.
+**That moment is why we built AfterWard.**
 
-When a patient leaves hospital, they go home with a few sheets of paper. From then on, it is up to them and the people who care for them to remember everything: which medicine is due, what they are allowed to do, when the follow-up is, and which warning signs mean "call now". They do this while tired, sore and often scared.
+### The care team stays at the hospital. The paper goes home.
 
-Everything they need is written down. But **paper cannot tell you what matters today, it cannot notice that you already did your walk, and it cannot remind you.**
+When patients leave the hospital, they take home a few sheets of discharge instructions. From that moment, they and their caregivers must remember which medicines are due, what activities are safe, when follow-up appointments are scheduled, and which warning signs require urgent help.
 
-In 2023, US hospitals recorded **3,769,100 readmissions within 30 days**, a readmission rate of **13.5%** ([AHRQ HCUP, Nationwide Readmissions Database 2023, Table A6](https://hcup-us.ahrq.gov/db/nation/nrd/NRDIntroduction2023.pdf)). Hospitals do the hard part on the ward. We wanted to help with the part that happens **after the ward**, at home. That is where our name comes from.
+They must manage all of this while tired, sore, recovering from surgery, or simply overwhelmed.
+
+The information may be written on the page. But **paper cannot notice that you have already completed your morning walk. It cannot remember what you have done, tell you what comes next, or proactively remind you when something is due.**
+
+According to [AHRQ's 2023 Nationwide Readmissions Database](https://hcup-us.ahrq.gov/db/nation/nrd/NRDIntroduction2023.pdf), US hospitals recorded approximately **3.77 million readmissions within 30 days**, representing a **13.5% readmission rate**. Although readmissions have many causes, these figures demonstrate the scale of the challenges surrounding recovery after discharge.
+
+### We wanted to make recovery easier at home.
+
+Our inspiration became Margaret, a 68-year-old synthetic patient recovering from knee replacement surgery.
+
+She has a new knee, a walking frame, medicines to remember, exercises to complete, and follow-up appointments to attend.
+
+Her hands are often occupied with her walking frame, making **speaking easier than navigating a phone or typing instructions**.
+
+We wanted to transform her discharge letter from passive paperwork into an active, personalised recovery companion.
+
+Something that could:
+
+* **Speak first:** Proactively remind her about upcoming recovery activities.
+* **Remember her progress:** Track completed walks, exercises, and recorded medicines.
+* **Guide her through each day:** Help her understand what comes next.
+* **Answer from her own discharge letter:** Provide answers grounded in her actual instructions.
+* **Flag uncertainty instead of guessing:** Highlight unclear medical instructions rather than inventing answers.
+
+We called it **AfterWard** because hospital care happens on the ward, but recovery continues long after patients leave it.
+
+Our ambition extends beyond Margaret. We want recovery support to become more accessible to people of different ages, abilities, and backgrounds, wherever they live.
+
+AfterWard is our first step toward that vision: a voice-first recovery companion demonstrated through a **simulated Alexa+ experience**, using entirely synthetic patient data.
 
 🔴 **Our mission: no one should have to remember their recovery alone.**
+
+*Discharge is one moment. Recovery happens every day.*
 
 ## Why AfterWard, when Alexa+ already exists?
 
@@ -162,9 +191,8 @@ For technical evidence, see the [AWS integrations](https://github.com/charvimaur
 ## Challenges we ran into
 
 - **Our first build on AWS.** Connecting S3, SQS and Lambda took about a full day. Permissions had to be fixed one link at a time, the queue delivered the same letter twice, and our first deploys failed. It gave us one rule for the whole project: **every write must be safe to repeat.**
-- **When being too cautious created a different risk.** Our first safety rule hid a blood thinner from the entire plan because its **end date** was unclear. An uncertain stop date should not silently erase otherwise supported dose instructions. We redesigned validation to flag the **specific unknown field** while retaining only the instructions supported by the letter. **Lesson:** trustworthy AI should distinguish exactly what is known, unknown and awaiting a human decision.
 - **No documented way for an add-on to speak first.** Reminders are the heart of recovery, so we built them with EventBridge and a pending reminder the client speaks, and labelled it clearly as simulated.
-- **No access to real Alexa+.** The toolkit is in preview with select partners. We built our client to Amazon's public design guide and tested the MCP server with MCP Inspector and MCPJam.
+- **No access to real Alexa+.** The toolkit is in preview with select partners. We built our client as a simulated Alexa+ experience and tested the MCP server with MCP Inspector and MCPJam.
 - **Hosting in our region.** The AgentCore starter would not deploy (“No resources defined in project”), so we moved the same container to **ECS on Fargate**.
 
 We documented these obstacles and workarounds in our [**friction log**](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md). We also collected product feedback on AWS and Alexa-related tools.
