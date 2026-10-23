@@ -2,6 +2,7 @@
 
 Built 31 Aug to 23 Oct 2026. Team: Charvi Maurya (developer), Shilpa Agarwal (mentor).
 First time using AWS and first time building a voice agent.
+Repository: public, at https://github.com/charvimaurya/post-discharge-mcp.
 
 These are the 15 issues that mattered most, **ordered by impact**: patient safety first, then
 what shaped the product and the AWS build. Every one was found by building and testing the
@@ -145,8 +146,9 @@ time or forced a design change. Low = an annoyance with a quick workaround.
 - **Actual:** A classic skill can only reply when the user speaks first. Proactive speech needs
   Amazon's reminder or notification features, user permission and usually certification.
 - **Severity:** Medium (~1.5 h)
-- **Workaround:** "Speaks first" runs on the web companion (EventBridge Scheduler and a reminder
-  Lambda), labelled as simulated; Alexa is used where the patient speaks first.
+- **Workaround:** "Speaks first" runs on the web companion, labelled as simulated, using the same
+  reminder rules that EventBridge Scheduler runs on AWS every 5 minutes; Alexa is used where the
+  patient speaks first.
 - **Suggestion:** A sandbox for proactive reminders in development skills, and a documented way
   for Alexa+ add-ons to speak first.
 

@@ -3,7 +3,7 @@
 > **Discharge is one moment. Recovery happens every day.**  
 > AfterWard turns a hospital discharge letter into a living recovery plan that speaks, reminds patients what is due, remembers recorded progress and flags unclear instructions—such as a missing end date or conflicting dates—for a person to clarify, never a confident guess.
 
-- 🎥 **Demo video:** [ADD LINK] · 📊 **Demo presentation (PDF):** [AfterWard Hackathon Presentation 2026](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/submission/AfterWard_Hackathon_Presentation_2026.pdf) · 💻 **Main repo:** [post-discharge-mcp](https://github.com/charvimaurya/post-discharge-mcp) · 🔓 **Open-source safety gate:** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) · 📝 **Friction log:** [Read the friction log](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md) · ☁️ **AWS integrations:** [Service-by-service documentation](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/aws-integrations.md)
+- 🎥 **Demo video:** [AfterWard Hackathon Presentation 2026](https://youtu.be/nZey601NhCE) · 📊 **Demo presentation (PDF):** [AfterWard Hackathon Presentation 2026](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/submission/AfterWard_Hackathon_Presentation_2026.pdf) · 💻 **Main repo:** [post-discharge-mcp](https://github.com/charvimaurya/post-discharge-mcp) · 🔓 **Open-source safety gate:** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) · 📝 **Friction log:** [Read the friction log](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md) · ☁️ **AWS integrations:** [Service-by-service documentation](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/aws-integrations.md)
 - 🧰 **Self-hosted MCP server** (MCP spec 2025-11-25, Streamable HTTP) on Amazon ECS: **9 tools, 2 prompts and an MCP App**
 - ☁️ **Built on AWS:** Bedrock (Claude and Titan Embeddings), S3, S3 Vectors, SQS, Lambda, DynamoDB, EventBridge Scheduler, ECS on Fargate, CloudWatch, Secrets Manager
 - 🛡️ **Safety lives in tested code, not prompts:** **1,269 Python and 130+ web tests passing**, and the open-source package’s CI passes on **Python 3.11–3.13**.
@@ -25,7 +25,7 @@ They must manage all of this while tired, sore, recovering from surgery, or simp
 
 The information may be written on the page. But **paper cannot notice that you have already completed your morning walk. It cannot remember what you have done, tell you what comes next, or proactively remind you when something is due.**
 
-According to [AHRQ's 2023 Nationwide Readmissions Database](https://hcup-us.ahrq.gov/db/nation/nrd/NRDIntroduction2023.pdf), US hospitals recorded approximately **3.77 million readmissions within 30 days**, representing a **13.5% readmission rate**. Although readmissions have many causes, these figures demonstrate the scale of the challenges surrounding recovery after discharge.
+In 2020, US hospitals recorded **3,850,413 readmissions within 30 days**, a rate of **13.9 per 100 admissions** ([AHRQ HCUP Statistical Brief #304, 2016–2020](https://hcup-us.ahrq.gov/reports/statbriefs/sb304-readmissions-2016-2020.jsp)). Although readmissions have many causes, these figures demonstrate the scale of the challenges surrounding recovery after discharge.
 
 ### We wanted to make recovery easier at home.
 
@@ -166,7 +166,7 @@ The evidence here comes from our **synthetic hackathon test environment**, not a
 
 | Evidence | Demonstrated in the build | Boundary |
 |---|---|---|
-| **1,400+ automated tests passing** | **1,269 Python** and **130+ web** tests, from our final test run | Automated coverage is not a guarantee of real-world safety |
+| **1,399+ automated tests passing** | **1,269 Python** and **130+ web** tests, from our final test run | Automated coverage is not a guarantee of real-world safety |
 | **9 MCP tools + 2 prompts + 1 MCP App** | Read/write recovery plan, search the letter, show Today/week/day history | The MCP App is for compatible hosts; it is not a released Alexa+ add-on |
 | **Proactive reminder pipeline** | EventBridge checks every five minutes; the **simulated client** speaks pending reminders | A classic Alexa skill does not proactively initiate this dialogue |
 | **Persisted event history** | Recovery tasks and medicine events can be recorded and queried; the weekly view distinguishes task counts from morning-dose evidence | Missing records mean **unknown**, not proof of a missed dose |
@@ -176,7 +176,7 @@ The evidence here comes from our **synthetic hackathon test environment**, not a
 
 ## How judges can test
 
-**Watch it work end to end:** [Demo video — ADD LINK]. It shows the live AWS build: a discharge letter becoming a recovery plan, AfterWard speaking first through the simulated Alexa+ client, and answers quoted from the letter.
+**Watch it work end to end:** [AfterWard Hackathon Presentation 2026 (demo video)](https://youtu.be/nZey601NhCE). It shows the live AWS build: a discharge letter becoming a recovery plan, AfterWard speaking first through the simulated Alexa+ client, and answers quoted from the letter.
 
 **Try the MCP server without AWS (about 10 minutes):** [README → Try the MCP server in an MCP client](https://github.com/charvimaurya/post-discharge-mcp#try-the-mcp-server-in-an-mcp-client-without-aws). Explore the **9 tools, 2 prompts and MCP App Today card** with a synthetic patient.
 
@@ -190,10 +190,10 @@ For technical evidence, see the [AWS integrations](https://github.com/charvimaur
 
 ## Challenges we ran into
 
-- **Our first build on AWS.** Connecting S3, SQS and Lambda took about a full day. Permissions had to be fixed one link at a time, the queue delivered the same letter twice, and our first deploys failed. It gave us one rule for the whole project: **every write must be safe to repeat.**
+- **Our first build on AWS.** Connecting S3, SQS and Lambda took many attempts. Permissions had to be fixed one link at a time, and our first deploys failed. It gave us one rule for the whole project: **every write must be safe to repeat.**
 - **No documented way for an add-on to speak first.** Reminders are the heart of recovery, so we built them with EventBridge and a pending reminder the client speaks, and labelled it clearly as simulated.
 - **No access to real Alexa+.** The toolkit is in preview with select partners. We built our client as a simulated Alexa+ experience and tested the MCP server with MCP Inspector and MCPJam.
-- **Hosting in our region.** The AgentCore starter would not deploy (“No resources defined in project”), so we moved the same container to **ECS on Fargate**.
+- **Hosting the MCP server.** The AgentCore starter would not deploy (“No resources defined in project”), so we moved the same container to **ECS on Fargate**.
 
 We documented these obstacles and workarounds in our [**friction log**](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md). We also collected product feedback on AWS and Alexa-related tools.
 
@@ -212,7 +212,7 @@ We documented these obstacles and workarounds in our [**friction log**](https://
 - **Honesty builds trust.** A clear "the letter doesn't say" beats a confident wrong answer, especially in health.
 - **Ears are not eyes.** A long spoken list is hard to follow. AfterWard says **one next step** and also shows it on screen.
 - **Ask before you write.** If two medicines are due, AfterWard asks which one. If only one is due, it records that one and says its name, so she can say “that’s wrong” to undo it. Our final test flagged this as too trusting, so **always asking first is our next fix**.
-- **Assume every message arrives twice.** Idempotent writes saved us more than once.
+- **Assume every message arrives twice.** Idempotent writes make duplicate messages harmless.
 - **Put the rules in the tools.** With real Alexa+, Alexa+ is the agent, so every safety rule lives in the MCP server and its prompts, not in our demo agent.
 - **Use AI for understanding, code for certainty.** That split made AfterWard both smart and safe.
 
