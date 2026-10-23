@@ -23,7 +23,7 @@ https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.m
 
 8. Amazon ECS on Fargate, Amazon ECR, Elastic Load Balancing, Amazon CloudFront and AWS Secrets Manager: host the MCP server container over HTTPS, with the bearer token kept in Secrets Manager.
 
-9. Amazon CloudWatch, AWS CloudFormation and AWS IAM: JSON logs with no patient data, five metrics, three alarms with email alerts (deployed from one stack), and a separate role for each Lambda, the scheduler and the ECS task.
+9. Amazon CloudWatch, AWS CloudFormation and AWS IAM: JSON logs with no patient data, five metrics, three alarms with email alerts (deployed from one stack), and scoped IAM roles for the Lambdas, the scheduler and the ECS task.
 
 10. Amazon Bedrock AgentCore: tried for hosting the MCP server; not used in the final app (see Q3).
 
@@ -37,8 +37,7 @@ https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.m
 
 2. MCP Python SDK and MCP Apps: Streamable HTTP worked through a load balancer and CloudFront once configured. One server now serves our web client, our Alexa skill and MCP Apps hosts. The Today card rendered in MCPJam Chat with no app changes. Putting the safety rules inside the tools meant every client got them for free.
 
-3. Amazon Bedrock: forced tool output gave dependable JSON for extraction. EU inference profiles kept requests in the EU. One setting (MODEL_MODE) switches between Haiku for testing and Sonnet for final runs. CloudWatch showed the tokens each letter used (about 7,400 in, 2,700 out).
-
+3. Amazon Bedrock: forced tool output gave dependable JSON for extraction. EU inference profiles kept requests in the EU. One setting (MODEL_MODE) switches between Haiku for testing and Sonnet for final runs.
 4. Amazon S3 Vectors: serverless and low cost. The patient filter returned the right passage of the right letter, with its page number, so every answer can show its evidence.
 
 5. S3, SQS and Lambda: a PDF became a ready plan in about 15 seconds, with a clear log line per stage. The dead-letter queue stopped a bad letter from looping forever.
@@ -47,11 +46,10 @@ https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.m
 
 7. Amazon EventBridge Scheduler: ran the reminder check every 5 minutes with 0 errors over the 3 hours we checked on 18 October.
 
-8. ECS on Fargate with ECR, ELB, CloudFront and Secrets Manager: the MCP server ran without a restart from 13 October; a redeploy on 20 October picked up 9 tools and 2 prompts. The token never appears in code or task settings.
-
+8. ECS on Fargate with ECR, ELB, CloudFront and Secrets Manager: the MCP server ran without a restart from 13 October; a redeploy on 20 October picked up 9 tools and 2 prompts.
 9. CloudWatch and CloudFormation: one stack created all three alarms with email alerts, and the logs made each pipeline stage easy to follow.
 
-10. Supporting tools: Python made it easy to pin every safety rule with tests (1,269 passing). Next.js let us build large, simple cards for older users quickly. GitHub Actions gave our open-source package a public green badge on three Python versions.
+10. Supporting tools: Python made it easy to pin every safety rule with tests (1,269 passing). Next.js let us build large, simple cards for older users quickly. GitHub Actions ran our open-source package's tests on three Python versions, and they passed.
 
 ---
 
@@ -59,7 +57,7 @@ https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.m
 
 1. Alexa+ (Category SDK, MCP Toolkit), Critical: the toolkit is open only to selected partners, so a working MCP server cannot be tried on real Alexa+. We also found no documented way for an add-on to speak first, which is the heart of a recovery companion. Ask: open the toolkit (or a sandbox) to hackathon teams, and document permission-based proactive speech.
 
-2. Amazon Bedrock tool use, Important (safety): the model sometimes said "your letter doesn't mention driving" without calling our search tool; the letter does mention it. We added code checks and a second model call. Ask: a documented "answer only after retrieval" pattern or grounding check.
+2. Amazon Bedrock tool use, Important (safety): the model sometimes said "your letter doesn't mention driving" without calling our search tool; the letter does mention it. We added code checks that send the model back to search first. Ask: a documented "answer only after retrieval" pattern or grounding check.
 
 3. Amazon Bedrock structured extraction, Important (safety): extraction silently dropped the letter's emergency phone number because no field held it. Ask: return the source lines that were not mapped to any field. Wording also varies between runs, with no deterministic mode for tests and demos.
 
@@ -93,7 +91,7 @@ This was our first build on AWS and our first voice agent.
 
 4. Amazon S3 Vectors: simple setup. The silent empty result was the only blocker.
 
-5. S3, SQS, Lambda and Boto3: the core pipeline was straightforward. About a day went on permissions fixed one link at a time and packaging Python dependencies, which we solved with a build script.
+5. S3, SQS, Lambda and Boto3: the core pipeline was straightforward. Much of our time went on permissions, fixed one link at a time, and on packaging Python dependencies, which we solved with a build script.
 
 6. Amazon DynamoDB: quick to set up once we chose one item per medicine, task and day.
 
