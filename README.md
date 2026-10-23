@@ -76,7 +76,7 @@ misread dose can send someone back to hospital.
     uncertain is treated as fact.
   - AfterWard installs it from the v0.1.0 release, and
     [a test](tests/ingestion/test_package_integration.py) proves AfterWard calls
-    the package itself, not a copy. 149 tests run on Python 3.11 to 3.13.
+    the package itself, not a copy. 145 tests run on Python 3.11 to 3.13.
 
 ### Hackathon requirements at a glance
 

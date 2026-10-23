@@ -8,7 +8,7 @@ These are the 15 issues that mattered most, **ordered by impact**: patient safet
 what shaped the product and the AWS build. Every one was found by building and testing the
 working app with synthetic discharge letters. Each entry gives the six things Amazon asked for:
 task attempted, steps taken, expected vs. actual result, severity, workaround and an actionable
-suggestion. Where an entry says "fixed", the fix has automated tests (1,269 Python tests passing
+suggestion. Where an entry says "fixed", the fix has automated tests (1,298 Python tests passing
 on 21 Oct 2026). Time lost is approximate; most times were estimated by the team afterwards.
 
 **Severity:** High = blocked a core feature or created a patient-safety risk. Medium = cost real
