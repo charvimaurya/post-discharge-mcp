@@ -1,4 +1,4 @@
-# AfterWard
+# AfterWard: The Alexa+ Recovery Companion That Speaks First
 
 **A living recovery plan for Alexa+.** AfterWard reads a hospital discharge letter,
 turns it into a daily plan, reminds the patient at the right moment, records what
@@ -12,8 +12,8 @@ they did, and answers questions using the letter's own words.
 
 | Item | Link |
 | --- | --- |
-| Demo video | **PENDING_VIDEO_URL** |
-| Devpost entry | **PENDING_DEVPOST_URL** |
+| Devpost entry | [AfterWard: The Alexa+ Recovery Companion That Speaks First](https://devpost.com/AfterWard:%20The%20Alexa+%20Recovery%20Companion%20That%20Speaks%20First) |
+| Presentation (PDF) | [AfterWard Hackathon Presentation 2026](docs/submission/AfterWard_Hackathon_Presentation_2026.pdf) |
 | This repository | https://github.com/charvimaurya/post-discharge-mcp |
 | Open-source package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) (MIT, tests on Python 3.11 to 3.13) |
 | AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |
@@ -84,7 +84,7 @@ misread dose can send someone back to hospital.
 
 ## Architecture
 
-![AfterWard architecture](docs/architecture.svg)
+![How AfterWard works](docs/how-it-works-slide.png)
 
 - **Letter to plan:** web upload → S3 → SQS (with a dead-letter queue) → Lambda →
   Bedrock extraction, checked by discharge-letter-check → DynamoDB plan. Each page
@@ -224,7 +224,7 @@ The demo patient is `demo_patient_001` (Margaret, after a knee replacement).
 
 - **Load her plan** with either:
   - On `/demo`, choose **Upload a discharge letter** and pick
-    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`. This uses the
+    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`. This uses the
     deployed S3, SQS and Lambda pipeline.
   - Or process the letter locally with the current code, without S3 or Lambda:
     `python scripts/ingestion/reingest_demo_letter.py --confirm`. This replaces her

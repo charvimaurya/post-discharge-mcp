@@ -1710,6 +1710,140 @@ async def _preload_appointments(tool_trace: list[dict]) -> str | None:
     return _appointments_fact((result.get("data") or {}).get("appointments"))
 
 
+# "How is my week?", "How have I done this week?", "How's your week been?"
+_ASKS_ABOUT_WEEK = re.compile(
+    r"\b(?:how(?:'s| is| was| has| have)?\s+(?:my|your|the|this)\s+week"
+    r"|how\s+(?:am|have)\s+i\s+(?:been\s+)?(?:doing|done|getting on)(?:\s+this\s+week|\s+so\s+far|\s+since)?"
+    r"|my\s+week\s+(?:so\s+far|going))\b",
+    re.IGNORECASE,
+)
+
+# A dose recorded within this long after it was due counts as on time.
+_ON_TIME = timedelta(hours=1)
+
+
+def asks_about_week(message: str) -> bool:
+    return bool(_ASKS_ABOUT_WEEK.search(message))
+
+
+def _long_date(day: date) -> str:
+    return f"{day.strftime('%A')} {day.day} {day.strftime('%B %Y')}"
+
+
+def _parse_time(value) -> object:
+    from datetime import datetime
+    try:
+        stamp = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+    return stamp if stamp.utcoffset() is not None else None
+
+
+def _day_line(day: date, details: dict, is_today: bool) -> str:
+    """One day's saved records, in words the model can repeat without working anything out."""
+
+    medicines = [m for m in details.get("medications") or [] if isinstance(m, dict)]
+    tasks = [t for t in details.get("tasks") or [] if isinstance(t, dict)]
+    taken = [m for m in medicines if m.get("status") == "taken"]
+    done = [t for t in tasks if t.get("status") in {"completed", "done"}]
+    on_time = 0
+    timed = 0
+    for medicine in taken:
+        due, at = _parse_time(medicine.get("due_at")), _parse_time(medicine.get("recorded_at"))
+        if due and at:
+            timed += 1
+            on_time += at <= due + _ON_TIME
+
+    label = _long_date(day) + (" (today, so far)" if is_today else "")
+    if not medicines and not tasks:
+        return f"- {label}: nothing recorded."
+
+    parts = [f"medicine doses recorded taken {len(taken)} of {len(medicines)}"]
+    if timed:
+        parts.append("all of them on time" if on_time == timed else f"{on_time} of {timed} on time")
+    parts.append(f"recovery tasks done {len(done)} of {len(tasks)}")
+    complete = medicines and tasks and len(taken) == len(medicines) and len(done) == len(tasks)
+    if complete:
+        parts.append("everything done")
+    elif is_today:
+        left = [str(item.get("name") or "an item") for item in medicines if item not in taken]
+        left += [str(item.get("name") or "a task") for item in tasks if item not in done]
+        if left:
+            parts.append("still to do today: " + ", ".join(dict.fromkeys(left)))
+    return f"- {label}: " + "; ".join(parts) + "."
+
+
+async def _preload_week(tool_trace: list[dict], timezone: str) -> str | None:
+    """
+    Her recovery so far, from saved records only, for "How is my week?".
+
+    The discharge date comes from her plan (the letter); each day since then, at most the
+    last seven, from get_recovery_day_details, the same records the weekly dashboard shows.
+    None when the plan cannot be read: the model then answers as before.
+    """
+
+    try:
+        plan = get_structured_tool_result(await call_mcp_tool("get_recovery_plan", {}))
+    except Exception:
+        plan = None
+    ok = isinstance(plan, dict) and plan.get("ok") is True
+    tool_trace.append({"tool": "get_recovery_plan", "arguments": {}, "ok": ok})
+    if not ok:
+        return None
+
+    today = get_patient_datetime(timezone).date()
+    discharged = None
+    try:
+        discharged = date.fromisoformat(str((plan.get("data") or {}).get("discharge_date") or ""))
+    except ValueError:
+        pass
+
+    first = today - timedelta(days=6)
+    if discharged and discharged + timedelta(days=1) > first:
+        first = discharged + timedelta(days=1)
+
+    lines = []
+    day = first
+    while day <= today:
+        arguments = {"date": day.isoformat()}
+        try:
+            result = get_structured_tool_result(await call_mcp_tool("get_recovery_day_details", arguments))
+        except Exception:
+            result = None
+        day_ok = isinstance(result, dict) and result.get("ok") is True
+        tool_trace.append({"tool": "get_recovery_day_details", "arguments": arguments, "ok": day_ok})
+        lines.append(_day_line(day, result.get("data") or {}, day == today) if day_ok
+                     else f"- {_long_date(day)}: could not be checked.")
+        day += timedelta(days=1)
+
+    if discharged and discharged <= today:
+        home = (today - discharged).days
+        left = (f"She left hospital on {_long_date(discharged)} (from her discharge letter). "
+                f"Today is {_long_date(today)}, so she has been home {home} day{'s' if home != 1 else ''}. "
+                f"Her recovery at home started on {_long_date(discharged + timedelta(days=1))}.")
+    else:
+        left = f"Her letter gives no discharge date. Today is {_long_date(today)}."
+
+    return (
+        "HER WEEK FROM SAVED RECORDS (read this turn, the same records as her weekly dashboard). "
+        "She asked how her week is going. Give a specific progress report from these facts only, "
+        "in 4 to 6 short spoken sentences, warmly and plainly. Start with her actual discharge "
+        "date and exact number of days home. For each past day, name the weekday and date and "
+        "say the exact medicine-dose and recovery-task counts, including each total. Two past "
+        "days may share a sentence only if their counts match; name both days and say 'each day'. "
+        "Report today separately as 'so far', again giving both exact counts and totals. "
+        "Finish with the named medicines and tasks still to do today, when listed. "
+        "Use the counts even when everything was done: do not replace them with vague praise "
+        "such as 'a strong week', 'doing everything', or 'taken your medicines'. Do not claim "
+        "everything is complete 'since Wednesday' when today is only partly complete. "
+        "Call a day done only if it says everything done; never say a medicine was on time "
+        "unless it says so, and scope timing claims to that day's recorded doses. Say when a "
+        "day has no records or could not be checked. Never add a day, dose, task or advice "
+        "that is not listed.\n"
+        f"{left}\n" + "\n".join(lines)
+    )
+
+
 # "Can I drive?" in code: one activity she asks about -> (words in her question, words in a restriction).
 _ACTIVITIES = {
     "drive": ({"drive", "driving", "car"}, {"drive", "driving"}),
@@ -1849,6 +1983,44 @@ _HOW_LONG_WORDS = {
 _HOW_LONG_SENTENCE = re.compile(r"\b(how long|until|stop|review|end date|course)\b", re.IGNORECASE)
 
 
+async def _with_letter_row(source: dict | None, tool_trace: list[dict]) -> dict | None:
+    """
+    A saved plan line shown in full, as it stands in the letter.
+
+    A medicine's saved line can hold only one column of the letter's table ("Take 2 tablets
+    four times a day..." without "1. Paracetamol 500 mg tablets."). Search the letter for
+    that line and show the passage it sits in, the saved line marked, like any other letter
+    answer. The letter's words are never rewritten; without a match the saved line stays.
+    """
+
+    line = str((source or {}).get("text") or "").strip()
+    if not line:
+        return source
+
+    arguments = {"query": line}
+    try:
+        found = get_structured_tool_result(await call_mcp_tool("search_discharge_instructions", arguments))
+    except Exception:
+        found = None
+
+    matches = collect_rag_matches("search_discharge_instructions", found)
+    tool_trace.append({"tool": "search_discharge_instructions", "arguments": arguments, "ok": bool(matches)})
+
+    wanted = _normalise_words(line)
+    for match in matches:
+        for item in split_letter_items(match["text"]):
+            if wanted and wanted in _normalise_words(item):
+                # The saved line itself picks the row to mark, so a neighbouring
+                # row with similar wording ("how long...") is not marked instead.
+                return evidence_source(match, item, line)
+
+    return source
+
+
+def _normalise_words(text: str) -> str:
+    return " ".join(re.findall(r"[a-z0-9]+", text.lower()))
+
+
 def _how_long_in_code(question: str, tool_trace: list[dict], today: dict[str, list] | None) -> tuple[str, dict | None] | None:
     """
     "How long do I take them for?" about the medicines saved this turn, from her plan and
@@ -1926,7 +2098,8 @@ async def _answer_question_too(
 
     in_code = _how_long_in_code(question, tool_trace, today)
     if in_code is not None:
-        return in_code
+        reply, source = in_code
+        return reply, await _with_letter_row(source, tool_trace)
 
     named = " and ".join(about)
     asked = f"About my {named}: {question}" if named else question
@@ -2381,6 +2554,9 @@ async def _chat_turn(
     tool_config, appointments_fact = await asyncio.gather(
         build_bedrock_tool_config(), _preload_appointments(tool_trace),
     )
+    # "How is my week?": her saved days since leaving hospital, read in code and given as facts.
+    week_fact = (await _preload_week(tool_trace, timezone or "Europe/London")
+                 if not answer_only and asks_about_week(cleaned_message) else None)
 
     messages = build_bedrock_messages(
         history,
@@ -2399,6 +2575,8 @@ async def _chat_turn(
     system = _build_system_prompt(patient_context, facts)
     if appointments_fact:
         system.append({"text": appointments_fact})
+    if week_fact:
+        system.append({"text": week_fact})
     if answer_only:
         system.append({"text": QUESTION_IN_REPORT_RULES})
     model_id = get_agent_model_id()

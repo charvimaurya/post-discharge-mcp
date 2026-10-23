@@ -1,8 +1,9 @@
-"""Read-only day details. Historical schedules come only from saved snapshots."""
+"""Day details from saved snapshots, repairing the fixed demo fixture if needed."""
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 from app.clock import get_patient_datetime
+from app.demo_history import ensure_demo_history
 from app.database.event_history import get_complete_patient_events
 from app.database.recovery_state import get_recovery_state, get_medications, get_today_tasks
 from app.mcp.results import success_result, error_result
@@ -159,7 +160,9 @@ def get_recovery_day_details_for_context(context, day):
         if day == now.date().isoformat():
             state["current_medications"] = get_medications(context.patient_id, day)
             state["current_tasks"] = get_today_tasks(context.patient_id, day)
-        result = build_day_details(state, get_complete_patient_events(context.patient_id), context.patient_id, day, now)
+        events = ensure_demo_history(context.patient_id, state,
+                                     get_complete_patient_events(context.patient_id), now)
+        result = build_day_details(state, events, context.patient_id, day, now)
         return success_result(data=result, message="Recovery history checked from saved records.")
     except (ValueError, TypeError):
         return error_result(code="DAY_UNAVAILABLE", message="That recovery day could not be checked.", next_step="Choose a date in the displayed week.")

@@ -15,7 +15,7 @@ function day(date = '2026-10-23') {
       period: 'morning', due_at: `${date}T06:30:00+01:00`, status: 'taken', recorded_at: `${date}T06:45:00+01:00` }],
     tasks: [{ occurrence_id: `walk#${date}#1`, name: 'Synthetic walk', status: 'completed', recorded_at: `${date}T06:50:00+01:00` }] };
 }
-const weekPayload = () => ({ week: { days: Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${17 + i}`,
+const weekPayload = () => ({ week: { discharge_date: '2026-10-20', days: Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${17 + i}`,
   is_today: i === 6, status: i === 6 ? 'completed' : 'unknown' })),
   activity: Array.from({ length: 7 }, (_, i) => ({ date: `2026-10-${17 + i}`, completed_tasks: i === 6 ? 1 : 0 })) } });
 
@@ -115,11 +115,45 @@ const savedFrom21 = () => {
   return readWeekSummary(payload)!;
 };
 
-test('the calendar is the two days before today, today and four days ahead, with or without history', () => {
-  for (const week of [savedFrom21(), readWeekSummary({ week: { days: weekPayload().week.days } })!]) {
+test('the calendar starts after discharge, regardless of whether history has been recorded', () => {
+  for (const week of [savedFrom21(), readWeekSummary(weekPayload())!]) {
     const { past, upcoming } = calendarDays(week);
     assert.deepEqual(past.map(day => day.date), ['2026-10-21', '2026-10-22', '2026-10-23']);
     assert.deepEqual(upcoming, ['2026-10-24', '2026-10-25', '2026-10-26', '2026-10-27']);
+  }
+});
+
+test('a 16 October discharge displays 17–23 October with six completed dummy days and live today', async () => {
+  const payload = weekPayload(); payload.week.discharge_date = '2026-10-16';
+  const week = readWeekSummary(payload)!;
+  assert.equal(week.dischargeDate, '2026-10-16');
+  assert.deepEqual(calendarDays(week).past.map(d => d.date), Array.from({ length: 7 }, (_, i) => `2026-10-${17 + i}`));
+  assert.deepEqual(calendarDays(week).upcoming, []);
+  const snapshot = await fetchRecoverySnapshot('', new AbortController().signal, async (url: any) => {
+    if (String(url).includes('week-summary')) return Response.json(payload);
+    const date = String(url).split('date=')[1];
+    const details = day(date);
+    if (date === '2026-10-23') {
+      details.tasks[0].status = 'unknown'; details.tasks[0].recorded_at = null as any;
+    }
+    return Response.json(details);
+  });
+  assert.equal(snapshot.date, '2026-10-23');
+  assert.equal(Object.keys(snapshot.days).length, 7);
+  const html = render({ ...snapshot, selected: snapshot.date });
+  assert.match(html, /Sat 17 – Fri 23/);
+  assert.match(html, /<b>6\/7<\/b><p>Days completed/);
+  for (let d = 17; d <= 22; d++) assert.ok(html.includes(`aria-label="2026-10-${d}, All done"`));
+  assert.ok(html.includes('aria-label="2026-10-23, In progress, today"'));
+});
+
+test('missing or invalid discharge dates use the available week, and old discharges stay within seven days', () => {
+  for (const discharge of [undefined, 'bad', '2026-02-30', '2026-10-01']) {
+    const payload = weekPayload(); (payload.week as any).discharge_date = discharge;
+    const calendar = calendarDays(readWeekSummary(payload)!);
+    assert.equal(calendar.past[0].date, '2026-10-17');
+    assert.equal(calendar.past.length, 7);
+    assert.deepEqual(calendar.upcoming, []);
   }
 });
 

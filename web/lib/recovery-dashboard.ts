@@ -1,11 +1,12 @@
 import { readWeekSummary, type WeekDay, type WeekSummary } from './week-summary.ts';
 
-// The dashboard calendar: the two days before today, today, then the days ahead (seven tiles).
-export const DAYS_BEFORE_TODAY = 2;
-
+// Start after discharge, within the available week; fill the remaining tiles with upcoming days.
 export function calendarDays(week: WeekSummary): { past: WeekDay[]; upcoming: string[] } {
-  const past = week.days.slice(-(DAYS_BEFORE_TODAY + 1));
   const today = Date.parse(`${week.days[week.days.length - 1].date}T12:00:00Z`);
+  const first = week.dischargeDate
+    ? new Date(Math.min(Date.parse(`${week.dischargeDate}T12:00:00Z`) + 86_400_000, today)).toISOString().slice(0, 10)
+    : week.days[0].date;
+  const past = week.days.filter(day => day.date >= first);
   const upcoming = Array.from({ length: week.days.length - past.length },
     (_, i) => new Date(today + (i + 1) * 86_400_000).toISOString().slice(0, 10));
   return { past, upcoming };

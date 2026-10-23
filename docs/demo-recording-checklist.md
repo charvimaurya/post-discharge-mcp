@@ -34,7 +34,7 @@ Keep the laptop plugged in with sleep turned off; a sleeping Mac drops the tunne
 
 ## Tabs and windows to open
 
-1. The synthetic letter `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`
+1. The synthetic letter `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`
    in a PDF viewer (scene 1).
 2. `http://127.0.0.1:3000/demo` on the start screen.
 3. Alexa developer console, **Test** tab, skill "after ward" (scene 5). Blur your

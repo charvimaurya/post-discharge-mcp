@@ -12,9 +12,12 @@ TASK_COUNTS = (2, 3, 1, 3, 2, 0)
 TASKS = (("task_walk", 1), ("task_exercises", 1), ("task_walk", 2))
 # On this many days ago a second task is recorded and then undone, so it does not count.
 UNDONE_OFFSET = 4
+# Days ago on which both morning medicines are taken: Tuesday and Wednesday when today is
+# Friday 23 October. Every other earlier day is recorded missed; today is not yet due.
+TAKEN_OFFSETS = (3, 2)
 
 
-def seed_week_events(patient_id, now, timezone="Europe/London"):
+def seed_week_events(patient_id, now, timezone="Europe/London", taken_offsets=TAKEN_OFFSETS):
     if patient_id not in PATIENTS or now.utcoffset() is None:
         raise ValueError("Only isolated synthetic patients and aware clocks are allowed")
     zone = ZoneInfo(timezone)
@@ -37,7 +40,7 @@ def seed_week_events(patient_id, now, timezone="Europe/London"):
                                           "occurrences": occurrences}, "schedule")
         if offset:
             for occurrence in occurrences:
-                kind = "medication_missed" if offset == 1 else "medication_taken"
+                kind = "medication_taken" if offset in taken_offsets else "medication_missed"
                 add(kind, {**common, "occurrence_id": occurrence["occurrence_id"],
                            "completed_at": occurrence["due_at"]} if kind == "medication_taken" else
                     {**common, "occurrence_id": occurrence["occurrence_id"]}, occurrence["occurrence_id"])

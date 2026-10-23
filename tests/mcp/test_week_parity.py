@@ -50,6 +50,6 @@ def test_mcp_app_and_web_app_show_the_same_days(monkeypatch):
     assert shown["raw"] == [2, 3, 1, 3, 2, 0, 1]
     assert shown["web_tasks"] == shown["app_tasks"] == shown["raw"]
     # Morning medicines are a separate series with their own statuses.
-    assert shown["web_medicines"] == shown["app_medicines"] == ["completed"] * 5 + ["missed", "not_yet_due"]
-    assert shown["web_medicine_days"] == 5
-    assert shown["app_medicine_summary"] == "5 of 7 days: all morning medicines taken"
+    assert shown["web_medicines"] == shown["app_medicines"] == ["missed"] * 3 + ["completed"] * 2 + ["missed", "not_yet_due"]
+    assert shown["web_medicine_days"] == 2
+    assert shown["app_medicine_summary"] == "2 of 7 days: all morning medicines taken"

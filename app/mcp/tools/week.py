@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.clock import get_patient_datetime
+from app.demo_history import ensure_demo_history
 from app.database.event_history import get_complete_patient_events
 from app.database.recovery_state import _completed, _completion_rounds, get_medications, get_recovery_state
 from app.mcp.results import error_result, success_result
@@ -188,7 +189,9 @@ def get_week_summary_for_context(context):
         timezone = state.get("timezone") or "Europe/London"
         now = get_patient_datetime(timezone)
         events = get_complete_patient_events(context.patient_id)
+        events = ensure_demo_history(context.patient_id, state, events, now)
         week = calculate_week(events, context.patient_id, timezone, now)
+        week["discharge_date"] = state.get("discharge_date")
         week["activity"] = task_activity(events, context.patient_id, week["days"])
         if isinstance(state.get("medications"), list):
             apply_current_morning(week, get_medications(context.patient_id, week["end_date"]))

@@ -3,12 +3,12 @@
 > **Discharge is one moment. Recovery happens every day.**  
 > AfterWard turns a hospital discharge letter into a living recovery plan that speaks, reminds patients what is due, remembers recorded progress and flags unclear instructions—such as a missing end date or conflicting dates—for a person to clarify, never a confident guess.
 
-- 🎥 **Demo video:** [ADD LINK] · 💻 **Main repo:** [post-discharge-mcp](https://github.com/charvimaurya/post-discharge-mcp) · 🔓 **Open-source safety gate:** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) · 📝 **Friction log:** [Read the friction log](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md) · ☁️ **AWS integrations:** [Service-by-service documentation](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/aws-integrations.md)
+- 🎥 **Demo video:** [ADD LINK] · 📊 **Demo presentation (PDF):** [AfterWard Hackathon Presentation 2026](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/submission/AfterWard_Hackathon_Presentation_2026.pdf) · 💻 **Main repo:** [post-discharge-mcp](https://github.com/charvimaurya/post-discharge-mcp) · 🔓 **Open-source safety gate:** [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) · 📝 **Friction log:** [Read the friction log](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md) · ☁️ **AWS integrations:** [Service-by-service documentation](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/aws-integrations.md)
 - 🧰 **Self-hosted MCP server** (MCP spec 2025-11-25, Streamable HTTP) on Amazon ECS: **9 tools, 2 prompts and an MCP App**
 - ☁️ **Built on AWS:** Bedrock (Claude and Titan Embeddings), S3, S3 Vectors, SQS, Lambda, DynamoDB, EventBridge Scheduler, ECS on Fargate, CloudWatch, Secrets Manager
-- 🛡️ **Safety lives in tested code, not prompts:** **1,269 Python and 143 web tests passing**, and the open-source package’s CI passes on **Python 3.11–3.13** (test figures supplied by the team).
+- 🛡️ **Safety lives in tested code, not prompts:** **1,269 Python and 130+ web tests passing**, and the open-source package’s CI passes on **Python 3.11–3.13**.
 - 🧪 **How judges can test:** follow the step-by-step instructions in [How judges can test](#how-judges-can-test) below.
-- ⚠️ **Demo scope:** synthetic patient letters and records; **Alexa+ is simulated** in the Next.js client. A classic Alexa skill is also part of the build, but it does not proactively speak first.
+- ⚠️ **Demo scope:** synthetic patient letters and records; **Alexa+ is simulated** in the Next.js client. A classic Alexa skill, tested in the Alexa developer console simulator, is also part of the build. It does not proactively speak first.
 
 ## Inspiration
 
@@ -22,7 +22,7 @@ When a patient leaves hospital, they go home with a few sheets of paper. From th
 
 Everything they need is written down. But **paper cannot tell you what matters today, it cannot notice that you already did your walk, and it cannot remind you.**
 
-In 2023, US adults had **3,769,100 hospital readmissions within 30 days**, a readmission rate of **13.5%** ([AHRQ HCUP, Nationwide Readmissions Database 2023, Table A6](https://hcup-us.ahrq.gov/db/nation/nrd/NRDIntroduction2023.pdf)). Hospitals do the hard part on the ward. We wanted to help with the part that happens **after the ward**, at home. That is where our name comes from.
+In 2023, US hospitals recorded **3,769,100 readmissions within 30 days**, a readmission rate of **13.5%** ([AHRQ HCUP, Nationwide Readmissions Database 2023, Table A6](https://hcup-us.ahrq.gov/db/nation/nrd/NRDIntroduction2023.pdf)). Hospitals do the hard part on the ward. We wanted to help with the part that happens **after the ward**, at home. That is where our name comes from.
 
 🔴 **Our mission: no one should have to remember their recovery alone.**
 
@@ -74,7 +74,7 @@ Our design rule: **AI where understanding is needed, fixed rules where safety ma
 
 - The letter is uploaded to **Amazon S3**, which sends an event to **Amazon SQS**. An **AWS Lambda** worker picks it up, with a dead-letter queue and an **Amazon CloudWatch** alarm for anything that keeps failing.
 - **Claude on Amazon Bedrock** reads the letter into a structured plan using structured output.
-- Every item then passes our **open-source safety gate**, `discharge-letter-check`. Fixed rules, not a second model, check every field. A missing dose holds the medicine back. A missing end date keeps today's doses but marks the end date as "not stated". Unclear is flagged, **never guessed**.
+- Every item then passes our **open-source safety gate**, `discharge-letter-check`. Fixed rules, not a second model, check every field. An unclear dose is held for confirmation; a missing detail is never invented. A missing end date keeps today's doses but marks the end date as "not stated". Unclear is flagged, **never guessed**.
 - The plan is saved in **Amazon DynamoDB**, and the letter is chunked and indexed in **Amazon S3 Vectors** with Titan Text Embeddings V2, filtered to one patient.
 - Processing is designed to be **idempotent**: duplicate events do not create duplicate recovery completions. Duplicate-handling safeguards limit unnecessary reprocessing; they do **not** guarantee that every duplicate cloud invocation is free of cost.
 
@@ -95,9 +95,9 @@ Our design rule: **AI where understanding is needed, fixed rules where safety ma
 
 **4. The client**
 
-- A **Next.js** simulated Alexa+ client, drawn to Amazon's public Alexa+ MCP add-on design guide: large text, one next step at a time, and the source sentence on every card.
+- A **Next.js** simulated Alexa+ client: large text, one next step at a time, and the source sentence on every card.
 - A **Developer view** shows every MCP tool call live, so judges can see that each reply comes from a real tool call.
-- A **classic Alexa custom skill**, so the same plan also works on a real Alexa device. (A classic skill can't speak first, so reminders stay in the simulated client.)
+- A **classic Alexa custom skill** that uses the same plan. It is tested in the Alexa developer console simulator and is not published. (A classic skill can't speak first, so reminders stay in the simulated client.)
 
 **5. Built to scale**
 
@@ -137,7 +137,7 @@ The evidence here comes from our **synthetic hackathon test environment**, not a
 
 | Evidence | Demonstrated in the build | Boundary |
 |---|---|---|
-| **1,412 automated tests passing** | **1,269 Python** and **143 web** tests, according to the team's final reported run | Automated coverage is not a guarantee of real-world safety |
+| **1,400+ automated tests passing** | **1,269 Python** and **130+ web** tests, from our final test run | Automated coverage is not a guarantee of real-world safety |
 | **9 MCP tools + 2 prompts + 1 MCP App** | Read/write recovery plan, search the letter, show Today/week/day history | The MCP App is for compatible hosts; it is not a released Alexa+ add-on |
 | **Proactive reminder pipeline** | EventBridge checks every five minutes; the **simulated client** speaks pending reminders | A classic Alexa skill does not proactively initiate this dialogue |
 | **Persisted event history** | Recovery tasks and medicine events can be recorded and queried; the weekly view distinguishes task counts from morning-dose evidence | Missing records mean **unknown**, not proof of a missed dose |
@@ -161,14 +161,13 @@ For technical evidence, see the [AWS integrations](https://github.com/charvimaur
 
 ## Challenges we ran into
 
-- **Our first build on AWS.** Connecting S3, SQS and Lambda took about a full day. S3's own test message broke our worker, permissions had to be fixed one link at a time, the queue delivered the same letter twice, and our first deploys failed. It gave us one rule for the whole project: **every write must be safe to repeat.**
-- **A dose misread with no warning.** Reading a photographed letter, the model returned "111" as **"171"**, with no sign of doubt. In a discharge letter, a wrong digit can be dangerous. We changed the flow so medicines extracted from images are held as **"needs confirmation"** rather than presented as verified instructions. **Lesson:** model output is not evidence of OCR accuracy.
+- **Our first build on AWS.** Connecting S3, SQS and Lambda took about a full day. Permissions had to be fixed one link at a time, the queue delivered the same letter twice, and our first deploys failed. It gave us one rule for the whole project: **every write must be safe to repeat.**
 - **When being too cautious created a different risk.** Our first safety rule hid a blood thinner from the entire plan because its **end date** was unclear. An uncertain stop date should not silently erase otherwise supported dose instructions. We redesigned validation to flag the **specific unknown field** while retaining only the instructions supported by the letter. **Lesson:** trustworthy AI should distinguish exactly what is known, unknown and awaiting a human decision.
 - **No documented way for an add-on to speak first.** Reminders are the heart of recovery, so we built them with EventBridge and a pending reminder the client speaks, and labelled it clearly as simulated.
 - **No access to real Alexa+.** The toolkit is in preview with select partners. We built our client to Amazon's public design guide and tested the MCP server with MCP Inspector and MCPJam.
-- **Hosting in our region.** We could not confirm Bedrock AgentCore Runtime in London, so we moved the same container to **ECS on Fargate**.
+- **Hosting in our region.** The AgentCore starter would not deploy (“No resources defined in project”), so we moved the same container to **ECS on Fargate**.
 
-We documented these obstacles and workarounds in our [**friction log**](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md). We also collected product feedback on AWS and Alexa-related tools; submission-specific product feedback should be checked before publishing.
+We documented these obstacles and workarounds in our [**friction log**](https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.md). We also collected product feedback on AWS and Alexa-related tools.
 
 ## Accomplishments that we're proud of
 

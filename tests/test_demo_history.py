@@ -94,3 +94,85 @@ def test_each_task_says_when_to_do_it(events):
     assert [t["period"] for t in today["tasks"]] == ["morning", "afternoon", "evening", "07:30", "15:55", None, None]
     past = recovery_day.build_day_details(state, events, PATIENT, "2026-10-21", NOW)
     assert [t["period"] for t in past["tasks"]] == ["morning", "afternoon", "evening", "07:30", "15:55", None, None]
+
+
+@pytest.fixture
+def repair_store(monkeypatch):
+    from app.database import event_history, recovery_state
+
+    stored = {}
+    def append(patient, kind, details, key):
+        stored.setdefault(key, {"patient_id": patient, "event_type": kind, "details": details,
+                                "idempotency_key": key, "timestamp": f"event#{key}"})
+    monkeypatch.setattr(event_history, "append_event", append)
+    monkeypatch.setattr(event_history, "get_complete_patient_events", lambda patient: list(stored.values()))
+    monkeypatch.setattr(recovery_state, "get_medications", lambda patient, day: _occurrences(day)[0])
+    monkeypatch.setattr(recovery_state, "get_today_tasks", lambda patient, day: _occurrences(day)[1])
+    return stored
+
+
+def ready_plan():
+    return {"ingestion_status": "ready", "discharge_date": "2026-10-20", "document_id": "new-letter"}
+
+
+def test_history_repairs_again_after_upload_and_preserves_today(repair_store):
+    today = {"patient_id": PATIENT, "event_type": "task_completed", "idempotency_key": "today-walk",
+             "details": {"date": "2026-10-23", "occurrence_id": "walk#2026-10-23#1"}}
+    for _ in range(2):
+        repair_store["today-walk"] = today
+        repaired = demo_history.ensure_demo_history(PATIENT, ready_plan(), list(repair_store.values()), NOW)
+        for day in ("2026-10-21", "2026-10-22"):
+            details = recovery_day.build_day_details({}, repaired, PATIENT, day, NOW)
+            assert all(m["status"] == "taken" for m in details["medications"])
+            assert len(details["medications"]) == 6
+            assert len(details["tasks"]) == 7
+            assert all(t["status"] == "completed" for t in details["tasks"])
+        assert [e for e in repaired if e["details"]["date"] == "2026-10-23"] == [today]
+        assert demo_history.ensure_demo_history(PATIENT, ready_plan(), repaired, NOW) is repaired
+        repair_store.clear()  # The next letter upload deletes old history.
+
+
+@pytest.mark.parametrize("mode,patient,changes,now", [
+    ("real", PATIENT, {}, NOW), ("production", PATIENT, {}, NOW),
+    ("demo", "someone-else", {}, NOW),
+    ("demo", PATIENT, {"ingestion_status": "indexing"}, NOW),
+    ("demo", PATIENT, {"discharge_date": "invalid"}, NOW),
+    ("demo", PATIENT, {"discharge_date": "2026-10-23"}, NOW),
+])
+def test_repair_is_limited_to_ready_recording_fixture(repair_store, monkeypatch, mode, patient, changes, now):
+    monkeypatch.setenv("CLOCK_MODE", mode)
+    assert demo_history.ensure_demo_history(patient, {**ready_plan(), **changes}, [], now) == []
+    assert repair_store == {}
+
+
+def test_repair_preserves_non_fixture_actions_and_resumes_partial_seed(repair_store):
+    partial = _stored("2026-10-22")[0]
+    repair_store[partial["idempotency_key"]] = partial
+    real = {"patient_id": PATIENT, "event_type": "task_undone", "idempotency_key": "manual-undo",
+            "details": {"date": "2026-10-21"}}
+    repair_store["manual-undo"] = real
+    repaired = demo_history.ensure_demo_history(PATIENT, ready_plan(), list(repair_store.values()), NOW)
+    assert [e for e in repaired if e["details"]["date"] == "2026-10-21"] == [real]
+    details = recovery_day.build_day_details({}, repaired, PATIENT, "2026-10-22", NOW)
+    assert len(details["tasks"]) == 7
+    assert all(t["status"] == "completed" for t in details["tasks"])
+
+
+@pytest.mark.parametrize("discharge,today,expected", [
+    ("2026-10-16", "2026-10-23", [f"2026-10-{d}" for d in range(17, 23)]),
+    ("2026-10-20", "2026-10-23", ["2026-10-21", "2026-10-22"]),
+    ("2026-10-22", "2026-10-23", []),
+    ("2026-10-23", "2026-10-23", []),
+    ("2026-10-01", "2026-10-23", [f"2026-10-{d}" for d in range(17, 23)]),
+    ("2026-11-28", "2026-12-02", ["2026-11-29", "2026-11-30", "2026-12-01"]),
+])
+def test_dummy_dates_follow_uploaded_discharge_and_demo_clock(repair_store, discharge, today, expected):
+    now = datetime.fromisoformat(f"{today}T07:00:00+00:00")
+    state = {**ready_plan(), "discharge_date": discharge}
+    repaired = demo_history.ensure_demo_history(PATIENT, state, [], now)
+    assert sorted({e["details"]["date"] for e in repaired}) == expected
+    for day in expected:
+        details = recovery_day.build_day_details(state, repaired, PATIENT, day, now)
+        assert len(details["medications"]) == 6 and len(details["tasks"]) == 7
+        assert all(m["status"] == "taken" for m in details["medications"])
+        assert all(t["status"] == "completed" for t in details["tasks"])

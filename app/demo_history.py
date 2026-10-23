@@ -4,7 +4,8 @@ Demo history for past days of the demo patient, so the weekly dashboard is not e
 Pure: given the medicine and task occurrences the plan gives for a past day (the same
 ones the app builds for that date), return the events a well-kept day would have saved:
 the day's schedule snapshots, every scheduled dose taken and every task done.
-scripts/seed_demo_history.py writes them; nothing here touches AWS.
+scripts/seed_demo_history.py writes them manually. ensure_demo_history restores
+the fixed recording fixture when the demo history tools find it missing.
 
 Every idempotency key starts with KEY_PREFIX, so the seeded events can be found and
 removed again. Today and later days are refused: today's history is only what is
@@ -25,6 +26,50 @@ DEFAULT_TIME = time(12)
 DONE_AFTER = timedelta(minutes=10)
 # Every task is recorded done, so the dashboard shows these days as complete.
 TASKS_LEFT_UNDONE = 0
+
+def ensure_demo_history(patient_id: str, state: dict, events: list[dict], now: datetime) -> list[dict]:
+    """Repair the recording fixture after an upload clears the previous history.
+
+    Restricted to Margaret on the demo clock with a ready plan. Real patient
+    history, today's progress and days with non-fixture actions are untouched.
+    Writes use the same idempotency keys as the manual seed script, so retries
+    (including interrupted seeds) cannot duplicate completions.
+    """
+    from app.clock import is_demo_clock
+
+    if (patient_id != PATIENT_ID or not is_demo_clock()
+            or state.get("ingestion_status") != "ready"):
+        return events
+    try:
+        discharge = Date.fromisoformat(state.get("discharge_date") or "")
+    except (ValueError, TypeError):
+        return events
+
+    from app.database import event_history, recovery_state
+
+    changed = False
+    # Same seven-day window as the history tools; recovery starts after discharge.
+    first = max(discharge + timedelta(days=1), now.date() - timedelta(days=6))
+    for offset in range(max((now.date() - first).days, 0)):
+        day = (first + timedelta(days=offset)).isoformat()
+        rows = [event for event in events if event.get("patient_id") == patient_id
+                and (event.get("details") or {}).get("date") == day]
+        if any(not str(event.get("idempotency_key", "")).startswith(KEY_PREFIX) for event in rows):
+            continue
+        marker = f"{KEY_PREFIX}{patient_id}#{day}#ready#{state.get('document_id', '')}"
+        if any(event.get("idempotency_key") == marker for event in rows):
+            continue
+        planned = build_demo_day(day, now.date().isoformat(),
+                                 recovery_state.get_medications(patient_id, day),
+                                 recovery_state.get_today_tasks(patient_id, day),
+                                 state.get("timezone") or "Europe/London")
+        for kind, details, key in planned:
+            event_history.append_event(patient_id, kind, details, key)
+        # Saved last: an interrupted seed is retried rather than treated as done.
+        event_history.append_event(patient_id, "demo_history_seeded",
+                                   {"date": day, "document_id": state.get("document_id")}, marker)
+        changed = True
+    return event_history.get_complete_patient_events(patient_id) if changed else events
 
 
 def _due(day: str, clock: str | None, period: str | None, zone: ZoneInfo) -> datetime:

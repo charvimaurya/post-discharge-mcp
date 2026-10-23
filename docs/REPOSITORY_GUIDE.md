@@ -64,7 +64,7 @@ for this local setup. The old README used 8000, which was a different launch
 argument rather than a fixed server port.
 
 The upload flow uses live AWS services and needs the deployed document pipeline.
-Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`, wait for the new document to be ready, then open
+Upload `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`, wait for the new document to be ready, then open
 Today. To reset progress in an existing demo plan:
 
 ```sh
@@ -138,7 +138,7 @@ python -m scripts.ingestion.test_extraction
 ```
 
 Reads the default test letter (`DEFAULT_TEST_LETTER` in `scripts/test_letters.py`,
-currently `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`) and
+currently `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`) and
 prints its text. No AWS calls.
 The current sample has **2 pages**. You may see pypdf `startxref` warnings;
 the sample currently still extracts successfully.
