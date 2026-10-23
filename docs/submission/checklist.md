@@ -87,7 +87,7 @@ Friday 23 October, 20:00 BST). Nothing can be edited after this.
   the AgentCore challenge gives the real reason (the starter would not deploy).
 - [ ] Confirm or remove two "Challenges" items not in the friction log: the photo
   dose misread ("111" read as "171") and the S3 test message breaking the worker.
-- [ ] Use **one title everywhere**: "AfterWard: A Living Recovery Plan for Alexa+".
+- [x] Use **one title everywhere**: "AfterWard: The Alexa+ Recovery Companion That Speaks First" (README heading, Devpost project name).
   Set it in the Devpost project name field, because Devpost builds the
   "What's next for…" heading from that field.
 - [ ] Elevator pitch (tagline): "Discharge is one moment. Recovery happens every

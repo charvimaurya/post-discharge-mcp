@@ -1,4 +1,4 @@
-# AfterWard
+# AfterWard: The Alexa+ Recovery Companion That Speaks First
 
 **A living recovery plan for Alexa+.** AfterWard reads a hospital discharge letter,
 turns it into a daily plan, reminds the patient at the right moment, records what
