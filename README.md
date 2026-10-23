@@ -1,4 +1,4 @@
-# AfterWard: The Alexa+ Recovery Companion That Speaks First
+cls# AfterWard
 
 **A living recovery plan for Alexa+.** AfterWard reads a hospital discharge letter,
 turns it into a daily plan, reminds the patient at the right moment, records what
@@ -8,15 +8,12 @@ they did, and answers questions using the letter's own words.
 > AfterWard is a hackathon prototype, not a medical device, and has not been
 > clinically validated.
 
-**Team:** Charvi Maurya and Shilpa Agarwal. **Built:** between 31 August and 23 October 2026.
-
 ## Judge links
 
 | Item | Link |
 | --- | --- |
-| Devpost entry | [AfterWard: The Alexa+ Recovery Companion That Speaks First](https://devpost.com/AfterWard:%20The%20Alexa+%20Recovery%20Companion%20That%20Speaks%20First) |
-| Presentation (PDF) | [AfterWard Hackathon Presentation 2026](docs/submission/AfterWard_Hackathon_Presentation_2026.pdf) |
-| Demo video | [Watch on YouTube](https://youtu.be/nZey601NhCE) |
+| Demo video | **PENDING_VIDEO_URL** |
+| Devpost entry | **PENDING_DEVPOST_URL** |
 | This repository | https://github.com/charvimaurya/post-discharge-mcp |
 | Open-source package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) (MIT, tests on Python 3.11 to 3.13) |
 | AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |
@@ -65,7 +62,7 @@ misread dose can send someone back to hospital.
 - **Alexa+ track.** A voice-first recovery companion, shown as a **Simulated
   Alexa+** web experience plus an Alexa skill (see below).
 - **AWS Builder.** Bedrock, Titan Embeddings, S3, S3 Vectors, SQS, Lambda,
-  DynamoDB, EventBridge Scheduler, ECS Fargate, ECR, CloudFront, Secrets Manager, CloudWatch and CloudFormation. See
+  DynamoDB, EventBridge Scheduler, ECS Fargate, CloudFront and Secrets Manager. See
   [AWS integrations](docs/aws-integrations.md) for each service, the file that uses
   it and its checked deployment status.
 - **Open Source: [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check).**
@@ -79,15 +76,15 @@ misread dose can send someone back to hospital.
     uncertain is treated as fact.
   - AfterWard installs it from the v0.1.0 release, and
     [a test](tests/ingestion/test_package_integration.py) proves AfterWard calls
-    the package itself, not a copy. Its tests run on Python 3.11 to 3.13.
+    the package itself, not a copy. 149 tests run on Python 3.11 to 3.13.
 
-### Hackathon requirements
+### Hackathon requirements at a glance
 
-Each track's requirements and where they are met are listed in the [judge quick-start](docs/judging-guide.md).
+![How AfterWard works — Alexa+, MCP, AWS and open-source safety](docs/how-it-works-slide.png)
 
 ## Architecture
 
-![How AfterWard works](docs/how-it-works-slide.png)
+![AfterWard architecture](docs/architecture.svg)
 
 - **Letter to plan:** web upload → S3 → SQS (with a dead-letter queue) → Lambda →
   Bedrock extraction, checked by discharge-letter-check → DynamoDB plan. Each page
@@ -227,7 +224,7 @@ The demo patient is `demo_patient_001` (Margaret, after a knee replacement).
 
 - **Load her plan** with either:
   - On `/demo`, choose **Upload a discharge letter** and pick
-    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_v4.pdf`. This uses the
+    `test_data/letter1_margaret_knee_replacement_SYNTHETIC_Oct20.pdf`. This uses the
     deployed S3, SQS and Lambda pipeline.
   - Or process the letter locally with the current code, without S3 or Lambda:
     `python scripts/ingestion/reingest_demo_letter.py --confirm`. This replaces her
@@ -273,8 +270,6 @@ npm run typecheck
 npm run build
 ```
 
-Expected results: `python -m pytest -q` shows **1,298 passed, 10 deselected**, and `npm test` shows **145 passed**.
-
 `pytest` skips tests marked `integration`, which contact real AWS
 ([pytest.ini](pytest.ini)). The default tests use mocks and need no AWS access.
 
@@ -294,7 +289,7 @@ Expected results: `python -m pytest -q` shows **1,298 passed, 10 deselected**, a
   Tested on synthetic letters only.
 - Medication normalisation does not keep a "stopped" status from the letter; see
   the [package review](docs/discharge-letter-check-review.md).
-- The recorded final-model evaluation (before the 18 October medication change) passed 13 of 14 cases, using synthetic
+- The recorded final-model evaluation passed 13 of 14 cases, using synthetic
   in-memory tools ([agent-final-evaluation.json](docs/agent-final-evaluation.json)).
   The failure was an ambiguous medicine report that was recorded without asking.
 - Voice in the web demo is the browser's own; the Alexa skill runs in the Alexa
