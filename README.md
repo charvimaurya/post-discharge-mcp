@@ -78,13 +78,9 @@ misread dose can send someone back to hospital.
     [a test](tests/ingestion/test_package_integration.py) proves AfterWard calls
     the package itself, not a copy. 149 tests run on Python 3.11 to 3.13.
 
-### Hackathon requirements at a glance
-
-![How AfterWard works — Alexa+, MCP, AWS and open-source safety](docs/how-it-works-slide.png)
-
 ## Architecture
 
-![AfterWard architecture](docs/architecture.svg)
+![AfterWard architecture](docs/how-it-works.svg)
 
 - **Letter to plan:** web upload → S3 → SQS (with a dead-letter queue) → Lambda →
   Bedrock extraction, checked by discharge-letter-check → DynamoDB plan. Each page

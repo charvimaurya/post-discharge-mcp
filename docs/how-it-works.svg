@@ -1,0 +1,229 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1152" height="768" viewBox="0 0 1152 768" font-family="DejaVu Sans, Arial, sans-serif">
+  <rect x="0" y="0" width="1152" height="768" fill="#FBF7F8"/>
+
+  <!-- header -->
+  <rect x="0" y="0" width="1152" height="50" fill="#8E1B3D"/>
+  <rect x="20" y="10" width="30" height="30" rx="6" fill="#FFFFFF"/>
+  <text x="62" y="36" font-size="24" font-weight="bold" fill="#FFFFFF" font-family="DejaVu Serif, Georgia, serif">AfterWard</text>
+  <circle cx="930" cy="25" r="5" fill="#FFFFFF"/>
+  <text x="1132" y="30" font-size="13" font-weight="bold" fill="#FFFFFF" text-anchor="end">SIMULATED ALEXA+</text>
+
+  <text x="20" y="72" font-size="12" font-weight="bold" fill="#8E1B3D" letter-spacing="1">ALEXA+ TRACK · AWS BUILDER · OPEN SOURCE · EU-WEST-2</text>
+  <text x="20" y="110" font-size="34" font-weight="bold" fill="#8E1B3D" font-family="DejaVu Serif, Georgia, serif">How AfterWard meets the brief</text>
+  <text x="680" y="100" font-size="13" font-style="italic" fill="#6B6B6B">Every claim links to a file in the repo.</text>
+  <rect x="860" y="58" width="272" height="28" rx="14" fill="#DDF5E4"/>
+  <text x="996" y="77" font-size="12" font-weight="bold" fill="#1B6B3A" text-anchor="middle">R1 to R7 = requirements met</text>
+
+  <!-- ===== Column 1 ===== -->
+  <rect x="20" y="128" width="165" height="32" rx="6" fill="#C2185B"/>
+  <circle cx="38" cy="144" r="10" fill="#FFFFFF"/>
+  <text x="38" y="148" font-size="12" font-weight="bold" fill="#C2185B" text-anchor="middle">1</text>
+  <text x="56" y="149" font-size="12" font-weight="bold" fill="#FFFFFF">Patient and input</text>
+
+  <rect x="20" y="170" width="165" height="80" rx="8" fill="#FCE4EC" stroke="#C2185B" stroke-width="1"/>
+  <text x="32" y="192" font-size="13" font-weight="bold" fill="#3A1020">Margaret</text>
+  <text x="32" y="210" font-size="11" fill="#3A1020">talks or types</text>
+
+  <rect x="20" y="262" width="165" height="72" rx="8" fill="#FCE4EC" stroke="#C2185B" stroke-width="1"/>
+  <text x="32" y="284" font-size="13" font-weight="bold" fill="#3A1020">Simulated Alexa+</text>
+  <text x="32" y="302" font-size="11" fill="#3A1020">Next.js web app</text>
+  <text x="32" y="316" font-size="11" fill="#3A1020">with browser voice</text>
+
+  <rect x="20" y="346" width="165" height="72" rx="8" fill="#FCE4EC" stroke="#C2185B" stroke-width="1"/>
+  <text x="32" y="368" font-size="13" font-weight="bold" fill="#3A1020">Alexa skill</text>
+  <text x="32" y="386" font-size="11" fill="#3A1020">Tested in Alexa developer</text>
+  <text x="32" y="400" font-size="11" fill="#3A1020">console simulator</text>
+
+  <text x="20" y="446" font-size="11" font-style="italic" fill="#6B6B6B">Mobile app and hospital systems:</text>
+  <text x="20" y="460" font-size="11" font-style="italic" fill="#6B6B6B">future work, not built.</text>
+
+  <!-- ===== Column 2 ===== -->
+  <rect x="200" y="128" width="165" height="32" rx="6" fill="#F4B400"/>
+  <circle cx="218" cy="144" r="10" fill="#FFFFFF"/>
+  <text x="218" y="148" font-size="12" font-weight="bold" fill="#8A6100" text-anchor="middle">2</text>
+  <text x="236" y="149" font-size="12" font-weight="bold" fill="#2B2000">Edge and access</text>
+
+  <rect x="200" y="170" width="165" height="112" rx="8" fill="#FFF6D6" stroke="#F4B400" stroke-width="1"/>
+  <text x="212" y="192" font-size="13" font-weight="bold" fill="#2B2000">Amazon CloudFront</text>
+  <text x="212" y="212" font-size="11" fill="#2B2000">HTTPS front door for the</text>
+  <text x="212" y="226" font-size="11" fill="#2B2000">MCP server</text>
+  <rect x="212" y="238" width="62" height="16" rx="8" fill="#1B8A4B"/>
+  <text x="243" y="250" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">LIVE</text>
+  <text x="212" y="270" font-size="10" fill="#6B6B6B">Both point at the ALB</text>
+
+  <rect x="200" y="294" width="165" height="92" rx="8" fill="#FFF6D6" stroke="#F4B400" stroke-width="1"/>
+  <text x="212" y="316" font-size="13" font-weight="bold" fill="#2B2000">Load balancer</text>
+  <text x="212" y="334" font-size="11" fill="#2B2000">Sends traffic to the</text>
+  <text x="212" y="348" font-size="11" fill="#2B2000">MCP containers (ALB)</text>
+  <rect x="212" y="360" width="62" height="16" rx="8" fill="#1B8A4B"/>
+  <text x="243" y="372" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">LIVE</text>
+
+  <rect x="200" y="398" width="165" height="116" rx="8" fill="#FFF6D6" stroke="#F4B400" stroke-width="1"/>
+  <text x="212" y="420" font-size="13" font-weight="bold" fill="#2B2000">Access control</text>
+  <text x="212" y="440" font-size="11" fill="#2B2000">Every MCP call needs a</text>
+  <text x="212" y="454" font-size="11" fill="#2B2000">token. One patient only.</text>
+  <text x="212" y="476" font-size="10" fill="#6B6B6B">Amazon Cognito and API</text>
+  <text x="212" y="490" font-size="10" fill="#6B6B6B">Gateway: not used.</text>
+
+  <!-- ===== Column 3 ===== -->
+  <rect x="380" y="128" width="185" height="32" rx="6" fill="#D32F2F"/>
+  <circle cx="398" cy="144" r="10" fill="#FFFFFF"/>
+  <text x="398" y="148" font-size="12" font-weight="bold" fill="#D32F2F" text-anchor="middle">3</text>
+  <text x="416" y="149" font-size="12" font-weight="bold" fill="#FFFFFF">AfterWard MCP</text>
+
+  <rect x="380" y="170" width="185" height="236" rx="8" fill="#FDECEC" stroke="#D32F2F" stroke-width="1"/>
+  <text x="392" y="192" font-size="13" font-weight="bold" fill="#3A0A0A">AfterWard MCP server</text>
+  <text x="392" y="210" font-size="9.5" fill="#3A0A0A">Python MCP SDK, spec 2025-11-25</text>
+  <text x="392" y="224" font-size="10" fill="#3A0A0A">Streamable HTTP, 9 tools</text>
+  <text x="392" y="238" font-size="10" fill="#3A0A0A">ECS Fargate, ALB, CloudFront</text>
+  <text x="392" y="258" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">get_today_tasks</text>
+  <text x="392" y="272" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">get_medications</text>
+  <text x="392" y="286" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">get_recovery_plan</text>
+  <text x="392" y="300" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">get_week_summary</text>
+  <text x="392" y="314" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">get_recovery_day_details</text>
+  <text x="392" y="328" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">search_discharge_instructions</text>
+  <text x="392" y="342" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">report_task_completed</text>
+  <text x="392" y="356" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">report_medication_taken</text>
+  <text x="392" y="370" font-size="9.5" fill="#D32F2F" font-family="DejaVu Sans Mono, monospace">undo_report</text>
+  <text x="392" y="392" font-size="10" fill="#6B6B6B">+ MCP App card: today's plan</text>
+
+  <rect x="380" y="418" width="185" height="98" rx="8" fill="#FDECEC" stroke="#D32F2F" stroke-width="1"/>
+  <text x="392" y="440" font-size="13" font-weight="bold" fill="#3A0A0A">Safety gate</text>
+  <text x="392" y="458" font-size="11" fill="#3A0A0A">discharge-letter-check</text>
+  <text x="392" y="472" font-size="11" fill="#3A0A0A">(open source, MIT)</text>
+  <text x="392" y="490" font-size="10" fill="#3A0A0A">Flags missing or unclear</text>
+  <text x="392" y="504" font-size="10" fill="#3A0A0A">items for a person to confirm</text>
+
+  <!-- ===== Column 4 ===== -->
+  <rect x="580" y="128" width="165" height="32" rx="6" fill="#1E6FD9"/>
+  <circle cx="598" cy="144" r="10" fill="#FFFFFF"/>
+  <text x="598" y="148" font-size="12" font-weight="bold" fill="#1E6FD9" text-anchor="middle">4</text>
+  <text x="616" y="149" font-size="12" font-weight="bold" fill="#FFFFFF">Data layer</text>
+
+  <rect x="580" y="170" width="165" height="80" rx="8" fill="#E8F1FD" stroke="#1E6FD9" stroke-width="1"/>
+  <text x="592" y="192" font-size="13" font-weight="bold" fill="#0B2A55">Amazon S3 Vectors</text>
+  <text x="592" y="210" font-size="11" fill="#0B2A55">Letter pages, embedded</text>
+  <text x="592" y="224" font-size="11" fill="#0B2A55">with Titan V2</text>
+
+  <rect x="580" y="262" width="165" height="72" rx="8" fill="#E8F1FD" stroke="#1E6FD9" stroke-width="1"/>
+  <text x="592" y="284" font-size="13" font-weight="bold" fill="#0B2A55">DynamoDB:</text>
+  <text x="592" y="300" font-size="13" font-weight="bold" fill="#0B2A55">recovery state</text>
+  <text x="592" y="320" font-size="11" fill="#0B2A55">Plan and today's tasks</text>
+
+  <rect x="580" y="346" width="165" height="58" rx="8" fill="#E8F1FD" stroke="#1E6FD9" stroke-width="1"/>
+  <text x="592" y="368" font-size="13" font-weight="bold" fill="#0B2A55">DynamoDB: history</text>
+  <text x="592" y="386" font-size="11" fill="#0B2A55">Log of what was done</text>
+
+  <rect x="580" y="416" width="165" height="100" rx="8" fill="#E8F1FD" stroke="#1E6FD9" stroke-width="1"/>
+  <text x="592" y="438" font-size="12" font-weight="bold" fill="#0B2A55">Amazon S3 and SQS</text>
+  <text x="592" y="456" font-size="11" fill="#0B2A55">Letter PDFs. A queue</text>
+  <text x="592" y="470" font-size="11" fill="#0B2A55">with a dead-letter queue</text>
+  <text x="592" y="484" font-size="11" fill="#0B2A55">for failed letters</text>
+
+  <!-- ===== Column 5 ===== -->
+  <rect x="760" y="128" width="165" height="32" rx="6" fill="#E0457B"/>
+  <circle cx="778" cy="144" r="10" fill="#FFFFFF"/>
+  <text x="778" y="148" font-size="12" font-weight="bold" fill="#E0457B" text-anchor="middle">5</text>
+  <text x="796" y="149" font-size="12" font-weight="bold" fill="#FFFFFF">AI and ML</text>
+
+  <rect x="760" y="170" width="165" height="118" rx="8" fill="#FDE8F0" stroke="#E0457B" stroke-width="1"/>
+  <text x="772" y="192" font-size="13" font-weight="bold" fill="#4A0A22">Amazon Bedrock</text>
+  <text x="772" y="210" font-size="11" fill="#4A0A22">Claude Sonnet 4.5 (final)</text>
+  <text x="772" y="224" font-size="11" fill="#4A0A22">Haiku 4.5 (testing)</text>
+  <text x="772" y="244" font-size="11" fill="#4A0A22">Answers use RAG and the</text>
+  <text x="772" y="258" font-size="11" fill="#4A0A22">letter's own sentences</text>
+
+  <rect x="760" y="300" width="165" height="92" rx="8" fill="#FDE8F0" stroke="#E0457B" stroke-width="1"/>
+  <text x="772" y="322" font-size="13" font-weight="bold" fill="#4A0A22">Reminder Lambda</text>
+  <text x="772" y="340" font-size="11" fill="#4A0A22">Run by EventBridge every</text>
+  <text x="772" y="354" font-size="11" fill="#4A0A22">5 min; saves a check-in</text>
+  <text x="772" y="368" font-size="11" fill="#4A0A22">for AfterWard to speak</text>
+
+  <rect x="760" y="406" width="165" height="110" rx="8" fill="#FDE8F0" stroke="#E0457B" stroke-width="1"/>
+  <text x="772" y="428" font-size="13" font-weight="bold" fill="#4A0A22">Document Lambda</text>
+  <text x="772" y="446" font-size="11" fill="#4A0A22">Reads the letter PDF,</text>
+  <text x="772" y="460" font-size="11" fill="#4A0A22">extracts the plan and</text>
+  <text x="772" y="474" font-size="11" fill="#4A0A22">checks it with the</text>
+  <text x="772" y="488" font-size="11" fill="#4A0A22">safety gate</text>
+
+  <!-- ===== Column 6 ===== -->
+  <rect x="940" y="128" width="192" height="32" rx="6" fill="#1B8A4B"/>
+  <text x="952" y="149" font-size="12" font-weight="bold" fill="#FFFFFF">Quality of the idea</text>
+
+  <rect x="940" y="170" width="192" height="370" rx="8" fill="#E9F7EE" stroke="#1B8A4B" stroke-width="1"/>
+  <text x="952" y="190" font-size="10" fill="#1B5E3A">Is this a creative, imaginative</text>
+  <text x="952" y="203" font-size="10" fill="#1B5E3A">use of the required tools?</text>
+
+  <circle cx="960" cy="230" r="11" fill="#1B8A4B"/>
+  <text x="960" y="234" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R1</text>
+  <text x="978" y="227" font-size="11" fill="#1B3A28">More than a reminder</text>
+  <text x="978" y="241" font-size="11" fill="#1B3A28">or document Q&amp;A</text>
+
+  <circle cx="960" cy="272" r="11" fill="#1B8A4B"/>
+  <text x="960" y="276" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R2</text>
+  <text x="978" y="269" font-size="11" fill="#1B3A28">Knows what is done</text>
+  <text x="978" y="283" font-size="11" fill="#1B3A28">and never guesses</text>
+
+  <circle cx="960" cy="314" r="11" fill="#1B8A4B"/>
+  <text x="960" y="318" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R3</text>
+  <text x="978" y="311" font-size="11" fill="#1B3A28">Safety gate: reusable</text>
+  <text x="978" y="325" font-size="11" fill="#1B3A28">open-source package</text>
+
+  <circle cx="960" cy="356" r="11" fill="#1B8A4B"/>
+  <text x="960" y="360" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R4</text>
+  <text x="978" y="353" font-size="11" fill="#1B3A28">Alexa+, MCP, AWS and</text>
+  <text x="978" y="367" font-size="11" fill="#1B3A28">safety, combined</text>
+
+  <circle cx="960" cy="398" r="11" fill="#1B8A4B"/>
+  <text x="960" y="402" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R5</text>
+  <text x="978" y="395" font-size="11" fill="#1B3A28">Many services, data</text>
+  <text x="978" y="409" font-size="11" fill="#1B3A28">kept secure</text>
+
+  <circle cx="960" cy="440" r="11" fill="#1B8A4B"/>
+  <text x="960" y="444" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R6</text>
+  <text x="978" y="437" font-size="11" fill="#1B3A28">LLMs with RAG over</text>
+  <text x="978" y="451" font-size="11" fill="#1B3A28">your documents</text>
+
+  <circle cx="960" cy="482" r="11" fill="#1B8A4B"/>
+  <text x="960" y="486" font-size="9" font-weight="bold" fill="#FFFFFF" text-anchor="middle">R7</text>
+  <text x="978" y="479" font-size="11" fill="#1B3A28">Open source: a new,</text>
+  <text x="978" y="493" font-size="11" fill="#1B3A28">separate package (MIT)</text>
+
+  <text x="952" y="516" font-size="12" font-weight="bold" fill="#1B6B3A">Tested: 1,298 Python</text>
+  <text x="952" y="532" font-size="12" font-weight="bold" fill="#1B6B3A">and 145 web tests</text>
+
+  <!-- ===== Bottom band ===== -->
+  <rect x="20" y="552" width="1112" height="72" rx="10" fill="#FBEFF3"/>
+  <text x="36" y="572" font-size="14" font-weight="bold" fill="#8E1B3D">Tech choices and the trade-offs we accepted</text>
+
+  <rect x="36" y="580" width="170" height="36" rx="6" fill="#FFFFFF"/>
+  <text x="44" y="595" font-size="11" font-weight="bold" fill="#4A0A22">Two models, one switch</text>
+  <text x="44" y="610" font-size="10" fill="#4A0A22">Sonnet final, Haiku for tests</text>
+
+  <rect x="216" y="580" width="170" height="36" rx="6" fill="#FFFFFF"/>
+  <text x="224" y="595" font-size="11" font-weight="bold" fill="#4A0A22">Rules gate, not AI</text>
+  <text x="224" y="610" font-size="10" fill="#4A0A22">Repeatable and testable</text>
+
+  <rect x="396" y="580" width="170" height="36" rx="6" fill="#FFFFFF"/>
+  <text x="404" y="595" font-size="10" font-weight="bold" fill="#4A0A22">S3 Vectors, not OpenSearch</text>
+  <text x="404" y="610" font-size="10" fill="#4A0A22">Simple and low cost</text>
+
+  <rect x="576" y="580" width="170" height="36" rx="6" fill="#FFFFFF"/>
+  <text x="584" y="595" font-size="11" font-weight="bold" fill="#4A0A22">DynamoDB, not SQL</text>
+  <text x="584" y="610" font-size="10" fill="#4A0A22">Fast reads by patient</text>
+
+  <rect x="756" y="580" width="170" height="36" rx="6" fill="#FFFFFF"/>
+  <text x="764" y="595" font-size="9.5" font-weight="bold" fill="#4A0A22">MCP on Fargate, not Lambda</text>
+  <text x="764" y="610" font-size="10" fill="#4A0A22">Always-on endpoint</text>
+
+  <rect x="936" y="580" width="184" height="36" rx="6" fill="#FFFFFF"/>
+  <text x="944" y="595" font-size="11" font-weight="bold" fill="#4A0A22">Browser voice, not Polly</text>
+  <text x="944" y="610" font-size="10" fill="#4A0A22">Polly is not used</text>
+
+  <text x="576" y="648" font-size="13" font-weight="bold" fill="#8E1B3D" text-anchor="middle">Together, these criteria show a complete, safe and impactful solution.</text>
+
+  <!-- footer -->
+  <rect x="0" y="688" width="1152" height="80" fill="#8E1B3D"/>
+  <text x="20" y="736" font-size="13" fill="#FFFFFF">AfterWard · A living recovery plan for Alexa+</text>
+  <text x="1132" y="736" font-size="12" fill="#FFFFFF" text-anchor="end">Synthetic patient data · Simulated Alexa+</text>
+</svg>
