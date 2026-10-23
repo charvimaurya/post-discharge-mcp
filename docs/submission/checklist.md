@@ -134,7 +134,7 @@ entry is judged from the AWS part of this same answer.
 
 ## Tests, reliability and demo instructions
 
-- [x] Latest recorded run: **1,264 Python tests and 138 web tests passed**
+- [x] Latest recorded run: **1,298 Python tests and 145 web tests passed**
   (10 live AWS tests run separately). Re-run before quoting a number.
 - [x] Final-model evaluation: **13/14**, Claude Sonnet 4.5, 19 real Converse calls.
   The one failure: an ambiguous "I took my tablet" was recorded without asking

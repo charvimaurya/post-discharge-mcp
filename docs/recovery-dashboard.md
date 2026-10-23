@@ -201,7 +201,7 @@ tool functions and readers with memory storage; Next route tests inject only
 server dependencies. React tests render actual components but are not browser
 interaction tests or Amazon NLU verification.
 
-Local results: **1257 Python tests passed, 10 deselected**; **137 Web tests
+Local results: **1,298 Python tests passed, 10 deselected**; **145 Web tests
 passed, 0 failed**; `npm run typecheck`, `npm run build` and `git diff --check`
 passed. The build includes `/demo/recovery` and `/api/recovery-day`. The
 standalone seed script's default preview was also run without AWS calls.

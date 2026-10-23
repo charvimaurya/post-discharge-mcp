@@ -54,7 +54,7 @@ ports and `MCP_URL` / `AGENT_API_URL` changed to match.
 | --- | --- |
 | `pip install -r requirements-dev.txt` | Succeeded in 12.6 s; `pip check`: no broken requirements; `discharge-letter-check` 0.1.0 from the pinned release |
 | `npm ci` | 67 packages in 2.3 s |
-| `pytest -q` (whole suite, no AWS) | **1257 passed, 10 deselected** (integration tests that contact real AWS) |
+| `pytest -q` (whole suite, no AWS) | **1,298 passed, 10 deselected** (integration tests that contact real AWS). Current total; the per-suite rows below are from the 18 October run |
 | MCP (`tests/mcp`) | 80 passed, 3 deselected |
 | Ingestion (`tests/ingestion`) | 163 passed |
 | Agent (`tests/agent`) | 474 passed |
@@ -62,7 +62,7 @@ ports and `MCP_URL` / `AGENT_API_URL` changed to match.
 | Reminders and proactive check-ins (8 files in `tests/`) | 105 passed |
 | Alexa skill (5 files) | 108 passed |
 | Auth (`tests/auth`) | 25 passed |
-| `npm test` | **138 passed**, 0 failed |
+| `npm test` | **145 passed**, 0 failed |
 | `npm run typecheck` | Passed |
 | `npm run build` | Passed; 16 routes including `/demo` and `/demo/recovery` |
 | Agent test plan (`scripts/evaluate_public_demo.py`, final model `eu.anthropic.claude-sonnet-4-5-20250929-v1:0`, synthetic in-memory tools, 12 Bedrock calls) | **13 of 14 passed**. The failing case is the same as the recorded run (see Remaining issues) |

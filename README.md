@@ -1,4 +1,4 @@
-cls# AfterWard
+# AfterWard
 
 **A living recovery plan for Alexa+.** AfterWard reads a hospital discharge letter,
 turns it into a daily plan, reminds the patient at the right moment, records what
@@ -12,8 +12,8 @@ they did, and answers questions using the letter's own words.
 
 | Item | Link |
 | --- | --- |
-| Demo video | **PENDING_VIDEO_URL** |
-| Devpost entry | **PENDING_DEVPOST_URL** |
+| Demo video | [Watch on YouTube](https://youtu.be/nZey601NhCE) |
+| Devpost entry | [View our Devpost submission](https://devpost.com/submit-to/30992-build-ship-shape-amazon-developer-hackathon/manage/submissions) |
 | This repository | https://github.com/charvimaurya/post-discharge-mcp |
 | Open-source package | [discharge-letter-check](https://github.com/charvimaurya/discharge-letter-check) (MIT, tests on Python 3.11 to 3.13) |
 | AWS integrations | [docs/aws-integrations.md](docs/aws-integrations.md) |

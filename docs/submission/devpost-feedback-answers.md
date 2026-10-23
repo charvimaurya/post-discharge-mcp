@@ -49,7 +49,7 @@ https://github.com/charvimaurya/post-discharge-mcp/blob/main/docs/friction-log.m
 8. ECS on Fargate with ECR, ELB, CloudFront and Secrets Manager: the MCP server ran without a restart from 13 October; a redeploy on 20 October picked up 9 tools and 2 prompts.
 9. CloudWatch and CloudFormation: one stack created all three alarms with email alerts, and the logs made each pipeline stage easy to follow.
 
-10. Supporting tools: Python made it easy to pin every safety rule with tests (1,269 passing). Next.js let us build large, simple cards for older users quickly. GitHub Actions ran our open-source package's tests on three Python versions, and they passed.
+10. Supporting tools: Python made it easy to pin every safety rule with tests (1,298 passing). Next.js let us build large, simple cards for older users quickly. GitHub Actions ran our open-source package's tests on three Python versions, and they passed.
 
 ---
 

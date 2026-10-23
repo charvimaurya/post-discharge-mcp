@@ -129,4 +129,4 @@ tool we would use instead.
 | `app/database/` | RecoveryState and EventHistory |
 | `lambdas/` | Document worker and reminder Lambda |
 | `web/` | Next.js Simulated Alexa+ app |
-| `tests/` | 1,264 Python tests; `web/` has 138 more |
+| `tests/` | 1,298 Python tests; `web/` has 145 more |
